@@ -5,6 +5,8 @@
 #include <type_traits>
 #include <iostream>
 #include <string>
+#include <utility>
+#include <exception>
 
 namespace BiggerInts
 {
@@ -158,8 +160,14 @@ namespace BiggerInts
 			high += other.high;
 			return *this;
 		}
-		inline constexpr double_int &operator-=(const double_int &other) noexcept { *this += ~other; ++*this; return *this; }
-		
+		inline constexpr double_int &operator-=(const double_int &other) noexcept
+		{
+			if (low < other.low) --high;
+			low -= other.low;
+			high -= other.high;
+			return *this;
+		}
+
 		inline constexpr double_int &operator&=(const double_int &other) noexcept { low &= other.low; high &= other.high; return *this; }
 		inline constexpr double_int &operator|=(const double_int &other) noexcept { low |= other.low; high |= other.high; return *this; }
 		inline constexpr double_int &operator^=(const double_int &other) noexcept { low ^= other.low; high ^= other.high; return *this; }
@@ -210,8 +218,8 @@ namespace BiggerInts
 
 		inline constexpr friend double_int operator~(const double_int &a) noexcept { double_int res; res.low = ~a.low; res.high = ~a.high; return res; }
 
-		inline constexpr friend double_int operator+(const double_int &a, const double_int &b) noexcept { double_int res = a; a += b; return res; }
-		inline constexpr friend double_int operator-(const double_int &a, const double_int &b) noexcept { double_int res = a; a -= b; return res; }
+		inline constexpr friend double_int operator+(const double_int &a, const double_int &b) noexcept { double_int res = a; res += b; return res; }
+		inline constexpr friend double_int operator-(const double_int &a, const double_int &b) noexcept { double_int res = a; res -= b; return res; }
 
 		inline constexpr friend double_int operator&(const double_int &a, const double_int &b) noexcept { double_int res = a; res &= b; return res; }
 		inline constexpr friend double_int operator|(const double_int &a, const double_int &b) noexcept { double_int res = a; res |= b; return res; }
@@ -219,6 +227,21 @@ namespace BiggerInts
 
 		inline constexpr friend double_int operator<<(const double_int &a, u64 count) noexcept { double_int res = a; res <<= count; return res; }
 		inline constexpr friend double_int operator>>(const double_int &a, u64 count) noexcept { double_int res = a; res >>= count; return res; }
+
+		inline constexpr friend double_int operator*(double_int a, const double_int &b) noexcept
+		{
+			double_int res = 0;
+			for (u64 bit = 0; a; ++bit, a <<= 1)
+				if (bit_test(b, bit)) res += a;
+			return res;
+		}
+		inline constexpr double_int &operator*=(const double_int &b) noexcept { *this = *this * b; return *this; }
+
+		inline constexpr double_int &operator/=(const double_int &den) noexcept { *this = divmod(*this, den).first; return *this; }
+		inline constexpr double_int &operator%=(const double_int &den) noexcept { *this = divmod(*this, den).second; return *this; }
+
+		inline constexpr friend double_int operator/(const double_int &num, const double_int &den) noexcept { return divmod(num, den).first; }
+		inline constexpr friend double_int operator%(const double_int &num, const double_int &den) noexcept { return divmod(num, den).second; }
 
 		// equivalent to <=> but works for any version of C++
 		inline constexpr friend int cmp(const double_int &a, const double_int &b) noexcept { return a.high < b.high ? -1 : a.high > b.high ? 1 : a.low < b.low ? -1 : a.low > b.low ? 1 : 0; }
@@ -239,24 +262,26 @@ namespace BiggerInts
 			if (ostr.flags() & std::ios::oct)
 			{
 				const double_int mask = 7;
-				while (copy)
+				do
 				{
 					digit = copy & mask;
 					copy >>= 3;
 					str.push_back('0' + digit);
 				}
+				while (copy);
 				if (ostr.flags() & std::ios::showbase) ostr.put('0');
 			}
 			else // default to hex mode
 			{
 				const double_int mask = 15;
 				const char hex_alpha = ostr.flags() & std::ios::uppercase ? 'A' : 'a';
-				while (copy)
+				do
 				{
 					digit = copy & mask;
 					copy >>= 4;
 					str.push_back(digit < 10 ? '0' + digit : hex_alpha + digit - 10);
 				}
+				while (copy);
 				if (ostr.flags() & std::ios::showbase)
 				{
 					ostr.put('0'); // uses put() to make sure we don't clobber ostr.width()
@@ -280,7 +305,49 @@ namespace BiggerInts
 			ostr.width(0);
 			return ostr;
 		}
+
+	public: // -- utilities -- //
+
+		inline constexpr friend std::pair<double_int, double_int> divmod(const double_int &num, const double_int &den) noexcept
+		{
+			if (!den) throw std::domain_error("divide by zero");
+
+			auto res = std::make_pair<double_int, double_int>(0, 0);
+			u64 bit = bits - 1;
+			while (true)
+			{
+				res.second <<= 1;
+				if (bit_test(num, bit)) bit_set(res.second, 0);
+
+				if (res.second >= den)
+				{
+					res.second -= den;
+					bit_set(res.first, bit);
+				}
+
+				if (bit-- == 0) break;
+			}
+			return res;
+		}
+
+		inline constexpr friend bool bit_test(const double_int &val, u64 bit) noexcept { bit &= bits - 1; return bit >= bits / 2 ? bit_test(val.high, bit - bits / 2) : bit_test(val.low, bit); }
+		inline constexpr friend void bit_set(double_int &val, u64 bit) noexcept { bit &= bits - 1; if (bit >= bits / 2) bit_set(val.high, bit - bits / 2); else bit_set(val.low, bit); }
+
 	};
+
+	// returns a pair of <quotient, remainder>
+	inline constexpr std::pair<std::uint8_t, std::uint8_t> divmod(std::uint8_t num, std::uint8_t den) { return {num / den, num % den}; }
+	inline constexpr std::pair<std::uint16_t, std::uint16_t> divmod(std::uint16_t num, std::uint16_t den) { return {num / den, num % den}; }
+	inline constexpr std::pair<std::uint32_t, std::uint32_t> divmod(std::uint32_t num, std::uint32_t den) { return {num / den, num % den}; }
+	inline constexpr std::pair<std::uint64_t, std::uint64_t> divmod(std::uint64_t num, std::uint64_t den) { return {num / den, num % den}; }
+
+	inline constexpr bool bit_test(u64 val, u64 bit) noexcept { return (val >> bit) & 1; }
+
+	inline constexpr void bit_set(std::uint8_t &val, u64 bit) noexcept { val |= (std::uint8_t)1 << bit; }
+	inline constexpr void bit_set(std::uint16_t &val, u64 bit) noexcept { val |= (std::uint16_t)1 << bit; }
+	inline constexpr void bit_set(std::uint32_t &val, u64 bit) noexcept { val |= (std::uint32_t)1 << bit; }
+	inline constexpr void bit_set(std::uint64_t &val, u64 bit) noexcept { val |= (std::uint64_t)1 << bit; }
+
 }
 
 #endif

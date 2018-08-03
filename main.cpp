@@ -31,14 +31,24 @@ int main(int argc, const char *argv[])
 
 	//big = big;
 	big = 4156475324365;
-	big <<= 4000;
 	//less_big = ++big;
 	//less_big--;
 
 	//less_big = 493;
 
+	//big = 21;
+	big *= 0xf4da218bcffe;
+	decltype(big) den = 0x4d5837abcdeab75;
+	//divmod(4, 5);
+	auto thing = divmod(big, den);
+	std::cout << big << " / " << den << " = " << thing.first << " R " << thing.second << '\n';
+	std::cout << "patching: " << ((thing.first * den + thing.second) == big) << '\n';
+
 	std::cout << "plz work :3 .... " << std::setw(sizeof(big) * 2) << std::setfill('0') << std::showbase << big << '\n';
 	std::cout << "width: " << std::cout.width() << '\n';
+	std::cout << "bit test: " << bit_test(big, 4006) << '\n';
+
+	if (big) std::cout << "nonzero\n";
 
 	uint_t<12> masked;
 
@@ -53,13 +63,13 @@ int main(int argc, const char *argv[])
 
 	std::cout << masked << '\n';
 
-	bool thing = false;
+	//bool thing = false;
 	//++masked;
 
-	thing = masked <= masked;
+	//thing = masked <= masked;
 
-	if (thing) std::cout << "nonzero\n";
-	else std::cout << "zero\n";
+	//if (thing) std::cout << "nonzero\n";
+	//else std::cout << "zero\n";
 
 	std::cin.get();
 	return 0;
