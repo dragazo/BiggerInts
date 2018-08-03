@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <iostream>
+#include <string>
 
 namespace BiggerInts
 {
@@ -138,47 +140,85 @@ namespace BiggerInts
 		template<typename U, std::enable_if_t<(bit_count<U>::value <= bits / 2)>* = 0>
 		inline constexpr double_int &operator=(const U &val) noexcept { low = val; high = 0; return *this; }
 
-		template<typename U, std::enable_if_t<(bit_count<U>::value > bits / 2)>* = 0>
-		inline constexpr double_int(const U &val) noexcept : low(val), high(val >> (bits / 2)) {}
-
-		template<typename U, std::enable_if_t<(bit_count<U>::value > bits / 2)>* = 0>
-		inline constexpr double_int &operator=(const U &val) noexcept { low = val; high = val >> (bits / 2); }
+		template<typename U, std::enable_if_t<(bit_count<U>::value <= bits / 2)>* = 0>
+		inline constexpr operator U() const noexcept { return low; }
 
 	public: // -- operators -- //
 
+		inline constexpr double_int &operator++() { if (!++low) ++high; return *this; }
+		inline constexpr double_int &operator--() { if (!low) --high; --low; return *this; }
+
+		inline constexpr double_int operator++(int) { double_int val = *this; ++*this; return *this; }
+		inline constexpr double_int operator--(int) { double_int val = *this; --*this; return *this; }
+
+		inline constexpr double_int &operator+=(const double_int &other) noexcept
+		{
+			low += other.low;
+			if (low < other.low) ++high;
+			high += other.high;
+			return *this;
+		}
+		inline constexpr double_int &operator-=(const double_int &other) noexcept { *this += ~other; ++*this; return *this; }
+		
 		inline constexpr double_int &operator&=(const double_int &other) noexcept { low &= other.low; high &= other.high; return *this; }
 		inline constexpr double_int &operator|=(const double_int &other) noexcept { low |= other.low; high |= other.high; return *this; }
 		inline constexpr double_int &operator^=(const double_int &other) noexcept { low ^= other.low; high ^= other.high; return *this; }
 
 		inline constexpr double_int &operator<<=(u64 count) noexcept
 		{
-			// count masked to (bits / 2) limit - no-op on zero
-			if (count &= (bits / 2) - 1)
+			// count masked to bits limit - no-op on zero
+			if (count &= bits - 1)
 			{
-				high <<= count;
-				high |= low >> (bits / 2 - count);
-				low <<= count;
+				if (count >= bits / 2)
+				{
+					high = low;
+					high <<= count - bits / 2;
+					low = 0;
+				}
+				else
+				{
+					high <<= count;
+					high |= low >> (bits / 2 - count);
+					low <<= count;
+				}
 			}
 			return *this;
 		}
 		inline constexpr double_int &operator>>=(u64 count) noexcept
 		{
-			// count masked to (bits / 2) limit - no-op on zero
-			if (count &= (bits / 2) - 1)
+			// count masked to bits limit - no-op on zero
+			if (count &= bits - 1)
 			{
-				low >>= count;
-				low |= high << (bits / 2 - count);
-				high >>= count;
+				if (count >= bits / 2)
+				{
+					low = high;
+					low >>= count - bits / 2;
+					high = 0;
+				}
+				else
+				{
+					low >>= count;
+					low |= high << (bits / 2 - count);
+					high >>= count;
+				}
 			}
 			return *this;
 		}
+
+		inline constexpr explicit operator bool() const noexcept { return low || high; }
+		inline constexpr friend bool operator!(const double_int &a) noexcept { return !(bool)a; }
+
+		inline constexpr friend double_int operator~(const double_int &a) noexcept { double_int res; res.low = ~a.low; res.high = ~a.high; return res; }
+
+		inline constexpr friend double_int operator+(const double_int &a, const double_int &b) noexcept { double_int res = a; a += b; return res; }
+		inline constexpr friend double_int operator-(const double_int &a, const double_int &b) noexcept { double_int res = a; a -= b; return res; }
 
 		inline constexpr friend double_int operator&(const double_int &a, const double_int &b) noexcept { double_int res = a; res &= b; return res; }
 		inline constexpr friend double_int operator|(const double_int &a, const double_int &b) noexcept { double_int res = a; res |= b; return res; }
 		inline constexpr friend double_int operator^(const double_int &a, const double_int &b) noexcept { double_int res = a; res ^= b; return res; }
 
-		inline constexpr friend double_int operator<<(const double_int &a, u64 count) noexcept { double_int res = a; res <<= b; return res; }
-		inline constexpr friend double_int operator>>(const double_int &a, u64 count) noexcept { double_int res = a; res >>= b; return res; }
+		inline constexpr friend double_int operator<<(const double_int &a, u64 count) noexcept { double_int res = a; res <<= count; return res; }
+		inline constexpr friend double_int operator>>(const double_int &a, u64 count) noexcept { double_int res = a; res >>= count; return res; }
 
 		// equivalent to <=> but works for any version of C++
 		inline constexpr friend int cmp(const double_int &a, const double_int &b) noexcept { return a.high < b.high ? -1 : a.high > b.high ? 1 : a.low < b.low ? -1 : a.low > b.low ? 1 : 0; }
@@ -188,6 +228,58 @@ namespace BiggerInts
 		inline constexpr friend bool operator<=(const double_int &a, const double_int &b) noexcept { return cmp(a, b) <= 0; }
 		inline constexpr friend bool operator>(const double_int &a, const double_int &b) noexcept { return cmp(a, b) > 0; }
 		inline constexpr friend bool operator>=(const double_int &a, const double_int &b) noexcept { return cmp(a, b) >= 0; }
+
+		inline friend std::ostream &operator<<(std::ostream &ostr, const double_int &val)
+		{
+			double_int copy = val;
+			std::string str;
+			int digit;
+			
+			// build the string
+			if (ostr.flags() & std::ios::oct)
+			{
+				const double_int mask = 7;
+				while (copy)
+				{
+					digit = copy & mask;
+					copy >>= 3;
+					str.push_back('0' + digit);
+				}
+				if (ostr.flags() & std::ios::showbase) ostr.put('0');
+			}
+			else // default to hex mode
+			{
+				const double_int mask = 15;
+				const char hex_alpha = ostr.flags() & std::ios::uppercase ? 'A' : 'a';
+				while (copy)
+				{
+					digit = copy & mask;
+					copy >>= 4;
+					str.push_back(digit < 10 ? '0' + digit : hex_alpha + digit - 10);
+				}
+				if (ostr.flags() & std::ios::showbase)
+				{
+					ostr.put('0'); // uses put() to make sure we don't clobber ostr.width()
+					ostr.put('x');
+				}
+			}
+			
+			// write the string
+			if (ostr.flags() & std::ios::left)
+			{
+				for (int i = str.size() - 1; i >= 0; --i) ostr.put(str[i]);
+				for (int i = (int)ostr.width() - (int)str.size(); i > 0; --i) ostr.put(ostr.fill());
+			}
+			else // default to right
+			{
+				for (int i = (int)ostr.width() - (int)str.size(); i > 0; --i) ostr.put(ostr.fill());
+				for (int i = str.size() - 1; i >= 0; --i) ostr.put(str[i]);
+			}
+
+			// clobber width - makes sure the next write isn't weird
+			ostr.width(0);
+			return ostr;
+		}
 	};
 }
 
