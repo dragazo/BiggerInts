@@ -51,24 +51,24 @@ namespace BiggerInts
 	template<u64 bits> struct double_int;
 
 	// -- #hax typedef omega synergy highjinks - don't even need to be defined, boi -- //
+	
+	template<u64 bits, std::enable_if_t<(bits > 64 && is_pow2(bits)), int> = 0> double_int<bits> returns_proper_type();
+	template<u64 bits, std::enable_if_t<(bits > 64 && !is_pow2(bits)), int> = 0> masked_single_int<double_int<round_bits_up(bits)>, bits> returns_proper_type();
 
-	template<u64 bits, std::enable_if_t<(bits > 64 && is_pow2(bits))>* = 0> double_int<bits> returns_proper_type();
-	template<u64 bits, std::enable_if_t<(bits > 64 && !is_pow2(bits))>* = 0> masked_single_int<double_int<round_bits_up(bits)>, bits> returns_proper_type();
+	template<u64 bits, std::enable_if_t<(bits == 64), int> = 0> std::uint64_t returns_proper_type();
+	template<u64 bits, std::enable_if_t<(bits > 32 && bits < 64), int> = 0> masked_single_int<std::uint64_t, bits> returns_proper_type();
 
-	template<u64 bits, std::enable_if_t<(bits == 64)>* = 0> std::uint64_t returns_proper_type();
-	template<u64 bits, std::enable_if_t<(bits > 32 && bits < 64)>* = 0> masked_single_int<std::uint64_t, bits> returns_proper_type();
+	template<u64 bits, std::enable_if_t<(bits == 32), int> = 0> std::uint32_t returns_proper_type();
+	template<u64 bits, std::enable_if_t<(bits > 16 && bits < 32), int> = 0> masked_single_int<std::uint32_t, bits> returns_proper_type();
 
-	template<u64 bits, std::enable_if_t<(bits == 32)>* = 0> std::uint32_t returns_proper_type();
-	template<u64 bits, std::enable_if_t<(bits > 16 && bits < 32)>* = 0> masked_single_int<std::uint32_t, bits> returns_proper_type();
+	template<u64 bits, std::enable_if_t<(bits == 16), int> = 0> std::uint16_t returns_proper_type();
+	template<u64 bits, std::enable_if_t<(bits > 8 && bits < 16), int> = 0> masked_single_int<std::uint16_t, bits> returns_proper_type();
 
-	template<u64 bits, std::enable_if_t<(bits == 16)>* = 0> std::uint16_t returns_proper_type();
-	template<u64 bits, std::enable_if_t<(bits > 8 && bits < 16)>* = 0> masked_single_int<std::uint16_t, bits> returns_proper_type();
-
-	template<u64 bits, std::enable_if_t<(bits == 8)>* = 0> std::uint8_t returns_proper_type();
-	template<u64 bits, std::enable_if_t<(bits < 8)>* = 0> masked_single_int<std::uint8_t, bits> returns_proper_type();
+	template<u64 bits, std::enable_if_t<(bits == 8), int> = 0> std::uint8_t returns_proper_type();
+	template<u64 bits, std::enable_if_t<(bits < 8), int> = 0> masked_single_int<std::uint8_t, bits> returns_proper_type();
 
 	template<u64 bits> struct uint { typedef decltype(returns_proper_type<bits>()) type; };
-
+	
 	// -- sigh, back to normal templating :( -- //
 	
 	template<typename T> struct bit_count {};
@@ -87,13 +87,13 @@ namespace BiggerInts
 	template<u64 bits> struct bit_count<double_int<bits>> : std::integral_constant<u64, bits> {};
 
 	// -- builder impl -- //
-
+	
 	template<u64 bits> inline constexpr uint_t<bits> build_uint(const uint_t<bits / 2> &high, const uint_t<bits / 2> &low) noexcept { return {high, low}; }
 
-	template<> inline std::uint64_t build_uint<64>(const std::uint32_t &high, const std::uint32_t &low) noexcept { return ((std::uint64_t)high << 32) | low; }
-	template<> inline std::uint32_t build_uint<32>(const std::uint16_t &high, const std::uint16_t &low) noexcept { return ((std::uint32_t)high << 16) | low; }
-	template<> inline std::uint16_t build_uint<16>(const std::uint8_t &high, const std::uint8_t &low) noexcept { return ((std::uint16_t)high << 8) | low; }
-
+	template<> inline uint_t<64> build_uint<64>(const uint_t<32> &high, const uint_t<32> &low) noexcept { return ((uint_t<64>)high << 32) | low; }
+	template<> inline uint_t<32> build_uint<32>(const uint_t<16> &high, const uint_t<16> &low) noexcept { return ((uint_t<32>)high << 16) | low; }
+	template<> inline uint_t<16> build_uint<16>(const uint_t<8> &high, const uint_t<8> &low) noexcept { return ((uint_t<16>)high << 8) | low; }
+	
 	// -- container iml -- //
 
 	template<typename T, u64 bits> struct masked_single_int
@@ -129,7 +129,7 @@ namespace BiggerInts
 		inline constexpr masked_single_int &operator<<=(T _val) { val = (val << _val) & mask; return *this; }
 		inline constexpr masked_single_int &operator>>=(T _val) { val = (val >> _val) & mask; return *this; }
 	};
-
+	
 	template<u64 bits> struct double_int
 	{
 	public: // -- ctor/asgn -- //
@@ -149,13 +149,13 @@ namespace BiggerInts
 
 	public: // -- conversion -- //
 
-		template<typename U, std::enable_if_t<(bit_count<U>::value <= bits / 2)>* = 0>
+		template<typename U, std::enable_if_t<(bit_count<U>::value <= bits / 2), int> = 0>
 		inline constexpr double_int(const U &val) noexcept : low(val), high(0) {}
 
-		template<typename U, std::enable_if_t<(bit_count<U>::value <= bits / 2)>* = 0>
+		template<typename U, std::enable_if_t<(bit_count<U>::value <= bits / 2), int> = 0>
 		inline constexpr double_int &operator=(const U &val) noexcept { low = val; high = 0; return *this; }
 
-		template<typename U, std::enable_if_t<(bit_count<U>::value <= bits / 2)>* = 0>
+		template<typename U, std::enable_if_t<(bit_count<U>::value <= bits / 2), int> = 0>
 		inline constexpr operator U() const noexcept { return low; }
 
 		inline constexpr double_int(half _high, half _low) noexcept : high(_high), low(_low) {}
@@ -240,8 +240,8 @@ namespace BiggerInts
 		inline constexpr friend double_int operator|(const double_int &a, const double_int &b) noexcept { double_int res = a; res |= b; return res; }
 		inline constexpr friend double_int operator^(const double_int &a, const double_int &b) noexcept { double_int res = a; res ^= b; return res; }
 
-		inline constexpr friend double_int operator<<(const double_int &a, u64 count) noexcept { double_int res = a; res <<= count; return res; }
-		inline constexpr friend double_int operator>>(const double_int &a, u64 count) noexcept { double_int res = a; res >>= count; return res; }
+		template<typename T> inline constexpr friend double_int operator<<(const double_int &a, const T &count) noexcept { double_int res = a; res <<= count; return res; }
+		template<typename T> inline constexpr friend double_int operator>>(const double_int &a, const T &count) noexcept { double_int res = a; res >>= count; return res; }
 
 		inline constexpr friend double_int operator*(double_int a, const double_int &b) noexcept
 		{
@@ -323,7 +323,7 @@ namespace BiggerInts
 
 	public: // -- utilities -- //
 
-		inline constexpr friend std::pair<double_int, double_int> divmod(const double_int &num, const double_int &den) noexcept
+		inline constexpr friend std::pair<uint_t<bits>, uint_t<bits>> divmod(const uint_t<bits> &num, const uint_t<bits> &den)
 		{
 			if (!den) throw std::domain_error("divide by zero");
 
@@ -349,20 +349,18 @@ namespace BiggerInts
 		inline constexpr friend void bit_set(double_int &val, u64 bit) noexcept { bit &= bits - 1; if (bit >= bits / 2) bit_set(val.high, bit - bits / 2); else bit_set(val.low, bit); }
 
 	};
-
-	// returns a pair of <quotient, remainder>
-	inline constexpr std::pair<std::uint8_t, std::uint8_t> divmod(std::uint8_t num, std::uint8_t den) { return {num / den, num % den}; }
-	inline constexpr std::pair<std::uint16_t, std::uint16_t> divmod(std::uint16_t num, std::uint16_t den) { return {num / den, num % den}; }
-	inline constexpr std::pair<std::uint32_t, std::uint32_t> divmod(std::uint32_t num, std::uint32_t den) { return {num / den, num % den}; }
-	inline constexpr std::pair<std::uint64_t, std::uint64_t> divmod(std::uint64_t num, std::uint64_t den) { return {num / den, num % den}; }
+	
+	inline constexpr std::pair<std::uint64_t, std::uint64_t> divmod(const std::uint64_t &num, const std::uint64_t &den) { return {num / den, num % den}; }
+	inline constexpr std::pair<std::uint32_t, std::uint32_t> divmod(const std::uint32_t &num, const std::uint32_t &den) { return {num / den, num % den}; }
+	inline constexpr std::pair<std::uint16_t, std::uint16_t> divmod(const std::uint16_t &num, const std::uint16_t &den) { return {num / den, num % den}; }
+	inline constexpr std::pair<std::uint8_t, std::uint8_t> divmod(const std::uint8_t &num, const std::uint8_t &den) { return {num / den, num % den}; }
 
 	inline constexpr bool bit_test(u64 val, u64 bit) noexcept { return (val >> bit) & 1; }
 
-	inline constexpr void bit_set(std::uint8_t &val, u64 bit) noexcept { val |= (std::uint8_t)1 << bit; }
-	inline constexpr void bit_set(std::uint16_t &val, u64 bit) noexcept { val |= (std::uint16_t)1 << bit; }
-	inline constexpr void bit_set(std::uint32_t &val, u64 bit) noexcept { val |= (std::uint32_t)1 << bit; }
 	inline constexpr void bit_set(std::uint64_t &val, u64 bit) noexcept { val |= (std::uint64_t)1 << bit; }
-
+	inline constexpr void bit_set(std::uint32_t &val, u64 bit) noexcept { val |= (std::uint32_t)1 << bit; }
+	inline constexpr void bit_set(std::uint16_t &val, u64 bit) noexcept { val |= (std::uint16_t)1 << bit; }
+	inline constexpr void bit_set(std::uint8_t &val, u64 bit) noexcept { val |= (std::uint8_t)1 << bit; }
 }
 
 #endif

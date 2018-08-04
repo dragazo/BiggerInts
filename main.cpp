@@ -11,8 +11,15 @@ int main(int argc, const char *argv[])
 
 	//std::uint32_t *b = &a;
 
-	
+	/*
+	u64 num_high = 5;
+	u64 num_low = 4;
+	u64 denom = 2;
 
+	auto dm = divmod(build_uint<128>(num_high, num_low), (uint_t<128>)denom);
+	*/
+
+	
 	uint_t<8192> big = 24;
 
 	auto _big_ = build_uint<512>(1, 2);
@@ -39,6 +46,8 @@ int main(int argc, const char *argv[])
 
 	//big = 21;
 	big *= 0xf4da218bcffe;
+	big = big >> 5;
+
 	decltype(big) den = 0x4d5837abcdeab75;
 	//divmod(4, 5);
 	auto thing = divmod(big, den);
@@ -71,7 +80,7 @@ int main(int argc, const char *argv[])
 
 	//if (thing) std::cout << "nonzero\n";
 	//else std::cout << "zero\n";
-
+	
 	std::cin.get();
 	return 0;
 }
