@@ -15,8 +15,9 @@ int main(int argc, const char *argv[])
 
 	uint_t<8192> big = 24;
 
-
-
+	auto _big_ = build_uint<512>(1, 2);
+	std::cout << std::hex;
+	std::cout << "built value: " << _big_ << "\n\n";
 	//big = 23;
 	//big = big & big | big;
 

@@ -12,17 +12,6 @@ namespace BiggerInts
 {
 	typedef std::uint64_t u64;
 
-	// returns true if val is a power of 2
-	inline constexpr bool is_pow2(u64 val) { return val != 0 && (val & (val - 1)) == 0; }
-	
-	// given a size in bits, returns a power of 2 (also in bits) large enough to contain it and that is no smaller than 8
-	inline constexpr u64 round_bits_up(u64 size)
-	{
-		if (size < 8) return 8;
-		while (!is_pow2(size)) size = (size | (size - 1)) + 1;
-		return size;
-	}
-
 	// given a desired size in bits, provides a typedef that will suffice.
 	// 8, 16, 32, and 64 yield std::uint??_t directly. other values are wrappers defined here.
 	template<u64 bits> struct uint;
@@ -33,11 +22,27 @@ namespace BiggerInts
 	// bit_count<uint_t<bits>>::value == bits is always true
 	template<typename T> struct bit_count;
 
+	// given a desired size in bits, creates it from two ints of half that size
+	template<u64 bits> inline constexpr uint_t<bits> build_uint(const uint_t<bits / 2> &high, const uint_t<bits / 2> &low) noexcept;
+
 	// ----------------------------------------- //
 
 	// -- DON'T USE ANYTHING BELOW THIS POINT -- //
 
 	// ----------------------------------------- //
+
+	// -- helpers and types -- //
+
+	// returns true if val is a power of 2
+	inline constexpr bool is_pow2(u64 val) { return val != 0 && (val & (val - 1)) == 0; }
+
+	// given a size in bits, returns a power of 2 (also in bits) large enough to contain it and that is no smaller than 8
+	inline constexpr u64 round_bits_up(u64 size)
+	{
+		if (size < 8) return 8;
+		while (!is_pow2(size)) size = (size | (size - 1)) + 1;
+		return size;
+	}
 
 	// holds a type T where assignments to it are masked
 	template<typename T, u64 bits> struct masked_single_int;
@@ -80,6 +85,14 @@ namespace BiggerInts
 
 	template<typename T, u64 bits> struct bit_count<masked_single_int<T, bits>> : std::integral_constant<u64, bits> {};
 	template<u64 bits> struct bit_count<double_int<bits>> : std::integral_constant<u64, bits> {};
+
+	// -- builder impl -- //
+
+	template<u64 bits> inline constexpr uint_t<bits> build_uint(const uint_t<bits / 2> &high, const uint_t<bits / 2> &low) noexcept { return {high, low}; }
+
+	template<> inline std::uint64_t build_uint<64>(const std::uint32_t &high, const std::uint32_t &low) noexcept { return ((std::uint64_t)high << 32) | low; }
+	template<> inline std::uint32_t build_uint<32>(const std::uint16_t &high, const std::uint16_t &low) noexcept { return ((std::uint32_t)high << 16) | low; }
+	template<> inline std::uint16_t build_uint<16>(const std::uint8_t &high, const std::uint8_t &low) noexcept { return ((std::uint16_t)high << 8) | low; }
 
 	// -- container iml -- //
 
@@ -144,6 +157,8 @@ namespace BiggerInts
 
 		template<typename U, std::enable_if_t<(bit_count<U>::value <= bits / 2)>* = 0>
 		inline constexpr operator U() const noexcept { return low; }
+
+		inline constexpr double_int(half _high, half _low) noexcept : high(_high), low(_low) {}
 
 	public: // -- operators -- //
 
