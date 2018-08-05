@@ -6,7 +6,7 @@
 int main(int argc, const char *argv[])
 {
 	using namespace BiggerInts;
-
+	
 	//uint_t<32> a;
 
 	//std::uint32_t *b = &a;
@@ -18,13 +18,13 @@ int main(int argc, const char *argv[])
 
 	auto dm = divmod(build_uint<128>(num_high, num_low), (uint_t<128>)denom);
 	*/
-
 	
-	uint_t<8192> big = 24;
+	double_int<8192, false> big = 24;
 
-	auto _big_ = build_uint<512>(1, 2);
+	auto _big_ = uint_t<512>(1, 2);
 	std::cout << std::hex;
 	std::cout << "built value: " << _big_ << "\n\n";
+
 	//big = 23;
 	//big = big & big | big;
 
@@ -37,6 +37,7 @@ int main(int argc, const char *argv[])
 
 	//uint_t<128> less_big = big;
 
+	//big = 0xf4da218bcffe;
 	//big = big;
 	big = 4156475324365;
 	//less_big = ++big;
@@ -45,8 +46,11 @@ int main(int argc, const char *argv[])
 	//less_big = 493;
 
 	//big = 21;
-	big *= 0xf4da218bcffe;
+	big *= (decltype(big))0xf4da218bcffe;
 	big = big >> 5;
+
+	int_t<8192> &as_signed = *(int_t<8192>*)&big;
+	std::cout << "signed: " << as_signed << '\n';
 
 	decltype(big) den = 0x4d5837abcdeab75;
 	//divmod(4, 5);
@@ -82,5 +86,6 @@ int main(int argc, const char *argv[])
 	//else std::cout << "zero\n";
 	
 	std::cin.get();
+	
 	return 0;
 }
