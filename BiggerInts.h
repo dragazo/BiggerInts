@@ -15,24 +15,22 @@ namespace BiggerInts
 	typedef std::uint64_t u64;
 
 	// returns true if val is a power of 2
-	inline constexpr bool is_pow2(u64 val) { return val != 0 && (val & (val - 1)) == 0; }
+	inline constexpr bool is_pow2(u64 val) noexcept { return val != 0 && (val & (val - 1)) == 0; }
 
 	// given a size in bits, returns a power of 2 (also in bits) large enough to contain it and that is no smaller than 8
-	inline constexpr u64 round_bits_up(u64 size)
+	inline constexpr u64 round_bits_up(u64 size) noexcept
 	{
 		if (size < 8) return 8;
+		if (size > 0x8000000000000000) throw std::domain_error("bit size was too large");
 		while (!is_pow2(size)) size = (size | (size - 1)) + 1;
 		return size;
 	}
 
-	// holds a type T where assignments to it are masked
-	template<typename T, u64 bits> struct masked_single_int;
-
-	// wraps larger integer sizes in terms of 2 smaller ones
-	template<u64 bits, bool sign> struct double_int;
-
 	// -- #hax typedef omega synergy highjinks - don't even need to be defined, boi -- //
 	
+	template<typename T, u64 bits> struct masked_single_int;
+	template<u64 bits, bool sign> struct double_int;
+
 	template<u64 bits, bool sign, std::enable_if_t<(bits > 64 && is_pow2(bits)), int> = 0> double_int<bits, sign> returns_proper_type();
 	template<u64 bits, bool sign, std::enable_if_t<(bits > 64 && !is_pow2(bits)), int> = 0> masked_single_int<double_int<round_bits_up(bits), sign>, bits> returns_proper_type();
 
@@ -48,9 +46,11 @@ namespace BiggerInts
 	template<u64 bits, bool sign, std::enable_if_t<(bits == 8), int> = 0> std::conditional_t<sign, std::int8_t, std::uint8_t> returns_proper_type();
 	template<u64 bits, bool sign, std::enable_if_t<(bits < 8), int> = 0> masked_single_int<std::conditional_t<sign, std::int8_t, std::uint8_t>, bits> returns_proper_type();
 
-	// gets an unsigned integer with the specified number of bits
+	// the below two templated type aliases get signed/unsigned types of the specified width in bits.
+	// for a given number of bits, the structure is identical (i.e. you can safely bind a reference from signed to unsigned with reinterpret_cast to avoid a (potentially expensive) copy).
+	// negative signed values are stored via 2's complement, just as with built-in integral types on anything made since the dark ages.
+
 	template<u64 bits> using uint_t = decltype(returns_proper_type<bits, false>());
-	// gets a signed integer with the specified number of bits
 	template<u64 bits> using int_t = decltype(returns_proper_type<bits, true>());
 
 	// -- sigh, back to normal templating :( -- //
@@ -73,6 +73,7 @@ namespace BiggerInts
 	
 	// -- container iml -- //
 
+	// holds an integral type T that, upon assignment, is masked to the specified number of bits. bits must be in the range (0, bit count T).
 	template<typename T, u64 bits> struct masked_single_int
 	{
 	private:
@@ -107,6 +108,7 @@ namespace BiggerInts
 		inline constexpr masked_single_int &operator>>=(T _val) { val = (val >> _val) & mask; return *this; }
 	};
 	
+	// given a desired number of bits (power of 2), simulates it with 2 ints of half that size - sign flag marks signed/unsigned
 	template<u64 bits, bool sign> struct double_int
 	{
 	public: // -- ctor/asgn -- //
@@ -134,8 +136,6 @@ namespace BiggerInts
 
 		template<typename U, std::enable_if_t<(bit_count<U>::value <= bits / 2), int> = 0>
 		inline constexpr explicit operator U() const noexcept { return (U)low; }
-
-		inline constexpr double_int(half _high, half _low) noexcept : high(_high), low(_low) {}
 
 	public: // -- bool conversion -- //
 
@@ -234,7 +234,7 @@ namespace BiggerInts
 
 	template<u64 bits> inline constexpr double_int<bits, true> operator-(const double_int<bits, true> &a) noexcept { double_int<bits, true> res = ~a; ++res; return res; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator~(const double_int<bits, sign> &a) noexcept { return {~a.high, ~a.low}; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator~(const double_int<bits, sign> &a) noexcept { double_int<bits, sign> res; res.high = ~a.high; res.low = ~a.low; return res; }
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator+(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res += b; return res; }
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator-(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res -= b; return res; }
@@ -420,12 +420,19 @@ namespace BiggerInts
 	{
 		// we'll do signed io in terms of unsigned
 
+		// if it's negative make it positing and print the - sign
 		if (bit_test(val, bits - 1))
 		{
 			make_neg(val);
-			if (ostr.flags() & std::ios::showpos) ostr.put('-');
+			ostr.put('-'); // put the - sign and dec width by 1
+			if (ostr.width() > 0) ostr.width(ostr.width() - 1);
 		}
-		else if (ostr.flags() & std::ios::showpos) ostr.put('+');
+		// otherwise, is positive. print the + sign if showpos is set
+		else if (ostr.flags() & std::ios::showpos)
+		{
+			ostr.put('+');// put the + sign and dec width by 1
+			if (ostr.width() > 0) ostr.width(ostr.width() - 1);
+		}
 
 		// refer to val as unsigned
 		ostr << *(double_int<bits, false>*)&val;
@@ -451,6 +458,69 @@ namespace BiggerInts
 	inline constexpr void bit_set(std::uint32_t &val, u64 bit) noexcept { val |= (std::uint32_t)1 << bit; }
 	inline constexpr void bit_set(std::uint64_t &val, u64 bit) noexcept { val |= (std::uint64_t)1 << bit; }
 	template<u64 bits, bool sign> inline constexpr void bit_set(double_int<bits, sign> &val, u64 bit) noexcept { bit &= bits - 1; if (bit >= bits / 2) bit_set(val.high, bit - bits / 2); else bit_set(val.low, bit); }
+}
+
+// -- std info definitions -- //
+
+namespace std
+{
+	// -- double_int info -- //
+
+	template<std::uint64_t bits, bool sign> struct std::is_integral<BiggerInts::double_int<bits, sign>> : std::true_type {};
+
+	template<std::uint64_t bits, bool sign> struct std::is_signed<BiggerInts::double_int<bits, sign>> : std::bool_constant<sign> {};
+	template<std::uint64_t bits, bool sign> struct std::is_unsigned<BiggerInts::double_int<bits, sign>> : std::bool_constant<!sign> {};
+
+	template<std::uint64_t bits, bool sign> struct std::make_signed<BiggerInts::double_int<bits, sign>> { typedef BiggerInts::double_int<bits, true> type; };
+	template<std::uint64_t bits, bool sign> struct std::make_unsigned<BiggerInts::double_int<bits, sign>> { typedef BiggerInts::double_int<bits, false> type; };
+	
+	template<std::uint64_t bits, bool sign> struct std::numeric_limits<BiggerInts::double_int<bits, sign>>
+	{
+		static constexpr bool is_specialized = true;
+		static constexpr bool is_signed = sign;
+		static constexpr bool is_integer = true;
+		static constexpr bool is_exact = true;
+		static constexpr bool has_infinity = false;
+		static constexpr bool has_quiet_NaN = false;
+		static constexpr bool has_signaling_NaN = false;
+		static constexpr bool has_denorm = false;
+		static constexpr bool has_denorm_loss = false;
+		static constexpr std::float_round_style round_style = std::round_toward_zero;
+		static constexpr bool is_iec559 = false;
+		static constexpr bool is_bounded = true;
+		static constexpr bool is_modulo = true;
+		static constexpr int digits = sign ? bits - 1 : bits;
+		static constexpr int digits10 = digits * 0.301029995663981195213738894724493026768189881462108541310; // log10(2)
+		static constexpr int max_digits10 = 0;
+		static constexpr int radix = 2;
+		static constexpr int min_exponent = 0;
+		static constexpr int min_exponent10 = 0;
+		static constexpr int max_exponent = 0;
+		static constexpr int max_exponent10 = 0;
+		static constexpr bool traps = true;
+		static constexpr bool tinyness_before = false;
+
+		static constexpr const BiggerInts::double_int<bits, sign> &min() { static const BiggerInts::double_int<bits, sign> val = sign ? (BiggerInts::double_int<bits, sign>)1 << (bits - 1) : 0; return val; }
+		static constexpr const BiggerInts::double_int<bits, sign> &lowest() { return min(); }
+		static constexpr const BiggerInts::double_int<bits, sign> &max() { static const BiggerInts::double_int<bits, sign> val = sign ? ~((BiggerInts::double_int<bits, sign>)1 << (bits - 1)) : ~(BiggerInts::double_int<bits, sign>)0; return val; }
+		static constexpr const BiggerInts::double_int<bits, sign> &epsilon() { static const BiggerInts::double_int<bits, sign> val = 0; return val; }
+		static constexpr const BiggerInts::double_int<bits, sign> &round_error() { return epsilon(); }
+		static constexpr const BiggerInts::double_int<bits, sign> &infinity() { return epsilon(); }
+		static constexpr const BiggerInts::double_int<bits, sign> &quiet_NaN() { return epsilon(); }
+		static constexpr const BiggerInts::double_int<bits, sign> &signaling_NaN() { return epsilon(); }
+		static constexpr const BiggerInts::double_int<bits, sign> &denorm_min() { return epsilon(); }
+		
+	};
+
+	// -- masked_single_int info -- //
+
+	template<typename T, std::uint64_t bits> struct std::is_integral<BiggerInts::masked_single_int<T, bits>> : std::is_integral<T> {};
+
+	template<typename T, std::uint64_t bits> struct std::is_signed<BiggerInts::masked_single_int<T, bits>> : std::is_signed<T> {};
+	template<typename T, std::uint64_t bits> struct std::is_unsigned<BiggerInts::masked_single_int<T, bits>> : std::is_unsigned<T> {};
+
+	template<typename T, std::uint64_t bits> struct std::make_signed<BiggerInts::masked_single_int<T, bits>> { typedef std::make_signed_t<T> type; };
+	template<typename T, std::uint64_t bits> struct std::make_unsigned<BiggerInts::masked_single_int<T, bits>> { typedef std::make_unsigned_t<T> type; };
 }
 
 #endif

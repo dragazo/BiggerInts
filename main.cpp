@@ -1,5 +1,7 @@
 #include <iostream>
 #include <iomanip>
+#include <type_traits>
+#include <limits>
 
 #include "BiggerInts.h"
 
@@ -21,8 +23,24 @@ int main(int argc, const char *argv[])
 	
 	double_int<8192, false> big = 24;
 
-	auto _big_ = uint_t<512>(1, 2);
-	std::cout << std::hex;
+	std::is_trivial<decltype(big)>::value;
+	std::is_integral<decltype(big)>::value;
+
+	std::is_signed<uint_t<512>>::value;
+	std::is_signed<int_t<512>>::value;
+
+	std::is_unsigned<uint_t<512>>::value;
+	std::is_unsigned<int_t<512>>::value;
+	
+	std::make_signed_t<decltype(big)> s_big;
+	std::make_unsigned_t<decltype(big)> us_big;
+
+	std::numeric_limits<decltype(big)>::is_specialized;
+
+	uint_t<512> _big_;
+	_big_.high = 1;
+	_big_.low = 2;
+	//std::cout << std::hex;
 	std::cout << "built value: " << _big_ << "\n\n";
 
 	//big = 23;
@@ -51,6 +69,22 @@ int main(int argc, const char *argv[])
 
 	int_t<8192> &as_signed = *(int_t<8192>*)&big;
 	std::cout << "signed: " << as_signed << '\n';
+
+	std::cout << "\n\n";
+
+	std::cout << "min: " << std::numeric_limits<uint_t<512>>::min() << '\n';
+	std::cout << "max: " << std::numeric_limits<uint_t<512>>::max() << '\n';
+	std::cout << "low: " << std::numeric_limits<uint_t<512>>::lowest() << '\n';
+	std::cout << "eps: " << std::numeric_limits<uint_t<512>>::epsilon() << '\n';
+
+	std::cout << '\n';
+
+	std::cout << "min: " << std::numeric_limits<int_t<512>>::min() << '\n';
+	std::cout << "max: " << std::numeric_limits<int_t<512>>::max() << '\n';
+	std::cout << "low: " << std::numeric_limits<int_t<512>>::lowest() << '\n';
+	std::cout << "eps: " << std::numeric_limits<int_t<512>>::epsilon() << '\n';
+
+	std::cout << "\n\n";
 
 	decltype(big) den = 0x4d5837abcdeab75;
 	//divmod(4, 5);
