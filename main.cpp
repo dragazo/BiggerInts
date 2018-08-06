@@ -12,6 +12,10 @@ int main(int argc, const char *argv[])
 	//uint_t<32> a;
 
 	//std::uint32_t *b = &a;
+	//std::cout << std::hex;
+	double_int<512, false> base = 10000000000000;
+
+	std::cout << "base: " << base << "\n\n\n";
 
 	/*
 	u64 num_high = 5;
@@ -37,11 +41,19 @@ int main(int argc, const char *argv[])
 
 	std::numeric_limits<decltype(big)>::is_specialized;
 
-	uint_t<512> _big_;
+	int_t<512> _big_;
 	_big_.high = 1;
 	_big_.low = 2;
+
+	_big_ <<= 2;
+	_big_ >>= 2;
+
+	_big_ *= _big_;
+	_big_ /= (decltype(_big_))23;
+
 	//std::cout << std::hex;
 	std::cout << "built value: " << _big_ << "\n\n";
+	std::cout << "built value x-77: " << (_big_ * -(decltype(_big_))77) << "\n\n";
 
 	//big = 23;
 	//big = big & big | big;

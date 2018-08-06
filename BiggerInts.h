@@ -220,13 +220,23 @@ namespace BiggerInts
 			{
 				val.low = val.high;
 				val.low >>= count - bits / 2;
-				val.high = bit_test(val.high, bits / 2 - 1) ? ~(decltype(val.high))0 : (decltype(val.high))0;
+				if (bit_test(val.high, bits / 2 - 1)) // fill with sign bit
+				{
+					val.high = ~(decltype(val.high))0;
+					if (count != bits / 2) val.low |= val.high << (bits - count);
+				}
+				else val.high = 0;
 			}
 			else
 			{
 				val.low >>= count;
 				val.low |= val.high << (bits / 2 - count);
-				val.high >>= count;
+				if (bit_test(val.high, bits / 2 - 1)) // fill with sign bit
+				{
+					val.high >>= count;
+					val.high |= ~(decltype(val.high))0 << (bits / 2 - count);
+				}
+				else val.high >>= count;
 			}
 		}
 		return val;
@@ -243,34 +253,34 @@ namespace BiggerInts
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator|(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res |= b; return res; }
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator^(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res ^= b; return res; }
 
-	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> operator<<(const double_int<bits, sign> &a, const T &count) noexcept { double_int<bits, sign> res = a; res <<= count; return res; }
-	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> operator>>(const double_int<bits, sign> &a, const T &count) noexcept { double_int<bits, sign> res = a; res >>= count; return res; }
+	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> operator<<(const double_int<bits, sign> &a, const T &count) noexcept { double_int<bits, sign> res = a; res <<= (u64)count; return res; }
+	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> operator>>(const double_int<bits, sign> &a, const T &count) noexcept { double_int<bits, sign> res = a; res >>= (u64)count; return res; }
 
 	// -- multiplication -- //
 
-	template<u64 bits> inline constexpr double_int<bits, false> operator*(double_int<bits, false> a, const double_int<bits, false> &b) noexcept
+	template<u64 bits> inline constexpr double_int<bits, false> operator*(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept
 	{
-		double_int<bits, false> res = 0;
-		for (u64 bit = 0; a; ++bit, a <<= 1)
-			if (bit_test(b, bit)) res += a;
+		double_int<bits, false> res = 0, _a = a;
+		for (u64 bit = 0; _a; ++bit, _a <<= 1)
+			if (bit_test(b, bit)) res += _a;
 		return res;
 	}
-	template<u64 bits> inline constexpr double_int<bits, true> operator*(double_int<bits, true> a, const double_int<bits, true> &b) noexcept
+	template<u64 bits> inline constexpr double_int<bits, true> operator*(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept
 	{
 		// we'll do signed divmod in terms of unsigned
 
-		double_int<bits, false> &ua = a;
-		double_int<bits, false> &ub = b;
+		double_int<bits, false> ua = *(double_int<bits, false>*)&a;
+		double_int<bits, false> ub = *(double_int<bits, false>*)&b;
 
 		bool neg = false;
-		if (bit_test(unum, bits - 1)) { make_neg(ua); neg = !neg; }
-		if (bit_test(uden, bits - 1)) { make_neg(ub); neg = !neg; }
+		if (bit_test(ua, bits - 1)) { make_neg(ua); neg = !neg; }
+		if (bit_test(ub, bits - 1)) { make_neg(ub); neg = !neg; }
 
 		ua = ua * ub;
 
 		if (neg) make_neg(ua);
 
-		return ua;
+		return *(double_int<bits, true>*)&ua;
 	}
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { a = a * b; return a; }
@@ -285,7 +295,7 @@ namespace BiggerInts
 	{
 		if (!den) throw std::domain_error("divide by zero");
 
-		auto res = std::make_pair<double_int<bits, false>, double_int<bits, false>>(0, 0);
+		std::pair<double_int<bits, false>, double_int<bits, false>> res(0, 0);
 		u64 bit = bits - 1;
 		while (true)
 		{
@@ -311,8 +321,8 @@ namespace BiggerInts
 	{
 		// we'll do signed divmod in terms of unsigned
 
-		double_int<bits, false> unum = num;
-		double_int<bits, false> uden = num;
+		double_int<bits, false> unum = *(double_int<bits, false>*)&num;
+		double_int<bits, false> uden = *(double_int<bits, false>*)&den;
 
 		bool neg = false;
 		if (bit_test(unum, bits - 1)) { make_neg(unum); neg = !neg; }
@@ -326,7 +336,7 @@ namespace BiggerInts
 			make_neg(res.second);
 		}
 
-		return std::make_pair<double_int<bits, true>, double_int<bits, true>>(res.first, res.second);
+		return { *(double_int<bits, true>*)&res.first, *(double_int<bits, true>*)&res.second };
 	}
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator/=(double_int<bits, sign> &num, const double_int<bits, sign> &den) { num = divmod(num, den).first; return num; }
@@ -351,35 +361,46 @@ namespace BiggerInts
 
 	// -- io -- //
 
-	template<u64 bits> inline std::ostream &operator<<(std::ostream &ostr, double_int<bits, false> val)
+	template<u64 bits> inline std::ostream &operator<<(std::ostream &ostr, const double_int<bits, false> &val)
 	{
+		double_int<bits, false> cpy = val;
 		std::string str;
 		int digit;
-		
+		u64 block;
+
 		// build the string
 		if (ostr.flags() & std::ios::oct)
 		{
-			static constexpr double_int<bits, false> mask = 7;
 			do
 			{
-				digit = (int)(val & mask);
-				val >>= 3;
-				str.push_back('0' + digit);
+				block = low64(cpy) & 0777777777777777777777;
+				cpy >>= 63;
+				do
+				{
+					str.push_back('0' + (block & 7));
+					block >>= 3;
+				}
+				while (block);
 			}
-			while (val);
+			while (cpy);
 			if (ostr.flags() & std::ios::showbase) ostr.put('0');
 		}
 		else if(ostr.flags() & std::ios::hex)
 		{
-			static constexpr double_int<bits, false> mask = 15;
 			const char hex_alpha = ostr.flags() & std::ios::uppercase ? 'A' : 'a';
 			do
 			{
-				digit = (int)(val & mask);
-				val >>= 4;
-				str.push_back(digit < 10 ? '0' + digit : hex_alpha + digit - 10);
+				block = low64(cpy);
+				cpy >>= 64;
+				do
+				{
+					digit = block & 15;
+					str.push_back(digit < 10 ? '0' + digit : hex_alpha + digit - 10);
+					block >>= 4;
+				}
+				while (block);
 			}
-			while (val);
+			while (cpy);
 			if (ostr.flags() & std::ios::showbase)
 			{
 				ostr.put('0'); // uses put() to make sure we don't clobber ostr.width()
@@ -388,16 +409,22 @@ namespace BiggerInts
 		}
 		else // default to dec mode
 		{
-			static constexpr double_int<bits, false> base = 10;
+			// divmod for double_int is really slow, so we'll extract several decimal digits in one go and then process them with built-in integers
+			static constexpr double_int<bits, false> base = 10000000000000000000;
 			std::pair<double_int<bits, false>, double_int<bits, false>> temp;
 			do
 			{
-				temp = divmod(val, base);
-				digit = (int)temp.second;
-				val = temp.first;
-				str.push_back('0' + digit);
+				temp = divmod(cpy, base);
+				block = low64(temp.second);
+				cpy = temp.first;
+				do
+				{
+					str.push_back('0' + block % 10);
+					block /= 10;
+				}
+				while (block);
 			}
-			while (val);
+			while (cpy);
 		}
 
 		// write the string
@@ -416,14 +443,16 @@ namespace BiggerInts
 		ostr.width(0);
 		return ostr;
 	}
-	template<u64 bits> inline std::ostream &operator<<(std::ostream &ostr, double_int<bits, true> val)
+	template<u64 bits> inline std::ostream &operator<<(std::ostream &ostr, const double_int<bits, true> &val)
 	{
 		// we'll do signed io in terms of unsigned
 
+		double_int<bits, true> cpy = val;
+
 		// if it's negative make it positing and print the - sign
-		if (bit_test(val, bits - 1))
+		if (bit_test(cpy, bits - 1))
 		{
-			make_neg(val);
+			make_neg(cpy);
 			ostr.put('-'); // put the - sign and dec width by 1
 			if (ostr.width() > 0) ostr.width(ostr.width() - 1);
 		}
@@ -434,13 +463,17 @@ namespace BiggerInts
 			if (ostr.width() > 0) ostr.width(ostr.width() - 1);
 		}
 
-		// refer to val as unsigned
-		ostr << *(double_int<bits, false>*)&val;
+		// refer to cpy as unsigned
+		ostr << *(double_int<bits, false>*)&cpy;
 
 		return ostr;
 	}
 
 	// -- extra utilities -- //
+
+	// gets the low 64-bit word of a given value
+	inline constexpr u64 low64(u64 val) noexcept { return val; }
+	template<u64 bits, bool sign> u64 low64(const double_int<bits, sign> &val) noexcept { return low64(val.low); }
 
 	inline constexpr void make_not(std::uint64_t &val) noexcept { val = ~val; }
 	template<u64 bits, bool sign> inline constexpr void make_not(double_int<bits, sign> &val) noexcept { make_not(val.low); make_not(val.high); }
@@ -509,7 +542,6 @@ namespace std
 		static constexpr const BiggerInts::double_int<bits, sign> &quiet_NaN() { return epsilon(); }
 		static constexpr const BiggerInts::double_int<bits, sign> &signaling_NaN() { return epsilon(); }
 		static constexpr const BiggerInts::double_int<bits, sign> &denorm_min() { return epsilon(); }
-		
 	};
 
 	// -- masked_single_int info -- //
