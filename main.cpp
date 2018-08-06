@@ -104,11 +104,9 @@ int main(int argc, const char *argv[])
 	std::cout << big << " / " << den << " = " << thing.first << " R " << thing.second << '\n';
 	std::cout << "patching: " << ((thing.first * den + thing.second) == big) << '\n';
 
-	std::cout << "plz work :3 .... " << std::setw(sizeof(big) * 2) << std::setfill('0') << std::showbase << big << '\n';
-	std::cout << "width: " << std::cout.width() << '\n';
-	std::cout << "bit test: " << bit_test(big, 4006) << '\n';
-
 	if (big) std::cout << "nonzero\n";
+
+
 
 	uint_t<12> masked;
 
@@ -131,7 +129,43 @@ int main(int argc, const char *argv[])
 	//if (thing) std::cout << "nonzero\n";
 	//else std::cout << "zero\n";
 	
+	std::cout << std::hex;
+
+	int_t<512> a;// , b, c, d;
+	int_t<128> b, f, g;
+
+	//asgn(a, -1);
+	//asgn(b, a);
+
+	b = -1;
+	//b = a;
+	a = b;
+	b = (decltype(b))a;
+
+	int i_thing;
+
+	i_thing = (int)a;
+
+	//asgn(b, (u64)-1);
+	//asgn(c, (u64)-1);
+	//d = -1;
+
+	//asgn(e, -1);
+	//asgn(f, (signed int)(-1));
+	//asgn(g, (unsigned int)(-1));
+	//h = -1
+
+	std::cout << std::numeric_limits<decltype(a)>::max();
+
+	std::cout << "\n\n--------------------------------\n\n";
+
+	std::cout << a << '\n' << b << '\n';// << b << '\n' << c << '\n' << d << "\n\n";
+
+	//std::cout << e << '\n' << f << '\n' << g << '\n' << h << "\n\n";
+
+
+
 	std::cin.get();
-	
+	std::system("pause");
 	return 0;
 }
