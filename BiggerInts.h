@@ -10,6 +10,20 @@
 #include <utility>
 #include <exception>
 
+/*
+
+Adds signed and unsigned types accessible by alias templates uint_t and int_t for any given number of bits.
+These aliased types display behavior identical to the built-in integral types (moreover, uint_t<> and int_t<> for 8, 16, 32, or 64 bits returns a built-in type).
+Any type returned has a full set of specialized type_traits and numeric_limits.
+For a given number of bits, the signed/unsigned structures are identical (e.g. you can safely bind a reference from signed to unsigned with reinterpret_cast to avoid a (potentially expensive) copy).
+Negative signed values are stored via 2's complement, just as with built-in integral types on anything made since the dark ages.
+
+Aside from these two alias templates, everything else is subject to change/removal and should not be used directly.
+
+Report bugs to https://github.com/dragazo/BiggerInts/issues
+
+*/
+
 namespace BiggerInts
 {
 	// -- helpers and types -- //
@@ -21,7 +35,7 @@ namespace BiggerInts
 	inline constexpr bool is_pow2(u64 val) noexcept { return val != 0 && (val & (val - 1)) == 0; }
 
 	// given a size in bits, returns a power of 2 (also in bits) large enough to contain it and that is no smaller than 8
-	inline constexpr u64 round_bits_up(u64 size) noexcept
+	inline constexpr u64 round_bits_up(u64 size)
 	{
 		if (size < 8) return 8;
 		if (size > 0x8000000000000000) throw std::domain_error("bit size was too large");
@@ -48,10 +62,6 @@ namespace BiggerInts
 	
 	template<u64 bits, bool sign, std::enable_if_t<(bits == 8), int> = 0> std::conditional_t<sign, std::int8_t, std::uint8_t> returns_proper_type();
 	template<u64 bits, bool sign, std::enable_if_t<(bits < 8), int> = 0> masked_single_int<std::conditional_t<sign, std::int8_t, std::uint8_t>, bits> returns_proper_type();
-
-	// the below two templated type aliases get signed/unsigned types of the specified width in bits.
-	// for a given number of bits, the structure is identical (i.e. you can safely bind a reference from signed to unsigned with reinterpret_cast to avoid a (potentially expensive) copy).
-	// negative signed values are stored via 2's complement, just as with built-in integral types on anything made since the dark ages.
 
 	template<u64 bits> using uint_t = decltype(returns_proper_type<bits, false>());
 	template<u64 bits> using int_t = decltype(returns_proper_type<bits, true>());
@@ -211,8 +221,13 @@ namespace BiggerInts
 		return a;
 	}
 
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, u64 b) noexcept { a.low &= b; a.high = (u64)0; return a; }
 	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator&=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept { a.low &= b.low; a.high &= b.high; return a; }
+
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, u64 b) noexcept { a.low |= b; return a; }
 	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator|=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept { a.low |= b.low; a.high |= b.high; return a; }
+
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, u64 b) noexcept { a.low ^= b; return a; }
 	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator^=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept { a.low ^= b.low; a.high ^= b.high; return a; }
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator<<=(double_int<bits, sign> &val, u64 count) noexcept
@@ -406,12 +421,24 @@ namespace BiggerInts
 
 	// -- io -- //
 
-	template<u64 bits> inline std::ostream &operator<<(std::ostream &ostr, const double_int<bits, false> &val)
+	// given a hex character, converts it to an integer [0, 15] - returns true if it was a valid hex digit. ch is only meaningful on success.
+	inline constexpr bool ext_hex(int &ch) noexcept
+	{
+		if (ch >= '0' && ch <= '9') { ch -= '0'; return true; }
+		ch |= 32;
+		if (ch >= 'a' && ch <= 'f') { ch = ch - 'a' + 10; return true; }
+		return false;
+	}
+
+	template<u64 bits> std::ostream &operator<<(std::ostream &ostr, const double_int<bits, false> &val)
 	{
 		double_int<bits, false> cpy = val;
 		std::string str;
 		int digit;
 		u64 block;
+
+		std::ostream::sentry sentry(ostr);
+		if (!sentry) return ostr;
 
 		// build the string
 		if (ostr.flags() & std::ios::oct)
@@ -475,20 +502,20 @@ namespace BiggerInts
 		// write the string
 		if (ostr.flags() & std::ios::left)
 		{
-			for (int i = str.size() - 1; i >= 0; --i) ostr.put(str[i]);
+			for (std::size_t i = str.size(); i > 0;) ostr.put(str[--i]);
 			for (int i = (int)ostr.width() - (int)str.size(); i > 0; --i) ostr.put(ostr.fill());
 		}
 		else // default to right
 		{
 			for (int i = (int)ostr.width() - (int)str.size(); i > 0; --i) ostr.put(ostr.fill());
-			for (int i = str.size() - 1; i >= 0; --i) ostr.put(str[i]);
+			for (std::size_t i = str.size(); i > 0;) ostr.put(str[--i]);
 		}
 
 		// clobber width - makes sure the next write isn't weird
 		ostr.width(0);
 		return ostr;
 	}
-	template<u64 bits> inline std::ostream &operator<<(std::ostream &ostr, const double_int<bits, true> &val)
+	template<u64 bits> std::ostream &operator<<(std::ostream &ostr, const double_int<bits, true> &val)
 	{
 		// we'll do signed io in terms of unsigned
 
@@ -512,6 +539,150 @@ namespace BiggerInts
 		ostr << *(double_int<bits, false>*)&cpy;
 
 		return ostr;
+	}
+	
+	template<u64 bits> std::istream &parse_udouble_int(std::istream &istr, double_int<bits, false> &val, bool noskipws = false)
+	{
+		val = 0; // start by zeroing value
+		int digit, num_digits;
+		u64 block;
+
+		std::istream::sentry sentry(istr, noskipws);
+		if (!sentry) return istr;
+
+		// parse the string
+		if (istr.flags() & std::ios::oct)
+		{
+			parse_oct:
+
+			// first char must be an oct digit - don't extract
+			if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+			if (digit < '0' || digit > '7') { istr.setstate(std::ios::failbit); return istr; }
+
+			while (true)
+			{
+				block = 0; // read a block of 21 oct digits
+				for (num_digits = 0; num_digits < 21; ++num_digits)
+				{
+					// get the digit and make sure it's in range - only extract it if it's good
+					if ((digit = istr.peek()) == EOF) break;
+					if (digit < '0' || digit > '7') break;
+					istr.get();
+
+					block <<= 3;
+					block |= digit - '0';
+				}
+				// incorporate it into value
+				val <<= (u64)(3 * num_digits);
+				val |= block;
+
+				if (num_digits < 21) break;
+			}
+		}
+		else if (istr.flags() & std::ios::hex)
+		{
+			parse_hex:
+
+			// first char must be an hex digit - don't extract
+			if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+			if (!ext_hex(digit)) { istr.setstate(std::ios::failbit); return istr; }
+
+			while (true)
+			{
+				block = 0; // read a block of 16 hex digits
+				for (num_digits = 0; num_digits < 16; ++num_digits)
+				{
+					// get the digit and make sure it's in range - only extract it if it's good
+					if ((digit = istr.peek()) == EOF) break;
+					if (!ext_hex(digit)) break;
+					istr.get();
+
+					block <<= 4;
+					block |= digit;
+				}
+				// incorporate it into value
+				val <<= (u64)(4 * num_digits);
+				val |= block;
+
+				if (num_digits < 16) break;
+			}
+		}
+		else if(istr.flags() & std::ios::dec)
+		{
+			parse_dec:
+
+			// first char must be an dec digit - don't extract
+			if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+			if (digit < '0' || digit > '9') { istr.setstate(std::ios::failbit); return istr; }
+
+			while (true)
+			{
+				block = 0; // read a block of 19 dec digits
+				for (num_digits = 0; num_digits < 19; ++num_digits)
+				{
+					// get the digit and make sure it's in range - only extract it if it's good
+					if ((digit = istr.peek()) == EOF) break;
+					if (digit < '0' || digit > '9') break;
+					istr.get();
+
+					block *= 10;
+					block += digit - '0';
+				}
+				// incorporate it into value
+				val *= (double_int<bits, false>)(u64)std::pow((u64)10, (u64)num_digits);
+				val += (double_int<bits, false>)block;
+
+				if (num_digits < 19) break;
+			}
+		}
+		else // if no base specified, determine it from the suffix
+		{
+			// look at the top character - fail if none
+			if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+			// if it's a zero we have a prefix
+			if (digit == '0')
+			{
+				// get the next character - if there is none, it's a valid dec zero
+				istr.get();
+				if ((digit = istr.peek()) == EOF) return istr;
+
+				// if second char is 'x', extract it and parse a hex value
+				if (digit == 'x') { istr.get(); goto parse_hex; }
+				// otherwise parse as oct
+				else goto parse_oct;
+			}
+			// no prefix is dec
+			else goto parse_dec;
+		}
+
+		return istr;
+	}
+
+	template<u64 bits> inline std::istream &operator>>(std::istream &istr, double_int<bits, false> &val) { parse_udouble_int(istr, val); return istr; }
+	template<u64 bits> std::istream &operator>>(std::istream &istr, double_int<bits, true> &val)
+	{
+		// we'll do signed io in terms of unsigned
+
+		int ch;
+		bool neg = false;
+
+		std::istream::sentry sentry(istr);
+		if (!sentry) return istr;
+
+		// look at the first char - fail if we can't get one
+		if ((ch = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+
+		// account for optional sign - extract it if present
+		if (ch == '-') { istr.get(); neg = true; }
+		else if (ch == '+') istr.get();
+
+		// parse the value (and don't skip ws since we already did that)
+		parse_udouble_int(istr, *(double_int<bits, false>*)&val, true);
+
+		// account for sign in result
+		if (neg) make_neg(val);
+
+		return istr;
 	}
 
 	// -- extra utilities -- //
@@ -570,7 +741,7 @@ namespace std
 		static constexpr bool is_bounded = true;
 		static constexpr bool is_modulo = true;
 		static constexpr int digits = sign ? bits - 1 : bits;
-		static constexpr int digits10 = digits * 0.301029995663981195213738894724493026768189881462108541310; // log10(2)
+		static constexpr int digits10 = (int)(digits * 0.301029995663981195213738894724493026768189881462108541310); // log10(2)
 		static constexpr int max_digits10 = 0;
 		static constexpr int radix = 2;
 		static constexpr int min_exponent = 0;
@@ -600,6 +771,43 @@ namespace std
 
 	template<typename T, std::uint64_t bits> struct std::make_signed<BiggerInts::masked_single_int<T, bits>> { typedef std::make_signed_t<T> type; };
 	template<typename T, std::uint64_t bits> struct std::make_unsigned<BiggerInts::masked_single_int<T, bits>> { typedef std::make_unsigned_t<T> type; };
+
+	template<typename T, std::uint64_t bits> struct std::numeric_limits<BiggerInts::masked_single_int<T, bits>>
+	{
+		static constexpr bool is_specialized = true;
+		static constexpr bool is_signed = std::is_signed_v<T>;
+		static constexpr bool is_integer = true;
+		static constexpr bool is_exact = true;
+		static constexpr bool has_infinity = false;
+		static constexpr bool has_quiet_NaN = false;
+		static constexpr bool has_signaling_NaN = false;
+		static constexpr bool has_denorm = false;
+		static constexpr bool has_denorm_loss = false;
+		static constexpr std::float_round_style round_style = std::round_toward_zero;
+		static constexpr bool is_iec559 = false;
+		static constexpr bool is_bounded = true;
+		static constexpr bool is_modulo = true;
+		static constexpr int digits = std::is_signed_v<T> ? bits - 1 : bits;
+		static constexpr int digits10 = (int)(digits * 0.301029995663981195213738894724493026768189881462108541310); // log10(2)
+		static constexpr int max_digits10 = 0;
+		static constexpr int radix = 2;
+		static constexpr int min_exponent = 0;
+		static constexpr int min_exponent10 = 0;
+		static constexpr int max_exponent = 0;
+		static constexpr int max_exponent10 = 0;
+		static constexpr bool traps = true;
+		static constexpr bool tinyness_before = false;
+
+		static constexpr const BiggerInts::masked_single_int<T, bits> &min() { static const BiggerInts::masked_single_int<T, bits> val = std::is_signed_v<T> ? (T)1 << (bits - 1) : 0; return val; }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &lowest() { return min(); }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &max() { static const BiggerInts::masked_single_int<T, bits> val = std::is_signed_v<T> ? ~((T)1 << (bits - 1)) : ~(T)0; return val; }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &epsilon() { static const BiggerInts::masked_single_int<T, bits> val = 0; return val; }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &round_error() { return epsilon(); }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &infinity() { return epsilon(); }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &quiet_NaN() { return epsilon(); }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &signaling_NaN() { return epsilon(); }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &denorm_min() { return epsilon(); }
+	};
 }
 
 #endif

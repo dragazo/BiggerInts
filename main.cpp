@@ -9,7 +9,31 @@ int main(int argc, const char *argv[])
 {
 	using namespace BiggerInts;
 	
+	int_t<512> _readme = 0;
+
+	std::cin >> std::setbase(0);
+	std::cout << std::boolalpha;
+
+	std::cin >> _readme;
+	std::cout << "got: " << _readme << '\n';
+	std::cout << (bool)std::cin << "\n\n\n";
+	//std::cin.clear();
+	//std::cout << '\'' << (char)std::cin.get() << "\'\n";
+
 	//uint_t<32> a;
+
+	typedef int_t<23> t_t;
+
+	std::cout << std::boolalpha << std::hex;
+
+	std::cout << "min: " << std::numeric_limits<t_t>::min() << '\n';
+	std::cout << "max: " << std::numeric_limits<t_t>::max() << '\n';
+	std::cout << "bits: " << std::numeric_limits<t_t>::digits10 << '\n';
+	std::cout << "dig: " << std::numeric_limits<t_t>::digits10 << '\n';
+	std::cout << "signed: " << std::numeric_limits<t_t>::is_signed << '\n';
+	std::cout << "eps: " << std::numeric_limits<t_t>::epsilon() << '\n';
+
+	std::cout << "\n\n\n";
 
 	//std::uint32_t *b = &a;
 	//std::cout << std::hex;
