@@ -14,21 +14,23 @@ int main(int argc, const char *argv[])
 	std::cin >> std::setbase(0);
 	std::cout << std::boolalpha;
 
-	std::cin >> _readme;
+	//std::cin >> _readme;
 	std::cout << "got: " << _readme << '\n';
 	std::cout << (bool)std::cin << "\n\n\n";
 	//std::cin.clear();
 	//std::cout << '\'' << (char)std::cin.get() << "\'\n";
 
 	//uint_t<32> a;
+	//std::cout << "offset: " << (std::size_t)(&((double_int<512, false>*)0)->low) << '\n';
+	//auto off = offsetof(decltype(double_int<512, false>()), low);
 
 	typedef int_t<23> t_t;
 
-	std::cout << std::boolalpha << std::hex;
+	//std::cout << std::boolalpha << std::hex;
 
 	std::cout << "min: " << std::numeric_limits<t_t>::min() << '\n';
 	std::cout << "max: " << std::numeric_limits<t_t>::max() << '\n';
-	std::cout << "bits: " << std::numeric_limits<t_t>::digits10 << '\n';
+	std::cout << "bits: " << std::numeric_limits<t_t>::digits << '\n';
 	std::cout << "dig: " << std::numeric_limits<t_t>::digits10 << '\n';
 	std::cout << "signed: " << std::numeric_limits<t_t>::is_signed << '\n';
 	std::cout << "eps: " << std::numeric_limits<t_t>::epsilon() << '\n';
@@ -74,6 +76,13 @@ int main(int argc, const char *argv[])
 
 	_big_ *= _big_;
 	_big_ /= (decltype(_big_))23;
+
+	_big_ *= 53;
+
+	_big_ += 75;
+	_big_ += big;
+	big += _big_;
+	big += 7;
 
 	//std::cout << std::hex;
 	std::cout << "built value: " << _big_ << "\n\n";
@@ -153,7 +162,7 @@ int main(int argc, const char *argv[])
 	//if (thing) std::cout << "nonzero\n";
 	//else std::cout << "zero\n";
 	
-	std::cout << std::hex;
+	//std::cout << std::hex;
 
 	int_t<512> a;// , b, c, d;
 	int_t<128> b, f, g;
