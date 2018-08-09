@@ -84,6 +84,10 @@ int main(int argc, const char *argv[])
 	big += _big_;
 	big += 7;
 
+	big |= (unsigned)7;
+	big &= (unsigned)7;
+	big ^= (unsigned)7;
+
 	//std::cout << std::hex;
 	std::cout << "built value: " << _big_ << "\n\n";
 	std::cout << "built value x-77: " << (_big_ * -(decltype(_big_))77) << "\n\n";

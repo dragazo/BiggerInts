@@ -24,6 +24,17 @@ Report bugs to https://github.com/dragazo/BiggerInts/issues
 
 */
 
+// -- optimization switches -- //
+
+// if true, uses shortcut: address of struct == address of first member
+#define USE_C_PTR_TO_FIRST 1
+
+// the types to use for zero/sign extension. zero ext must be unsigned. sign ext must be signed.
+#define ZEXT_TYPE unsigned
+#define SEXT_TYPE signed
+
+// --------------------------- //
+
 namespace BiggerInts
 {
 	// -- helpers and types -- //
@@ -145,35 +156,35 @@ namespace BiggerInts
 
 	public: // -- promotion constructors -- //
 
-		inline constexpr double_int(std::uint8_t val) noexcept : high((unsigned)0), low(val) {}
-		inline constexpr double_int(std::uint16_t val) noexcept : high((unsigned)0), low(val) {}
-		inline constexpr double_int(std::uint32_t val) noexcept : high((unsigned)0), low(val) {}
-		inline constexpr double_int(std::uint64_t val) noexcept : high((unsigned)0), low(val) {}
+		inline constexpr double_int(std::uint8_t val) noexcept : high((ZEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(std::uint16_t val) noexcept : high((ZEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(std::uint32_t val) noexcept : high((ZEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(std::uint64_t val) noexcept : high((ZEXT_TYPE)0), low(val) {}
 		
-		inline constexpr double_int(std::int8_t val) noexcept : high(val < 0 ? -1 : 0), low(val) {}
-		inline constexpr double_int(std::int16_t val) noexcept : high(val < 0 ? -1 : 0), low(val) {}
-		inline constexpr double_int(std::int32_t val) noexcept : high(val < 0 ? -1 : 0), low(val) {}
-		inline constexpr double_int(std::int64_t val) noexcept : high(val < 0 ? -1 : 0), low(val) {}
+		inline constexpr double_int(std::int8_t val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(std::int16_t val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(std::int32_t val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(std::int64_t val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
 
-		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int(const double_int<_bits, false> &val) noexcept : high((unsigned)0), low(val) {}
-		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int(const double_int<_bits, true> &val) noexcept : high(is_neg(val) ? -1 : 0), low(val) {}
+		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int(const double_int<_bits, false> &val) noexcept : high((ZEXT_TYPE)0), low(val) {}
+		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int(const double_int<_bits, true> &val) noexcept : high(is_neg(val) ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
 
 		template<u64 _bits, bool _sign, std::enable_if_t<(bits == _bits), int> = 0> inline constexpr double_int(const double_int<_bits, _sign> &val) noexcept { *this = *(double_int*)&val; }
 
 	public: // -- promotion assignment -- //
 
-		inline constexpr double_int &operator=(std::uint8_t val) noexcept { high = (unsigned)0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::uint16_t val) noexcept { high = (unsigned)0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::uint32_t val) noexcept { high = (unsigned)0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::uint64_t val) noexcept { high = (unsigned)0; low = val; return *this; }
+		inline constexpr double_int &operator=(std::uint8_t val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(std::uint16_t val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(std::uint32_t val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(std::uint64_t val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
 
-		inline constexpr double_int &operator=(std::int8_t val) noexcept { high = val < 0 ? -1 : 0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::int16_t val) noexcept { high = val < 0 ? -1 : 0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::int32_t val) noexcept { high = val < 0 ? -1 : 0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::int64_t val) noexcept { high = val < 0 ? -1 : 0; low = val; return *this; }
+		inline constexpr double_int &operator=(std::int8_t val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(std::int16_t val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(std::int32_t val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(std::int64_t val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
 		
-		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, false> &val) noexcept { high = (unsigned)0; low = val; return *this; }
-		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, true> &val) noexcept { high = is_neg(val) ? -1 : 0; low = val; return *this; }
+		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, false> &val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
+		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, true> &val) noexcept { high = is_neg(val) ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
 
 		template<u64 _bits, bool _sign, std::enable_if_t<(bits == _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, _sign> &val) noexcept { *this = *(double_int*)&val; return *this; }
 
@@ -190,7 +201,14 @@ namespace BiggerInts
 		inline constexpr explicit operator std::int64_t() const noexcept { return (std::int64_t)low64(*this); }
 
 		template<u64 _bits, bool _sign, std::enable_if_t<(_bits < bits), int> = 0>
-		inline constexpr explicit operator double_int<_bits, _sign>() const noexcept { return (double_int<_bits, _sign>)low; }
+		inline constexpr explicit operator double_int<_bits, _sign>() const noexcept
+		{
+			#if USE_C_PTR_TO_FIRST
+			return *(double_int<_bits, _sign>*)this;
+			#else
+			return (double_int<_bits, _sign>)low;
+			#endif
+		}
 
 	public: // -- bool conversion -- //
 
@@ -236,10 +254,10 @@ namespace BiggerInts
 
 	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator&=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept { a.low &= b.low; a.high &= b.high; return a; }
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, const T &b) noexcept { a &= (double_int<bits, sign>)b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint64_t b) noexcept { a.low &= b; a.high = (unsigned)0; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint32_t b) noexcept { a.low &= b; a.high = (unsigned)0; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint16_t b) noexcept { a.low &= b; a.high = (unsigned)0; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint8_t b) noexcept { a.low &= b; a.high = (unsigned)0; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint64_t b) noexcept { a = low64(a) & b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint32_t b) noexcept { a = low64(a) & b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint16_t b) noexcept { a = low64(a) & b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint8_t b) noexcept { a = low64(a) & b; return a; }
 	
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator&(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res &= b; return res; }
 
@@ -247,10 +265,10 @@ namespace BiggerInts
 
 	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator|=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept { a.low |= b.low; a.high |= b.high; return a; }
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, const T &b) noexcept { a |= (double_int<bits, sign>)b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint64_t b) noexcept { a.low |= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint32_t b) noexcept { a.low |= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint16_t b) noexcept { a.low |= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint8_t b) noexcept { a.low |= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint64_t b) noexcept { ref_low64(a) |= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint32_t b) noexcept { ref_low64(a) |= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint16_t b) noexcept { ref_low64(a) |= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint8_t b) noexcept { ref_low64(a) |= b; return a; }
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator|(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res |= b; return res; }
 
@@ -258,10 +276,10 @@ namespace BiggerInts
 
 	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator^=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept { a.low ^= b.low; a.high ^= b.high; return a; }
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, const T &b) noexcept { a ^= (double_int<bits, sign>)b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint64_t b) noexcept { a.low ^= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint32_t b) noexcept { a.low ^= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint16_t b) noexcept { a.low ^= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint8_t b) noexcept { a.low ^= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint64_t b) noexcept { ref_low64(a) ^= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint32_t b) noexcept { ref_low64(a) ^= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint16_t b) noexcept { ref_low64(a) ^= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint8_t b) noexcept { ref_low64(a) ^= b; return a; }
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator^(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res ^= b; return res; }
 
@@ -276,7 +294,7 @@ namespace BiggerInts
 			{
 				val.high = val.low;
 				val.high <<= count - bits / 2;
-				val.low = 0;
+				val.low = (ZEXT_TYPE)0;
 			}
 			else
 			{
@@ -301,7 +319,7 @@ namespace BiggerInts
 			{
 				val.low = val.high;
 				val.low >>= count - bits / 2;
-				val.high = 0;
+				val.high = (ZEXT_TYPE)0;
 			}
 			else
 			{
@@ -323,7 +341,7 @@ namespace BiggerInts
 				val.low >>= count - bits / 2;
 				if (is_neg(val.high)) // fill with sign bit
 				{
-					val.high = -1;
+					val.high = (SEXT_TYPE)-1;
 					if (count != bits / 2) val.low |= val.high << (bits - count);
 				}
 				else val.high = 0;
@@ -335,7 +353,7 @@ namespace BiggerInts
 				if (is_neg(val.high)) // fill with sign bit
 				{
 					val.high >>= count;
-					val.high |= (decltype(val.high))(-1) << (bits / 2 - count);
+					val.high |= (decltype(val.high))((SEXT_TYPE)-1) << (bits / 2 - count);
 				}
 				else val.high >>= count;
 			}
@@ -355,7 +373,7 @@ namespace BiggerInts
 
 	template<u64 bits> inline constexpr double_int<bits, false> operator*(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept
 	{
-		double_int<bits, false> res = 0, _a = a;
+		double_int<bits, false> res = (ZEXT_TYPE)0, _a = a;
 		for (u64 bit = 0; _a; ++bit, _a <<= 1)
 			if (bit_test(b, bit)) res += _a;
 		return res;
@@ -727,10 +745,30 @@ namespace BiggerInts
 	// -- extra utilities -- //
 
 	// gets the low 64-bit word of a given value
-	inline constexpr u64 low64(u64 val) noexcept { return val; }
-	template<u64 bits, bool sign> u64 low64(const double_int<bits, sign> &val) noexcept { return low64(val.low); }
+	template<bool sign> u64 low64(const double_int<128, sign> &val) noexcept { return val.low; }
+	template<u64 bits, bool sign> u64 low64(const double_int<bits, sign> &val) noexcept
+	{
+		#if USE_C_PTR_TO_FIRST
+		// because the low half always comes first, the entire recursive definition for any number of bits is little-endian wrt 64-bit blocks
+		return *(u64*)&val;
+		#else
+		return low64(val.low);
+		#endif
+	}
 
-	inline constexpr void make_not(std::uint64_t &val) noexcept { val = ~val; }
+	// same as low64() but returns by reference
+	template<bool sign> u64 &ref_low64(double_int<128, sign> &val) noexcept { return val.low; }
+	template<u64 bits, bool sign> u64 &ref_low64(double_int<bits, sign> &val) noexcept
+	{
+		#if USE_C_PTR_TO_FIRST
+		// because the low half always comes first, the entire recursive definition for any number of bits is little-endian wrt 64-bit blocks
+		return *(u64*)&val;
+		#else
+		return ref_low64(val.low);
+		#endif
+	}
+
+	template<bool sign> inline constexpr void make_not(double_int<128, sign> &val) noexcept { val.low = ~val.low; val.high = ~val.high; }
 	template<u64 bits, bool sign> inline constexpr void make_not(double_int<bits, sign> &val) noexcept { make_not(val.low); make_not(val.high); }
 
 	template<u64 bits, bool sign> inline constexpr void make_neg(double_int<bits, sign> &val) noexcept { make_not(val); ++val; }
