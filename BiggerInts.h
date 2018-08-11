@@ -36,6 +36,9 @@ Report bugs to https://github.com/dragazo/BiggerInts/issues
 #define ZEXT_TYPE unsigned
 #define SEXT_TYPE signed
 
+// ADC is a faster addition algorithm, but has a higher constant cost. sizes below this will use the (worse) algorithm. at and above will use ADC.
+#define ADC_THRESH 1024
+
 // --------------------------- //
 
 namespace BiggerInts
@@ -245,13 +248,19 @@ namespace BiggerInts
 
 	// -- add -- //
 
-	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator+=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
+	template<u64 bits, bool sign1, bool sign2, std::enable_if_t<(bits < ADC_THRESH), int> = 0> inline constexpr double_int<bits, sign1> &operator+=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 	{
 		a.low += b.low;
 		if (a.low < b.low) ++a.high;
 		a.high += b.high;
 		return a;
 	}
+	template<u64 bits, bool sign1, bool sign2, std::enable_if_t<(bits >= ADC_THRESH), int> = 0> inline constexpr double_int<bits, sign1> &operator+=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
+	{
+		ADC(a, *(double_int<bits, sign1>*)&b, false);
+		return a;
+	}
+
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator+=(double_int<bits, sign> &a, const T &b) noexcept { a += (double_int<bits, sign>)b; return a; }
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator+(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res += b; return res; }
@@ -260,13 +269,19 @@ namespace BiggerInts
 
 	// -- sub -- //
 
-	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator-=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
+	template<u64 bits, bool sign1, bool sign2, std::enable_if_t<(bits < ADC_THRESH), int> = 0> inline constexpr double_int<bits, sign1> &operator-=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 	{
 		if (a.low < b.low) --a.high;
 		a.low -= b.low;
 		a.high -= b.high;
 		return a;
 	}
+	template<u64 bits, bool sign1, bool sign2, std::enable_if_t<(bits >= ADC_THRESH), int> = 0> inline constexpr double_int<bits, sign1> &operator-=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
+	{
+		ADCN(a, *(double_int<bits, sign1>*)&b, true);
+		return a;
+	}
+
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator-=(double_int<bits, sign> &a, const T &b) noexcept { a -= (double_int<bits, sign>)b; return a; }
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator-(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res -= b; return res; }
@@ -833,6 +848,36 @@ namespace BiggerInts
 
 	// -- extra utilities -- //
 
+	// adds b to a and optionally increments if carry is true. returns carry out
+	inline constexpr bool ADC(u64 &a, u64 b, bool carry) noexcept
+	{
+		// do the addition and get carry out
+		a += b;
+		bool _c = a < b;
+
+		// account for carry in
+		if (carry && !++a) _c = true;
+
+		// return carry out
+		return _c;
+	}
+	template<u64 bits, bool sign> inline constexpr bool ADC(double_int<bits, sign> &a, const double_int<bits, sign> &b, bool carry) noexcept { return ADC(a.high, b.high, ADC(a.low, b.low, carry)); }
+
+	// as ADC but adds the bitwise not of b
+	inline constexpr bool ADCN(u64 &a, u64 b, bool carry) noexcept
+	{
+		// do the addition and get carry out
+		a += ~b;
+		bool _c = a < ~b;
+
+		// account for carry in
+		if (carry && !++a) _c = true;
+
+		// return carry out
+		return _c;
+	}
+	template<u64 bits, bool sign> inline constexpr bool ADCN(double_int<bits, sign> &a, const double_int<bits, sign> &b, bool carry) noexcept { return ADCN(a.high, b.high, ADCN(a.low, b.low, carry)); }
+
 	// counts the number of set bits
 	inline constexpr u64 num_set_bits(u64 val) noexcept
 	{
@@ -840,27 +885,7 @@ namespace BiggerInts
 		for (; val; ++num, val = val & (val - 1));
 		return num;
 	}
-	template<u64 bits, bool sign> inline constexpr u64 num_set_bits(const double_int<bits, sign> &val) noexcept
-	{
-		#if USE_C_PTR_TO_FIRST && USE_COMPACTNESS
-		// we need to make sure it's actually compact
-		static_assert(sizeof(double_int<bits, sign>) == bits / CHAR_BIT, "type was not compact");
-
-		// get pointer to bytes
-		u64 *ptr = (u64*)&val;
-		u64 num = 0;
-		for (auto i = bits / 64; i > 0;) num += num_set_bits(ptr[--i]);
-		return num;
-
-		#else
-
-		double_int<bits, sign> cpy = val;
-		u64 num = 0;
-		for (; cpy; cpy >>= 64) num += num_set_bits(low64(cpy));
-		return num;
-
-		#endif
-	}
+	template<u64 bits, bool sign> inline constexpr u64 num_set_bits(const double_int<bits, sign> &val) noexcept { return num_set_bits(val.low) + num_set_bits(val.high); }
 
 	// gets the number of 64-bit blocks with significant bits (i.e. not including leading zero blocks)
 	template<u64 bits, bool sign> inline constexpr u64 num_blocks(const double_int<bits, sign> &val) noexcept

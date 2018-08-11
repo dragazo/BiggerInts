@@ -13,7 +13,7 @@
 
 #define t_start auto _t = std::chrono::high_resolution_clock::now();
 #define t_end auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - _t).count();
-#define t_print(expr, count) { std::cout << #expr ": " << dt << "ms\n"; }
+#define t_print(expr, count) { std::cout << #expr " -> " << (expr)  << " : " << dt << "ms\n"; }
 
 #define t_test(init, expr, count) { init; t_start; for(int i = 0; i < count; ++i) (expr); t_end; t_print(expr, count); }
 
@@ -23,12 +23,15 @@ int main(int argc, const char *argv[])
 	
 	int_t<512> _readme = 0;
 
-	t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c, c = a * b, 300000);
-	t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 64; b <<= 64, c = a * b, 300000);
-	t_test(uint_t<512> a = 74652465 COMMA b = 947563412 COMMA c, c = a * b, 300000);
-	t_test(uint_t<512> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256; b <<= 256, c = a * b, 300000);
-	t_test(uint_t<512> a = 74652465 COMMA b = 947563412 COMMA c; b <<= 256, c = a * b, 300000);
-	t_test(uint_t<512> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256, c = a * b, 300000);
+	#define __count__ 9000000
+	#define __bits__ 8192 * 8
+
+	t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c, c = ++a, __count__);
+	t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 64; b <<= 64, c = ++a, __count__);
+	t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c, c = ++a, __count__);
+	t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256; b <<= 256, c = ++a, __count__);
+	t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; b <<= 256, c = ++a, __count__);
+	t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256, c = ++a, __count__);
 
 	std::cin.get();
 	return 0;
