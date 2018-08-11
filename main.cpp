@@ -2,10 +2,20 @@
 #include <iomanip>
 #include <type_traits>
 #include <limits>
+#include <chrono>
 
 #include "BiggerInts.h"
 
-#define test(expr, expected, name) { auto res = (expr); if(res != (expected)) std::cerr << "Failed Test: " << (name) << ' ' << #expr << " -> " << res << " != " << expected << '\n'; }
+#define COMMA ,
+
+#define test_fail(expr, expected, name) { std::cerr << "Failed Test: " << (name) << " " expr " -> " << res << " != " << (expected) << '\n'; }
+#define test(expr, expected, name) { auto res = (expr); if(res != (expected)) test_fail(expr, expected, name); }
+
+#define t_start auto _t = std::chrono::high_resolution_clock::now();
+#define t_end auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - _t).count();
+#define t_print(expr, count) { std::cout << #expr ": " << dt << "ms\n"; }
+
+#define t_test(init, expr, count) { init; t_start; for(int i = 0; i < count; ++i) (expr); t_end; t_print(expr, count); }
 
 int main(int argc, const char *argv[])
 {
@@ -13,6 +23,18 @@ int main(int argc, const char *argv[])
 	
 	int_t<512> _readme = 0;
 
+	t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c, c = a * b, 300000);
+	t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 64; b <<= 64, c = a * b, 300000);
+	t_test(uint_t<512> a = 74652465 COMMA b = 947563412 COMMA c, c = a * b, 300000);
+	t_test(uint_t<512> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256; b <<= 256, c = a * b, 300000);
+	t_test(uint_t<512> a = 74652465 COMMA b = 947563412 COMMA c; b <<= 256, c = a * b, 300000);
+	t_test(uint_t<512> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256, c = a * b, 300000);
+
+	std::cin.get();
+	return 0;
+
+
+	/*
 	std::cin >> std::setbase(0);
 	std::cout << std::boolalpha;
 
@@ -45,13 +67,13 @@ int main(int argc, const char *argv[])
 
 	std::cout << "base: " << base << "\n\n\n";
 
-	/*
+	
 	u64 num_high = 5;
 	u64 num_low = 4;
 	u64 denom = 2;
 
 	auto dm = divmod(build_uint<128>(num_high, num_low), (uint_t<128>)denom);
-	*/
+	
 	
 	double_int<8192, false> big = 24;
 
@@ -99,6 +121,11 @@ int main(int argc, const char *argv[])
 	big |= 7;
 	big &= 7;
 	big ^= 7;
+
+	int int_thing = 8;
+
+	+int_thing;
+	+_big_;
 
 	//std::cout << std::hex;
 	std::cout << "built value: " << _big_ << "\n\n";
@@ -217,4 +244,5 @@ int main(int argc, const char *argv[])
 	std::cin.get();
 	std::system("pause");
 	return 0;
+	*/
 }

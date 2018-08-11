@@ -29,6 +29,8 @@ Report bugs to https://github.com/dragazo/BiggerInts/issues
 
 // if true, uses shortcut: address of struct == address of first member
 #define USE_C_PTR_TO_FIRST 1
+// if true, uses compactness shortcuts in double_int functions
+#define USE_COMPACTNESS 1
 
 // the types to use for zero/sign extension. zero ext must be unsigned. sign ext must be signed.
 #define ZEXT_TYPE unsigned
@@ -220,7 +222,7 @@ namespace BiggerInts
 	// shorthand for binary ops +, -, *, etc. will refer to a form that uses both sides of double_int
 	#define SHORTHAND_BINARY_FORMATTER(op, sign, type) \
 		template<u64 bits> inline constexpr double_int<bits, sign> operator op(const double_int<bits, sign> &a, type b) noexcept { return a op (double_int<bits, sign>)b; } \
-		template<u64 bits> inline constexpr double_int<bits, sign> operator op(type b, const double_int<bits, sign> &a) noexcept { return a op (double_int<bits, sign>)b; }
+		template<u64 bits> inline constexpr double_int<bits, sign> operator op(type a, const double_int<bits, sign> &b) noexcept { return (double_int<bits, sign>)a op b; }
 	// does all the standard shorthands for a given op
 	#define SHORTERHAND_BINARY_FORMATTER(op) \
 		SHORTHAND_BINARY_FORMATTER(op, false, std::uint64_t) \
@@ -392,6 +394,8 @@ namespace BiggerInts
 
 	// -- unary -- //
 
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator+(const double_int<bits, sign> &a) noexcept { return a; }
+
 	template<u64 bits> inline constexpr double_int<bits, true> operator-(const double_int<bits, true> &a) noexcept { double_int<bits, true> res = ~a; ++res; return res; }
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator~(const double_int<bits, sign> &a) noexcept { double_int<bits, sign> res; res.high = ~a.high; res.low = ~a.low; return res; }
@@ -549,7 +553,7 @@ namespace BiggerInts
 	{
 		double_int<bits, false> cpy = val;
 		std::string str;
-		int digit;
+		int digit, dcount;
 		u64 block;
 
 		std::ostream::sentry sentry(ostr);
@@ -558,36 +562,54 @@ namespace BiggerInts
 		// build the string
 		if (ostr.flags() & std::ios::oct)
 		{
-			do
+			while (true)
 			{
+				// get a block
 				block = low64(cpy) & 0777777777777777777777;
 				cpy >>= 63;
+				dcount = 0;
+
+				// write the block - do-while to ensure 0 gets printed
 				do
 				{
 					str.push_back('0' + (block & 7));
 					block >>= 3;
+					++dcount;
 				}
 				while (block);
+
+				// if there's still stuff, pad with zeroes and continue
+				if (cpy) { for (; dcount < 21; ++dcount) str.push_back('0'); }
+				// otherwise we're done
+				else break;
 			}
-			while (cpy);
 			if (ostr.flags() & std::ios::showbase) ostr.put('0');
 		}
 		else if(ostr.flags() & std::ios::hex)
 		{
 			const char hex_alpha = ostr.flags() & std::ios::uppercase ? 'A' : 'a';
-			do
+			while (true)
 			{
+				// get a block
 				block = low64(cpy);
 				cpy >>= 64;
+				dcount = 0;
+
+				// write the block - do-while to ensure 0 gets printed
 				do
 				{
 					digit = block & 15;
 					str.push_back(digit < 10 ? '0' + digit : hex_alpha + digit - 10);
 					block >>= 4;
+					++dcount;
 				}
 				while (block);
+
+				// if there's still stuff, pad with zeroes and continue
+				if (cpy) { for (; dcount < 16; ++dcount) str.push_back('0'); }
+				// otherwise we're done
+				else break;
 			}
-			while (cpy);
 			if (ostr.flags() & std::ios::showbase)
 			{
 				ostr.put('0'); // uses put() to make sure we don't clobber ostr.width()
@@ -599,19 +621,28 @@ namespace BiggerInts
 			// divmod for double_int is really slow, so we'll extract several decimal digits in one go and then process them with built-in integers
 			static constexpr double_int<bits, false> base = 10000000000000000000;
 			std::pair<double_int<bits, false>, double_int<bits, false>> temp;
-			do
+			while (true)
 			{
+				// get a block
 				temp = divmod(cpy, base);
 				block = low64(temp.second);
 				cpy = temp.first;
+				dcount = 0;
+
+				// write the block - do-while to ensure 0 gets printed
 				do
 				{
 					str.push_back('0' + block % 10);
 					block /= 10;
+					++dcount;
 				}
 				while (block);
+
+				// if there's still stuff, pad with zeroes and continue
+				if (cpy) { for (; dcount < 19; ++dcount) str.push_back('0'); }
+				// otherwise we're done
+				else break;
 			}
-			while (cpy);
 		}
 
 		// write the string
@@ -802,6 +833,61 @@ namespace BiggerInts
 
 	// -- extra utilities -- //
 
+	// counts the number of set bits
+	inline constexpr u64 num_set_bits(u64 val) noexcept
+	{
+		u64 num = 0;
+		for (; val; ++num, val = val & (val - 1));
+		return num;
+	}
+	template<u64 bits, bool sign> inline constexpr u64 num_set_bits(const double_int<bits, sign> &val) noexcept
+	{
+		#if USE_C_PTR_TO_FIRST && USE_COMPACTNESS
+		// we need to make sure it's actually compact
+		static_assert(sizeof(double_int<bits, sign>) == bits / CHAR_BIT, "type was not compact");
+
+		// get pointer to bytes
+		u64 *ptr = (u64*)&val;
+		u64 num = 0;
+		for (auto i = bits / 64; i > 0;) num += num_set_bits(ptr[--i]);
+		return num;
+
+		#else
+
+		double_int<bits, sign> cpy = val;
+		u64 num = 0;
+		for (; cpy; cpy >>= 64) num += num_set_bits(low64(cpy));
+		return num;
+
+		#endif
+	}
+
+	// gets the number of 64-bit blocks with significant bits (i.e. not including leading zero blocks)
+	template<u64 bits, bool sign> inline constexpr u64 num_blocks(const double_int<bits, sign> &val) noexcept
+	{
+		#if USE_C_PTR_TO_FIRST && USE_COMPACTNESS
+		// we need to make sure it's actually compact
+		static_assert(sizeof(double_int<bits, sign>) == bits / CHAR_BIT, "type was not compact");
+
+		// get pointer to u64 blocks (if compact, will be little-endian wrt 64-bit blocks)
+		u64 *ptr = (u64*)&val;
+		// go backwards through blocks (starting at high blocks) and stop on the first non-zero one
+		for (int num = bits / 64; num > 0; --num)
+			if (ptr[num - 1]) return num;
+		// otherwise, value is bit-zero
+		return 0;
+
+		#else
+
+		// start at zero, return when we've shifted out all the significant blocks
+		double_int<bits, sign> cpy = val;
+		int num;
+		for (num = 0; cpy; ++num, cpy >>= 64);
+		return num;
+
+		#endif
+	}
+
 	// gets the low 64-bit word of a given value
 	template<bool sign> u64 low64(const double_int<128, sign> &val) noexcept { return val.low; }
 	template<u64 bits, bool sign> u64 low64(const double_int<bits, sign> &val) noexcept
@@ -815,8 +901,8 @@ namespace BiggerInts
 	}
 
 	// same as low64() but returns by reference
-	template<bool sign> u64 &ref_low64(double_int<128, sign> &val) noexcept { return val.low; }
-	template<u64 bits, bool sign> u64 &ref_low64(double_int<bits, sign> &val) noexcept
+	template<bool sign> inline constexpr u64 &ref_low64(double_int<128, sign> &val) noexcept { return val.low; }
+	template<u64 bits, bool sign> inline constexpr u64 &ref_low64(double_int<bits, sign> &val) noexcept
 	{
 		#if USE_C_PTR_TO_FIRST
 		// because the low half always comes first, the entire recursive definition for any number of bits is little-endian wrt 64-bit blocks
@@ -831,15 +917,9 @@ namespace BiggerInts
 
 	template<u64 bits, bool sign> inline constexpr void make_neg(double_int<bits, sign> &val) noexcept { make_not(val); ++val; }
 
-	inline constexpr bool bit_test(std::uint8_t val, u64 bit) noexcept { return (val >> bit) & 1; }
-	inline constexpr bool bit_test(std::uint16_t val, u64 bit) noexcept { return (val >> bit) & 1; }
-	inline constexpr bool bit_test(std::uint32_t val, u64 bit) noexcept { return (val >> bit) & 1; }
 	inline constexpr bool bit_test(std::uint64_t val, u64 bit) noexcept { return (val >> bit) & 1; }
 	template<u64 bits, bool sign> inline constexpr bool bit_test(const double_int<bits, sign> &val, u64 bit) noexcept { bit &= bits - 1; return bit >= bits / 2 ? bit_test(val.high, bit - bits / 2) : bit_test(val.low, bit); }
 
-	inline constexpr void bit_set(std::uint8_t &val, u64 bit) noexcept { val |= (std::uint8_t)1 << bit; }
-	inline constexpr void bit_set(std::uint16_t &val, u64 bit) noexcept { val |= (std::uint16_t)1 << bit; }
-	inline constexpr void bit_set(std::uint32_t &val, u64 bit) noexcept { val |= (std::uint32_t)1 << bit; }
 	inline constexpr void bit_set(std::uint64_t &val, u64 bit) noexcept { val |= (std::uint64_t)1 << bit; }
 	template<u64 bits, bool sign> inline constexpr void bit_set(double_int<bits, sign> &val, u64 bit) noexcept { bit &= bits - 1; if (bit >= bits / 2) bit_set(val.high, bit - bits / 2); else bit_set(val.low, bit); }
 
