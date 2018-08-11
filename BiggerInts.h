@@ -9,6 +9,7 @@
 #include <string>
 #include <utility>
 #include <exception>
+#include <algorithm>
 
 /*
 
@@ -216,6 +217,22 @@ namespace BiggerInts
 		inline constexpr friend bool operator!(const double_int &a) noexcept { return !(bool)a; }
 	};
 
+	// shorthand for binary ops +, -, *, etc. will refer to a form that uses both sides of double_int
+	#define SHORTHAND_BINARY_FORMATTER(op, sign, type) \
+		template<u64 bits> inline constexpr double_int<bits, sign> operator op(const double_int<bits, sign> &a, type b) noexcept { return a op (double_int<bits, sign>)b; } \
+		template<u64 bits> inline constexpr double_int<bits, sign> operator op(type b, const double_int<bits, sign> &a) noexcept { return a op (double_int<bits, sign>)b; }
+	// does all the standard shorthands for a given op
+	#define SHORTERHAND_BINARY_FORMATTER(op) \
+		SHORTHAND_BINARY_FORMATTER(op, false, std::uint64_t) \
+		SHORTHAND_BINARY_FORMATTER(op, false, std::uint32_t) \
+		SHORTHAND_BINARY_FORMATTER(op, false, std::uint16_t) \
+		SHORTHAND_BINARY_FORMATTER(op, false, std::uint8_t) \
+		\
+		SHORTHAND_BINARY_FORMATTER(op, true, std::int64_t) \
+		SHORTHAND_BINARY_FORMATTER(op, true, std::int32_t) \
+		SHORTHAND_BINARY_FORMATTER(op, true, std::int16_t) \
+		SHORTHAND_BINARY_FORMATTER(op, true, std::int8_t)
+
 	// -- inc/dec -- //
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator++(double_int<bits, sign> &a) noexcept { if (!++a.low) ++a.high; return a; }
@@ -237,6 +254,8 @@ namespace BiggerInts
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator+(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res += b; return res; }
 
+	SHORTERHAND_BINARY_FORMATTER(+)
+
 	// -- sub -- //
 
 	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator-=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
@@ -250,6 +269,8 @@ namespace BiggerInts
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator-(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res -= b; return res; }
 
+	SHORTERHAND_BINARY_FORMATTER(-)
+
 	// -- and -- //
 
 	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator&=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept { a.low &= b.low; a.high &= b.high; return a; }
@@ -260,6 +281,8 @@ namespace BiggerInts
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint8_t b) noexcept { a = low64(a) & b; return a; }
 	
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator&(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res &= b; return res; }
+
+	SHORTERHAND_BINARY_FORMATTER(&)
 
 	// -- or -- //
 
@@ -272,6 +295,8 @@ namespace BiggerInts
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator|(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res |= b; return res; }
 
+	SHORTERHAND_BINARY_FORMATTER(|)
+
 	// -- xor -- //
 
 	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator^=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept { a.low ^= b.low; a.high ^= b.high; return a; }
@@ -282,6 +307,8 @@ namespace BiggerInts
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint8_t b) noexcept { ref_low64(a) ^= b; return a; }
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator^(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res ^= b; return res; }
+
+	SHORTERHAND_BINARY_FORMATTER(^)
 
 	// -- shl/sal -- //
 
@@ -396,6 +423,8 @@ namespace BiggerInts
 		return *(double_int<bits, true>*)&ua;
 	}
 
+	SHORTERHAND_BINARY_FORMATTER(*)
+
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { a = a * b; return a; }
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const T &b) noexcept { a *= (double_int<bits, sign>)b; return a; }
 
@@ -462,6 +491,9 @@ namespace BiggerInts
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator/(const double_int<bits, sign> &num, const double_int<bits, sign> &den) { return divmod(num, den).first; }
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator%(const double_int<bits, sign> &num, const double_int<bits, sign> &den) { return divmod(num, den).second; }
 
+	SHORTERHAND_BINARY_FORMATTER(/)
+	SHORTERHAND_BINARY_FORMATTER(%)
+
 	// -- cmp -- //
 
 	// cmp() will be equivalent to <=> but works for any version of C++
@@ -469,12 +501,38 @@ namespace BiggerInts
 	template<u64 bits> inline constexpr int cmp(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept { return a.high < b.high ? -1 : a.high > b.high ? 1 : a.low < b.low ? -1 : a.low > b.low ? 1 : 0; }
 	template<u64 bits> inline constexpr int cmp(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept { int ucmp = a.high < b.high ? -1 : a.high > b.high ? 1 : a.low < b.low ? -1 : a.low > b.low ? 1 : 0; return bit_test(a, bits - 1) ^ bit_test(b, bits - 1) ? -ucmp : ucmp; }
 	
-	template<u64 bits, bool sign> inline constexpr bool operator==(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { return cmp(a, b) == 0; }
-	template<u64 bits, bool sign> inline constexpr bool operator!=(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { return cmp(a, b) != 0; }
-	template<u64 bits, bool sign> inline constexpr bool operator<(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { return cmp(a, b) < 0; }
-	template<u64 bits, bool sign> inline constexpr bool operator<=(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { return cmp(a, b) <= 0; }
-	template<u64 bits, bool sign> inline constexpr bool operator>(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { return cmp(a, b) > 0; }
-	template<u64 bits, bool sign> inline constexpr bool operator>=(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { return cmp(a, b) >= 0; }
+	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator==(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) == 0; }
+	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator!=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) != 0; }
+	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator<(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) < 0; }
+	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator<=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) <= 0; }
+	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator>(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) > 0; }
+	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator>=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) >= 0; }
+
+	// shorthand for comparing double_int with specified signage to a primitive type
+	#define SHORTHAND_CMP_FORMATTER(sign, type) \
+		template<u64 bits> inline constexpr bool operator==(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) == 0; } \
+		template<u64 bits> inline constexpr bool operator!=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) != 0; } \
+		template<u64 bits> inline constexpr bool operator<(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) < 0; } \
+		template<u64 bits> inline constexpr bool operator<=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) <= 0; } \
+		template<u64 bits> inline constexpr bool operator>(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) > 0; } \
+		template<u64 bits> inline constexpr bool operator>=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) >= 0; } \
+		\
+		template<u64 bits> inline constexpr bool operator==(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) == 0; } \
+		template<u64 bits> inline constexpr bool operator!=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) != 0; } \
+		template<u64 bits> inline constexpr bool operator<(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) < 0; } \
+		template<u64 bits> inline constexpr bool operator<=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) <= 0; } \
+		template<u64 bits> inline constexpr bool operator>(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) > 0; } \
+		template<u64 bits> inline constexpr bool operator>=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) >= 0; }
+
+	SHORTHAND_CMP_FORMATTER(false, std::uint64_t)
+	SHORTHAND_CMP_FORMATTER(false, std::uint32_t)
+	SHORTHAND_CMP_FORMATTER(false, std::uint16_t)
+	SHORTHAND_CMP_FORMATTER(false, std::uint8_t)
+
+	SHORTHAND_CMP_FORMATTER(true, std::int64_t)
+	SHORTHAND_CMP_FORMATTER(true, std::int32_t)
+	SHORTHAND_CMP_FORMATTER(true, std::int16_t)
+	SHORTHAND_CMP_FORMATTER(true, std::int8_t)
 
 	// -- io -- //
 

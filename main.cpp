@@ -5,6 +5,8 @@
 
 #include "BiggerInts.h"
 
+#define test(expr, expected, name) { auto res = (expr); if(res != (expected)) std::cerr << "Failed Test: " << (name) << ' ' << #expr << " -> " << res << " != " << expected << '\n'; }
+
 int main(int argc, const char *argv[])
 {
 	using namespace BiggerInts;
@@ -67,15 +69,25 @@ int main(int argc, const char *argv[])
 
 	std::numeric_limits<decltype(big)>::is_specialized;
 
+	
+
 	int_t<512> _big_;
+	int_t<2048> _bigger_ = -46;
+
 	_big_.high = 1;
 	_big_.low = 2;
 
 	_big_ <<= 2;
 	_big_ >>= 2;
 
+	if (base == (unsigned long long)10000000000000) std::cout << "ALL GOOD!!!\n";
+	if (_big_ > _bigger_) std::cout << "less\n";
+	if (_bigger_ != 65) std::cout << "less equal\n";
+
+	//(const double &)val = 7;
+
 	_big_ *= _big_;
-	_big_ /= (decltype(_big_))23;
+	_big_ /= 23;
 
 	_big_ *= 53;
 
@@ -84,13 +96,13 @@ int main(int argc, const char *argv[])
 	big += _big_;
 	big += 7;
 
-	big |= (unsigned)7;
-	big &= (unsigned)7;
-	big ^= (unsigned)7;
+	big |= 7;
+	big &= 7;
+	big ^= 7;
 
 	//std::cout << std::hex;
 	std::cout << "built value: " << _big_ << "\n\n";
-	std::cout << "built value x-77: " << (_big_ * -(decltype(_big_))77) << "\n\n";
+	std::cout << "built value x-77: " << (_big_ % -77) << "\n\n";
 
 	//big = 23;
 	//big = big & big | big;
