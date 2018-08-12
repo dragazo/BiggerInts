@@ -240,8 +240,46 @@ namespace BiggerInts
 
 	// -- inc/dec -- //
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator++(double_int<bits, sign> &a) noexcept { if (!++a.low) ++a.high; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator--(double_int<bits, sign> &a) noexcept { if (!a.low) --a.high; --a.low; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator++(double_int<bits, sign> &a) noexcept
+	{
+		#if USE_C_PTR_TO_FIRST && USE_COMPACTNESS
+
+		// we need to make sure it's actually compact
+		static_assert(sizeof(double_int<bits, sign>) == bits / CHAR_BIT, "type was not compact");
+
+		// wind up 64-bit blocks - break on the first that doesn't overflow
+		u64 *ptr = (u64*)&a;
+		for (u64 i = 0; i < bits / 64; ++i)
+			if (++ptr[i]) break;
+		return a;
+
+		#else
+
+		if (!++a.low) ++a.high;
+		return a;
+
+		#endif
+	}
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator--(double_int<bits, sign> &a) noexcept
+	{
+		#if USE_C_PTR_TO_FIRST && USE_COMPACTNESS
+
+		// we need to make sure it's actually compact
+		static_assert(sizeof(double_int<bits, sign>) == bits / CHAR_BIT, "type was not compact");
+
+		// wind up 64-bit blocks - break on the first that doesn't underflow
+		u64 *ptr = (u64*)&a;
+		for (u64 i = 0; i < bits / 64; ++i)
+			if (ptr[i]--) break;
+		return a;
+
+		#else
+
+		if (!a.low) --a.high; --a.low;
+		return a;
+
+		#endif
+	}
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator++(double_int<bits, sign> &a, int) noexcept { double_int<bits, sign> val = a; ++a; return val; }
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator--(double_int<bits, sign> &a, int) noexcept { double_int<bits, sign> val = a; --a; return val; }
@@ -449,14 +487,9 @@ namespace BiggerInts
 
 	// -- divmod -- //
 
-	inline constexpr std::pair<std::uint8_t, std::uint8_t> divmod(std::uint8_t num, std::uint8_t den) { return {num / den, num % den}; }
-	inline constexpr std::pair<std::uint16_t, std::uint16_t> divmod(std::uint16_t num, std::uint16_t den) { return {num / den, num % den}; }
-	inline constexpr std::pair<std::uint32_t, std::uint32_t> divmod(std::uint32_t num, std::uint32_t den) { return {num / den, num % den}; }
-	inline constexpr std::pair<std::uint64_t, std::uint64_t> divmod(std::uint64_t num, std::uint64_t den) { return {num / den, num % den}; }
-	template<u64 bits> inline constexpr std::pair<double_int<bits, false>, double_int<bits, false>> divmod(const double_int<bits, false> &num, const double_int<bits, false> &den)
+	// utility function used internally - no divide by zero check
+	template<u64 bits> inline constexpr std::pair<double_int<bits, false>, double_int<bits, false>> divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den)
 	{
-		if (!den) throw std::domain_error("divide by zero");
-
 		std::pair<double_int<bits, false>, double_int<bits, false>> res(0, 0);
 		u64 bit = bits - 1;
 		while (true)
@@ -473,6 +506,16 @@ namespace BiggerInts
 			if (bit-- == 0) break;
 		}
 		return res;
+	}
+
+	inline constexpr std::pair<std::uint8_t, std::uint8_t> divmod(std::uint8_t num, std::uint8_t den) { return {num / den, num % den}; }
+	inline constexpr std::pair<std::uint16_t, std::uint16_t> divmod(std::uint16_t num, std::uint16_t den) { return {num / den, num % den}; }
+	inline constexpr std::pair<std::uint32_t, std::uint32_t> divmod(std::uint32_t num, std::uint32_t den) { return {num / den, num % den}; }
+	inline constexpr std::pair<std::uint64_t, std::uint64_t> divmod(std::uint64_t num, std::uint64_t den) { return {num / den, num % den}; }
+	template<u64 bits> inline constexpr std::pair<double_int<bits, false>, double_int<bits, false>> divmod(const double_int<bits, false> &num, const double_int<bits, false> &den)
+	{
+		if (!den) throw std::domain_error("divide by zero");
+		return divmod_unchecked(num, den);
 	}
 	
 	inline constexpr std::pair<std::int8_t, std::int8_t> divmod(std::int8_t num, std::int8_t den) { return {num / den, num % den}; }
@@ -639,7 +682,7 @@ namespace BiggerInts
 			while (true)
 			{
 				// get a block
-				temp = divmod(cpy, base);
+				temp = divmod_unchecked(cpy, base);
 				block = low64(temp.second);
 				cpy = temp.first;
 				dcount = 0;
