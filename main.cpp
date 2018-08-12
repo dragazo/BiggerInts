@@ -23,18 +23,19 @@ int main(int argc, const char *argv[])
 	
 	int_t<512> _readme = 0;
 
-	#define __count__ 9000000
+	#define __count__ 900000
 	#define __bits__ 8192 * 8
+	//#define __bits__ 1024
 
 	//std::cout << std::hex;
 
-	t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c, c = ++a, __count__);
-	t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 64; b <<= 64, c = ++a, __count__);
+	//t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c, c = ++a, __count__);
+	//t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 64; b <<= 64, c = ++a, __count__);
 
-	t_test(uint_t<__bits__> a = __count__ + 2 COMMA c, c = --a, __count__);
-	t_test(uint_t<__bits__> a = __count__ + 3 COMMA c, c = --a, __count__);
-	t_test(uint_t<__bits__> a = __count__ + 4 COMMA c, c = --a, __count__);
-	t_test(uint_t<__bits__> a = __count__ + 5 COMMA c, c = --a, __count__);
+	t_test(uint_t<__bits__> a = __count__ + 2 COMMA c, c = (a << 175) >> 175, __count__);
+	t_test(uint_t<__bits__> a = __count__ + 3 COMMA c, c = (a << 175) >> 175, __count__);
+	t_test(uint_t<__bits__> a = __count__ + 4 COMMA c, c = (a << 175) >> 175, __count__);
+	t_test(uint_t<__bits__> a = __count__ + 5 COMMA c, c = (a << 175) >> 175, __count__);
 
 	//t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c, c = ++a, __count__);
 	//t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256; b <<= 256, c = ++a, __count__);

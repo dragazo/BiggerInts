@@ -36,10 +36,20 @@ Report bugs to https://github.com/dragazo/BiggerInts/issues
 #define ZEXT_TYPE unsigned
 #define SEXT_TYPE signed
 
-// ADC is a faster addition algorithm, but has a higher constant cost. sizes below this will use the (worse) algorithm. at and above will use ADC.
+// ADC is a faster addition algorithm, but has a higher constant cost. sizes below this will use the (worse) algorithm. bit counts at and above will use ADC.
 #define ADC_THRESH 1024
 
-// --------------------------- //
+// shifts can be done quickly via looping, but it's slower than other methods for smaller sizes. bit counts at and above this value will use loops.
+#define SHIFT_LOOP_THRESH 1024
+
+// -- utility macros -- //
+
+#define __TOSTR(x) #x
+#define TOSTR(x) __TOSTR(x)
+
+#define COMPACTNESS_TEST(sign) static_assert(sizeof(double_int<bits, sign>) == bits / CHAR_BIT, __FILE__ " - " TOSTR(__LINE__) ": type was not compact")
+
+// -------------------- //
 
 namespace BiggerInts
 {
@@ -244,8 +254,7 @@ namespace BiggerInts
 	{
 		#if USE_C_PTR_TO_FIRST && USE_COMPACTNESS
 
-		// we need to make sure it's actually compact
-		static_assert(sizeof(double_int<bits, sign>) == bits / CHAR_BIT, "type was not compact");
+		COMPACTNESS_TEST(sign);
 
 		// wind up 64-bit blocks - break on the first that doesn't overflow
 		u64 *ptr = (u64*)&a;
@@ -264,8 +273,7 @@ namespace BiggerInts
 	{
 		#if USE_C_PTR_TO_FIRST && USE_COMPACTNESS
 
-		// we need to make sure it's actually compact
-		static_assert(sizeof(double_int<bits, sign>) == bits / CHAR_BIT, "type was not compact");
+		COMPACTNESS_TEST(sign);
 
 		// wind up 64-bit blocks - break on the first that doesn't underflow
 		u64 *ptr = (u64*)&a;
@@ -367,7 +375,7 @@ namespace BiggerInts
 
 	// -- shl/sal -- //
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator<<=(double_int<bits, sign> &val, u64 count) noexcept
+	template<u64 bits, bool sign, std::enable_if_t<(!USE_C_PTR_TO_FIRST || !USE_COMPACTNESS || bits < SHIFT_LOOP_THRESH), int> = 0> inline constexpr double_int<bits, sign> &operator<<=(double_int<bits, sign> &val, u64 count) noexcept
 	{
 		// count masked to bits limit - no-op on zero
 		if (count &= bits - 1)
@@ -387,12 +395,48 @@ namespace BiggerInts
 		}
 		return val;
 	}
+	template<u64 bits, bool sign, std::enable_if_t<(USE_C_PTR_TO_FIRST && USE_COMPACTNESS && bits >= SHIFT_LOOP_THRESH), int> = 0> inline constexpr double_int<bits, sign> &operator<<=(double_int<bits, sign> &val, u64 count) noexcept
+	{
+		COMPACTNESS_TEST(sign);
+
+		u64 *ptr = (u64*)&val;
+
+		// count masked to bits limit - no-op on zero
+		if (count &= bits - 1)
+		{
+			// get number of blocks being traversed
+			u64 blocks = count / 64;
+			// if that's not zero
+			if (blocks != 0)
+			{
+				// shuffle blocks
+				for (u64 i = (bits / 64) - 1; i >= blocks; --i) ptr[i] = ptr[i - blocks];
+				// fill the rest with zero
+				for (u64 i = 0; i < blocks; ++i) ptr[i] = 0;
+			}
+			// count masked to block limit - no-op on zero
+			if (count &= 0x3f)
+			{
+				// perform the intra-block shifting
+				for (u64 i = (bits / 64) - 1; i > blocks; --i)
+				{
+					ptr[i] <<= count;
+					ptr[i] |= ptr[i - 1] >> (64 - count);
+				}
+				// perform the last block separately (avoids an out of bounds error where blocks = 0)
+				ptr[blocks] <<= count;
+			}
+		}
+
+		return val;
+	}
 
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> operator<<(const double_int<bits, sign> &a, const T &count) noexcept { double_int<bits, sign> res = a; res <<= (u64)count; return res; }
 
 	// -- shr/sar -- //
 
-	template<u64 bits> inline constexpr double_int<bits, false> &operator>>=(double_int<bits, false> &val, u64 count) noexcept
+	// shr
+	template<u64 bits, std::enable_if_t<(!USE_C_PTR_TO_FIRST || !USE_COMPACTNESS || bits < SHIFT_LOOP_THRESH), int> = 0> inline constexpr double_int<bits, false> &operator>>=(double_int<bits, false> &val, u64 count) noexcept
 	{
 		// count masked to bits limit - no-op on zero
 		if (count &= bits - 1)
@@ -412,6 +456,43 @@ namespace BiggerInts
 		}
 		return val;
 	}
+	template<u64 bits, std::enable_if_t<(USE_C_PTR_TO_FIRST && USE_COMPACTNESS && bits >= SHIFT_LOOP_THRESH), int> = 0> inline constexpr double_int<bits, false> &operator>>=(double_int<bits, false> &val, u64 count) noexcept
+	{
+		COMPACTNESS_TEST(false);
+
+		u64 *ptr = (u64*)&val;
+
+		// count masked to bits limit - no-op on zero
+		if (count &= bits - 1)
+		{
+			// get number of blocks being traversed
+			u64 blocks = count / 64;
+			// if that's not zero
+			if (blocks != 0)
+			{
+				// shuffle blocks
+				for (u64 i = 0; i < bits / 64 - blocks; ++i) ptr[i] = ptr[i + blocks];
+				// fill the rest with zero
+				for (u64 i = bits / 64 - blocks; i < bits / 64; ++i) ptr[i] = 0;
+			}
+			// count masked to block limit - no-op on zero
+			if (count &= 0x3f)
+			{
+				// perform the intra-block shifting
+				for (u64 i = 0; i < bits / 64 - blocks - 1; ++i)
+				{
+					ptr[i] >>= count;
+					ptr[i] |= ptr[i + 1] << (64 - count);
+				}
+				// perform the last block separately (avoids an out of bounds error where blocks = 0)
+				ptr[bits / 64 - blocks - 1] >>= count;
+			}
+		}
+
+		return val;
+	}
+
+	// sar
 	template<u64 bits> inline constexpr double_int<bits, true> &operator>>=(double_int<bits, true> &val, u64 count) noexcept
 	{
 		// count masked to bits limit - no-op on zero
@@ -934,8 +1015,8 @@ namespace BiggerInts
 	template<u64 bits, bool sign> inline constexpr u64 num_blocks(const double_int<bits, sign> &val) noexcept
 	{
 		#if USE_C_PTR_TO_FIRST && USE_COMPACTNESS
-		// we need to make sure it's actually compact
-		static_assert(sizeof(double_int<bits, sign>) == bits / CHAR_BIT, "type was not compact");
+		
+		COMPACTNESS_TEST(sign);
 
 		// get pointer to u64 blocks (if compact, will be little-endian wrt 64-bit blocks)
 		u64 *ptr = (u64*)&val;
