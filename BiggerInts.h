@@ -56,6 +56,8 @@ Report bugs to https://github.com/dragazo/BiggerInts/issues
 
 #define CMP_LOOP_THRESH 1024
 
+#define NOT_LOOP_THRESH 1024
+
 // -- utility macros -- //
 
 // shorthand used for SFINAE overloading - returns true if the type is compact
@@ -492,7 +494,6 @@ namespace BiggerInts
 		return val;
 	}
 	
-
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> operator<<(const double_int<bits, sign> &a, const T &count) noexcept { double_int<bits, sign> res = a; res <<= (u64)count; return res; }
 
 	// -- shr/sar -- //
@@ -511,21 +512,21 @@ namespace BiggerInts
 			if (blocks != 0)
 			{
 				// shuffle blocks
-				for (u64 i = 0; i < bits / 64 - blocks; ++i) ptr[i] = ptr[i + blocks];
+				for (u64 i = 0; i < (bits / 64) - blocks; ++i) ptr[i] = ptr[i + blocks];
 				// fill the rest with zero
-				for (u64 i = bits / 64 - blocks; i < bits / 64; ++i) ptr[i] = 0;
+				for (u64 i = (bits / 64) - blocks; i < (bits / 64); ++i) ptr[i] = 0;
 			}
 			// count masked to block limit - no-op on zero
 			if (count &= 0x3f)
 			{
 				// perform the intra-block shifting
-				for (u64 i = 0; i < bits / 64 - blocks - 1; ++i)
+				for (u64 i = 0; i < (bits / 64) - blocks - 1; ++i)
 				{
 					ptr[i] >>= count;
 					ptr[i] |= ptr[i + 1] << (64 - count);
 				}
 				// perform the last block separately (avoids an out of bounds error where blocks = 0)
-				ptr[bits / 64 - blocks - 1] >>= count;
+				ptr[(bits / 64) - blocks - 1] >>= count;
 			}
 		}
 
@@ -553,7 +554,42 @@ namespace BiggerInts
 	}
 
 	// sar
-	template<u64 bits> inline constexpr double_int<bits, true> &operator>>=(double_int<bits, true> &val, u64 count) noexcept
+	template<u64 bits> inline constexpr auto operator>>=(double_int<bits, true> &val, u64 count) noexcept -> std::enable_if_t<(COMPACT(true) && bits >= SHIFT_LOOP_THRESH), double_int<bits, true>&>
+	{
+		u64 *ptr = (u64*)&val;
+		u64 fill = is_neg(val) ? 0xffffffffffffffff : 0; // value to fill in for sign filling
+
+		// count masked to bits limit - no-op on zero
+		if (count &= bits - 1)
+		{
+			// get number of blocks being traversed
+			u64 blocks = count / 64;
+			// if that's not zero
+			if (blocks != 0)
+			{
+				// shuffle blocks
+				for (u64 i = 0; i < (bits / 64) - blocks; ++i) ptr[i] = ptr[i + blocks];
+				// fill the rest with fill
+				for (u64 i = (bits / 64) - blocks; i < (bits / 64); ++i) ptr[i] = fill;
+			}
+			// count masked to block limit - no-op on zero
+			if (count &= 0x3f)
+			{
+				// perform the intra-block shifting
+				for (u64 i = 0; i < (bits / 64) - blocks - 1; ++i)
+				{
+					ptr[i] >>= count;
+					ptr[i] |= ptr[i + 1] << (64 - count);
+				}
+				// perform the last block separately (avoids an out of bounds error where blocks = 0)
+				ptr[(bits / 64) - blocks - 1] >>= count;
+				ptr[(bits / 64) - blocks - 1] |= fill << (64 - count); // last block must account for fill value
+			}
+		}
+
+		return val;
+	}
+	template<u64 bits> inline constexpr auto operator>>=(double_int<bits, true> &val, u64 count) noexcept -> std::enable_if_t<(!COMPACT(true) || bits < SHIFT_LOOP_THRESH), double_int<bits, true>&>
 	{
 		// count masked to bits limit - no-op on zero
 		if (count &= bits - 1)
@@ -590,9 +626,9 @@ namespace BiggerInts
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator+(const double_int<bits, sign> &a) noexcept { return a; }
 
-	template<u64 bits> inline constexpr double_int<bits, true> operator-(const double_int<bits, true> &a) noexcept { double_int<bits, true> res = ~a; ++res; return res; }
+	template<u64 bits> inline constexpr double_int<bits, true> operator-(const double_int<bits, true> &a) noexcept { double_int<bits, true> res = a; make_neg(res); return res; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator~(const double_int<bits, sign> &a) noexcept { double_int<bits, sign> res; res.high = ~a.high; res.low = ~a.low; return res; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator~(const double_int<bits, sign> &a) noexcept { double_int<bits, sign> res = a; make_not(res); return res; }
 
 	// -- mul -- //
 
@@ -636,7 +672,7 @@ namespace BiggerInts
 		while (true)
 		{
 			res.second <<= 1;
-			if (bit_test(num, bit)) bit_set(res.second, 0);
+			if (bit_test(num, bit)) ++ref_low64(res.second);
 
 			if (res.second >= den)
 			{
@@ -860,7 +896,7 @@ namespace BiggerInts
 		{
 			// divmod for double_int is really slow, so we'll extract several decimal digits in one go and then process them with built-in integers
 			static constexpr double_int<bits, false> base = 10000000000000000000;
-
+			
 			std::pair<double_int<bits, false>, double_int<bits, false>> temp;
 			temp.first = val; // temp.first takes the role of cpy in the other radicies
 
@@ -1114,6 +1150,8 @@ namespace BiggerInts
 		return num;
 	}
 
+	// -- block access -- //
+
 	// gets the low 64-bit word of a given value
 	template<u64 bits, bool sign> inline constexpr u64 low64(const double_int<bits, sign> &val) noexcept
 	{
@@ -1127,8 +1165,19 @@ namespace BiggerInts
 		return *(u64*)&val;
 	}
 
+	// -- in-place unary -- //
+	
+	template<u64 bits, bool sign, std::enable_if_t<(COMPACT(sign) && bits >= NOT_LOOP_THRESH), int> = 0> inline constexpr void make_not(double_int<bits, sign> &val) noexcept
+	{
+		u64 *ptr = (u64*)&val;
+		for (u64 i = 0; i < bits / 64; ++i) ptr[i] = ~ptr[i];
+	}
+	template<u64 bits, bool sign, std::enable_if_t<(!COMPACT(sign) || bits < NOT_LOOP_THRESH), int> = 0> inline constexpr void make_not(double_int<bits, sign> &val) noexcept
+	{
+		make_not(val.low);
+		make_not(val.high);
+	}
 	template<bool sign> inline constexpr void make_not(double_int<128, sign> &val) noexcept { val.low = ~val.low; val.high = ~val.high; }
-	template<u64 bits, bool sign> inline constexpr void make_not(double_int<bits, sign> &val) noexcept { make_not(val.low); make_not(val.high); }
 
 	template<u64 bits, bool sign> inline constexpr void make_neg(double_int<bits, sign> &val) noexcept { make_not(val); ++val; }
 

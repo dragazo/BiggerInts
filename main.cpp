@@ -32,15 +32,36 @@ int main(int argc, const char *argv[])
 	//t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c, c = ++a, __count__);
 	//t_test(uint_t<128> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 64; b <<= 64, c = ++a, __count__);
 
-	//t_test(uint_t<__bits__> a = __count__ + 2 COMMA c, c = (a << 175) >> 175, __count__);
-	//t_test(uint_t<__bits__> a = __count__ + 3 COMMA c, c = (a << 175) >> 175, __count__);
-	//t_test(uint_t<__bits__> a = __count__ + 4 COMMA c, c = (a << 175) >> 175, __count__);
-	//t_test(uint_t<__bits__> a = __count__ + 5 COMMA c, c = (a << 175) >> 175, __count__);
+	//t_test(int_t<__bits__> a = -(__count__ + 2) COMMA c, c = (a << 175) >> 175, __count__);
+	//t_test(int_t<__bits__> a = -(__count__ + 3) COMMA c, c = (a << 175) >> 175, __count__);
+	//t_test(int_t<__bits__> a = -(__count__ + 4) COMMA c, c = (a << 175) >> 175, __count__);
+	//t_test(int_t<__bits__> a = -(__count__ + 5) COMMA c, c = (a << 175) >> 175, __count__);
+	
+	uint_t<__bits__> thing = 947563412;
+	thing *= thing;
+	thing *= thing;
+	thing *= thing;
+	thing *= thing;
+	thing *= thing;
+	thing *= thing;
+	thing *= thing;
+	thing *= thing;
 
-	t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c, c = a ^ b, __count__);
-	t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256; b <<= 256, c = a ^ b, __count__);
-	t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; b <<= 256, c = a ^ b, __count__);
-	t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256, c = a ^ b, __count__);
+	t_start;
+
+	for (int i = 0; i < 10; ++i)
+	{
+		//t_test(int_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c, c = -(a ^ b), __count__);
+		//t_test(int_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256; b <<= 256, c = -(a ^ b), __count__);
+		//t_test(int_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; b <<= 256, c = -(a ^ b), __count__);
+		//t_test(int_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256, c = -(a ^ b), __count__);
+
+		std::cout << thing << "\n\n";
+	}
+
+	t_end;
+
+	t_print("", 1);
 
 	//t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c, c = ++a, __count__);
 	//t_test(uint_t<__bits__> a = 74652465 COMMA b = 947563412 COMMA c; a <<= 256; b <<= 256, c = ++a, __count__);
