@@ -240,7 +240,7 @@ namespace BiggerInts
 	public: // -- bool conversion -- //
 
 		inline constexpr explicit operator bool() const noexcept { return to_bool(*this); }
-		inline constexpr friend bool operator!(const double_int &a) noexcept { return !to_bool(*this); }
+		inline constexpr friend bool operator!(const double_int &a) noexcept { return !to_bool(a); }
 	};
 
 	// shorthand for binary ops +, -, *, etc. will refer to a form that uses both sides of double_int
