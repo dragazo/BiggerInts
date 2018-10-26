@@ -79,7 +79,7 @@ namespace BiggerInts
 	inline constexpr u64 round_bits_up(u64 size)
 	{
 		if (size < 8) return 8;
-		if (size > 0x8000000000000000) throw std::domain_error("bit size was too large");
+		if (size > 0x8000000000000000ul) throw std::domain_error("bit size was too large");
 		while (!is_pow2(size)) size = (size | (size - 1)) + 1;
 		return size;
 	}
@@ -895,7 +895,7 @@ namespace BiggerInts
 		else // default to dec mode
 		{
 			// divmod for double_int is really slow, so we'll extract several decimal digits in one go and then process them with built-in integers
-			static constexpr double_int<bits, false> base = 10000000000000000000;
+			static constexpr double_int<bits, false> base = 10000000000000000000ul;
 			
 			std::pair<double_int<bits, false>, double_int<bits, false>> temp;
 			temp.first = val; // temp.first takes the role of cpy in the other radicies
@@ -1217,15 +1217,15 @@ namespace std
 {
 	// -- double_int info -- //
 
-	template<std::uint64_t bits, bool sign> struct std::is_integral<BiggerInts::double_int<bits, sign>> : std::true_type {};
+	template<std::uint64_t bits, bool sign> struct is_integral<BiggerInts::double_int<bits, sign>> : std::true_type {};
 
-	template<std::uint64_t bits, bool sign> struct std::is_signed<BiggerInts::double_int<bits, sign>> : std::bool_constant<sign> {};
-	template<std::uint64_t bits, bool sign> struct std::is_unsigned<BiggerInts::double_int<bits, sign>> : std::bool_constant<!sign> {};
+	template<std::uint64_t bits, bool sign> struct is_signed<BiggerInts::double_int<bits, sign>> : std::integral_constant<bool, sign> {};
+	template<std::uint64_t bits, bool sign> struct is_unsigned<BiggerInts::double_int<bits, sign>> : std::integral_constant<bool, !sign> {};
 
-	template<std::uint64_t bits, bool sign> struct std::make_signed<BiggerInts::double_int<bits, sign>> { typedef BiggerInts::double_int<bits, true> type; };
-	template<std::uint64_t bits, bool sign> struct std::make_unsigned<BiggerInts::double_int<bits, sign>> { typedef BiggerInts::double_int<bits, false> type; };
+	template<std::uint64_t bits, bool sign> struct make_signed<BiggerInts::double_int<bits, sign>> { typedef BiggerInts::double_int<bits, true> type; };
+	template<std::uint64_t bits, bool sign> struct make_unsigned<BiggerInts::double_int<bits, sign>> { typedef BiggerInts::double_int<bits, false> type; };
 	
-	template<std::uint64_t bits, bool sign> struct std::numeric_limits<BiggerInts::double_int<bits, sign>>
+	template<std::uint64_t bits, bool sign> struct numeric_limits<BiggerInts::double_int<bits, sign>>
 	{
 		static constexpr bool is_specialized = true;
 		static constexpr bool is_signed = sign;
@@ -1251,10 +1251,10 @@ namespace std
 		static constexpr bool traps = true;
 		static constexpr bool tinyness_before = false;
 
-		static constexpr const BiggerInts::double_int<bits, sign> &min() { static const BiggerInts::double_int<bits, sign> val = sign ? (BiggerInts::double_int<bits, sign>)1 << (bits - 1) : 0; return val; }
+		static constexpr const BiggerInts::double_int<bits, sign> &min() { return sign ? (BiggerInts::double_int<bits, sign>)1 << (bits - 1) : (BiggerInts::double_int<bits, sign>)0; }
 		static constexpr const BiggerInts::double_int<bits, sign> &lowest() { return min(); }
-		static constexpr const BiggerInts::double_int<bits, sign> &max() { static const BiggerInts::double_int<bits, sign> val = sign ? ~((BiggerInts::double_int<bits, sign>)1 << (bits - 1)) : ~(BiggerInts::double_int<bits, sign>)0; return val; }
-		static constexpr const BiggerInts::double_int<bits, sign> &epsilon() { static const BiggerInts::double_int<bits, sign> val = 0; return val; }
+		static constexpr const BiggerInts::double_int<bits, sign> &max() { return sign ? ~((BiggerInts::double_int<bits, sign>)1 << (bits - 1)) : ~(BiggerInts::double_int<bits, sign>)0; }
+		static constexpr const BiggerInts::double_int<bits, sign> &epsilon() { return (BiggerInts::double_int<bits, sign>)0; }
 		static constexpr const BiggerInts::double_int<bits, sign> &round_error() { return epsilon(); }
 		static constexpr const BiggerInts::double_int<bits, sign> &infinity() { return epsilon(); }
 		static constexpr const BiggerInts::double_int<bits, sign> &quiet_NaN() { return epsilon(); }
@@ -1264,18 +1264,18 @@ namespace std
 
 	// -- masked_single_int info -- //
 
-	template<typename T, std::uint64_t bits> struct std::is_integral<BiggerInts::masked_single_int<T, bits>> : std::is_integral<T> {};
+	template<typename T, std::uint64_t bits> struct is_integral<BiggerInts::masked_single_int<T, bits>> : std::is_integral<T> {};
 
-	template<typename T, std::uint64_t bits> struct std::is_signed<BiggerInts::masked_single_int<T, bits>> : std::is_signed<T> {};
-	template<typename T, std::uint64_t bits> struct std::is_unsigned<BiggerInts::masked_single_int<T, bits>> : std::is_unsigned<T> {};
+	template<typename T, std::uint64_t bits> struct is_signed<BiggerInts::masked_single_int<T, bits>> : std::is_signed<T> {};
+	template<typename T, std::uint64_t bits> struct is_unsigned<BiggerInts::masked_single_int<T, bits>> : std::is_unsigned<T> {};
 
-	template<typename T, std::uint64_t bits> struct std::make_signed<BiggerInts::masked_single_int<T, bits>> { typedef std::make_signed_t<T> type; };
-	template<typename T, std::uint64_t bits> struct std::make_unsigned<BiggerInts::masked_single_int<T, bits>> { typedef std::make_unsigned_t<T> type; };
+	template<typename T, std::uint64_t bits> struct make_signed<BiggerInts::masked_single_int<T, bits>> { typedef std::make_signed_t<T> type; };
+	template<typename T, std::uint64_t bits> struct make_unsigned<BiggerInts::masked_single_int<T, bits>> { typedef std::make_unsigned_t<T> type; };
 
-	template<typename T, std::uint64_t bits> struct std::numeric_limits<BiggerInts::masked_single_int<T, bits>>
+	template<typename T, std::uint64_t bits> struct numeric_limits<BiggerInts::masked_single_int<T, bits>>
 	{
 		static constexpr bool is_specialized = true;
-		static constexpr bool is_signed = std::is_signed_v<T>;
+		static constexpr bool is_signed = std::is_signed<T>::value;
 		static constexpr bool is_integer = true;
 		static constexpr bool is_exact = true;
 		static constexpr bool has_infinity = false;
@@ -1287,7 +1287,7 @@ namespace std
 		static constexpr bool is_iec559 = false;
 		static constexpr bool is_bounded = true;
 		static constexpr bool is_modulo = true;
-		static constexpr int digits = std::is_signed_v<T> ? bits - 1 : bits;
+		static constexpr int digits = std::is_signed<T>::value ? bits - 1 : bits;
 		static constexpr int digits10 = (int)(digits * 0.301029995663981195213738894724493026768189881462108541310); // log10(2)
 		static constexpr int max_digits10 = 0;
 		static constexpr int radix = 2;
@@ -1298,10 +1298,10 @@ namespace std
 		static constexpr bool traps = true;
 		static constexpr bool tinyness_before = false;
 
-		static constexpr const BiggerInts::masked_single_int<T, bits> &min() { static const BiggerInts::masked_single_int<T, bits> val = std::is_signed_v<T> ? (T)1 << (bits - 1) : 0; return val; }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &min() { return std::is_signed<T>::value ? (T)1 << (bits - 1) : 0; }
 		static constexpr const BiggerInts::masked_single_int<T, bits> &lowest() { return min(); }
-		static constexpr const BiggerInts::masked_single_int<T, bits> &max() { static const BiggerInts::masked_single_int<T, bits> val = std::is_signed_v<T> ? ~((T)1 << (bits - 1)) : ~(T)0; return val; }
-		static constexpr const BiggerInts::masked_single_int<T, bits> &epsilon() { static const BiggerInts::masked_single_int<T, bits> val = 0; return val; }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &max() { return std::is_signed<T>::value ? ~((T)1 << (bits - 1)) : ~(T)0; }
+		static constexpr const BiggerInts::masked_single_int<T, bits> &epsilon() { return 0; }
 		static constexpr const BiggerInts::masked_single_int<T, bits> &round_error() { return epsilon(); }
 		static constexpr const BiggerInts::masked_single_int<T, bits> &infinity() { return epsilon(); }
 		static constexpr const BiggerInts::masked_single_int<T, bits> &quiet_NaN() { return epsilon(); }
