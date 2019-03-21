@@ -4,11 +4,14 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <climits>
+#include <cmath>
 #include <type_traits>
 #include <iostream>
 #include <string>
 #include <utility>
 #include <exception>
+#include <stdexcept>
 #include <algorithm>
 
 /*
@@ -24,11 +27,6 @@ Aside from these two alias templates, everything else is subject to change/remov
 Report bugs to https://github.com/dragazo/BiggerInts/issues
 
 */
-
-// -- compiler-specific macros -- //
-
-// expands to whatever is used to enable restrict pointers (can be empty, but may hurt performance)
-#define RESTRICT __restrict
 
 // -- optimization switches -- //
 
@@ -112,56 +110,60 @@ namespace BiggerInts
 	// contains an integral constant that represents the number of bits in a given (supported) (integral) type
 	template<typename T> struct bit_count {};
 
-	template<> struct bit_count<std::uint8_t> : std::integral_constant<u64, 8> {};
-	template<> struct bit_count<std::uint16_t> : std::integral_constant<u64, 16> {};
-	template<> struct bit_count<std::uint32_t> : std::integral_constant<u64, 32> {};
-	template<> struct bit_count<std::uint64_t> : std::integral_constant<u64, 64> {};
+	template<> struct bit_count<unsigned char> : std::integral_constant<u64, sizeof(unsigned char) * CHAR_BIT> {};
+	template<> struct bit_count<unsigned short> : std::integral_constant<u64, sizeof(unsigned short) * CHAR_BIT> {};
+	template<> struct bit_count<unsigned int> : std::integral_constant<u64, sizeof(unsigned int) * CHAR_BIT> {};
+	template<> struct bit_count<unsigned long> : std::integral_constant<u64, sizeof(unsigned long) * CHAR_BIT> {};
+	template<> struct bit_count<unsigned long long> : std::integral_constant<u64, sizeof(unsigned long long) * CHAR_BIT> {};
 
-	template<> struct bit_count<std::int8_t> : std::integral_constant<u64, 8> {};
-	template<> struct bit_count<std::int16_t> : std::integral_constant<u64, 16> {};
-	template<> struct bit_count<std::int32_t> : std::integral_constant<u64, 32> {};
-	template<> struct bit_count<std::int64_t> : std::integral_constant<u64, 64> {};
+	template<> struct bit_count<signed char> : std::integral_constant<u64, sizeof(signed char) * CHAR_BIT> {};
+	template<> struct bit_count<signed short> : std::integral_constant<u64, sizeof(signed short) * CHAR_BIT> {};
+	template<> struct bit_count<signed int> : std::integral_constant<u64, sizeof(signed int) * CHAR_BIT> {};
+	template<> struct bit_count<signed long> : std::integral_constant<u64, sizeof(signed long) * CHAR_BIT> {};
+	template<> struct bit_count<signed long long> : std::integral_constant<u64, sizeof(signed long long) * CHAR_BIT> {};
 
 	template<typename T, u64 bits> struct bit_count<masked_single_int<T, bits>> : std::integral_constant<u64, bits> {};
 	template<u64 bits, bool sign> struct bit_count<double_int<bits, sign>> : std::integral_constant<u64, bits> {};
 	
-	// -- container iml -- //
+	// -- container impl -- //
 
 	// holds an integral type T that, upon assignment, is masked to the specified number of bits. bits must be in the range (bit count T / 2, bit count T).
 	template<typename T, u64 bits> struct masked_single_int
 	{
-	private:
+	private: // -- data -- //
 
-		static_assert(bits > bit_count<T>::value / 2 && bits < bit_count<T>::value, "masked_single_int: bit count out of range");
+		static_assert(bits > bit_count<T>::value / 2 && bits < bit_count<T>::value, "masked_single_int: bit count out of intended range");
 
-		static constexpr T mask = ((T)1 << bits) - 1;
-		T val;
+		static constexpr T mask = ((T)1 << bits) - 1; // mask to apply - shift can't overflow because bits < bit_count<T>::count
 
-	public:
-		inline constexpr operator T() const { return val; }
+		T val; // the actual stored value
 
-		inline constexpr masked_single_int(T _val = 0) noexcept : val(_val & mask) {}
-		inline constexpr masked_single_int &operator=(T _val) { val = _val & mask; return *this; }
+	public: // -- wrapper interface -- // 
 
-		inline constexpr masked_single_int &operator++() { val = (val + 1) & mask; return *this; }
-		inline constexpr masked_single_int &operator--() { val = (val - 1) & mask; return *this; }
+		constexpr operator T() const { return val; }
 
-		inline constexpr T operator++(int) { T ret = val; val = (val + 1) & mask; return ret; }
-		inline constexpr T operator--(int) { T ret = val; val = (val - 1) & mask; return ret; }
+		constexpr masked_single_int(T _val = 0) noexcept : val(_val & mask) {}
+		constexpr masked_single_int &operator=(T _val) { val = _val & mask; return *this; }
 
-		inline constexpr masked_single_int &operator+=(T _val) { val = (val + _val) & mask; return *this; }
-		inline constexpr masked_single_int &operator-=(T _val) { val = (val + _val) & mask; return *this; }
+		constexpr masked_single_int &operator++() { val = (val + 1) & mask; return *this; }
+		constexpr masked_single_int &operator--() { val = (val - 1) & mask; return *this; }
 
-		inline constexpr masked_single_int &operator*=(T _val) { val = (val * _val) & mask; return *this; }
-		inline constexpr masked_single_int &operator/=(T _val) { val = (val / _val) & mask; return *this; }
-		inline constexpr masked_single_int &operator%=(T _val) { val = (val % _val) & mask; return *this; }
+		constexpr T operator++(int) { T ret = val; val = (val + 1) & mask; return ret; }
+		constexpr T operator--(int) { T ret = val; val = (val - 1) & mask; return ret; }
 
-		inline constexpr masked_single_int &operator&=(T _val) { val = (val & _val) & mask; return *this; }
-		inline constexpr masked_single_int &operator|=(T _val) { val = (val | _val) & mask; return *this; }
-		inline constexpr masked_single_int &operator^=(T _val) { val = (val ^ _val) & mask; return *this; }
+		constexpr masked_single_int &operator+=(T _val) { val = (val + _val) & mask; return *this; }
+		constexpr masked_single_int &operator-=(T _val) { val = (val + _val) & mask; return *this; }
 
-		inline constexpr masked_single_int &operator<<=(T _val) { val = (val << _val) & mask; return *this; }
-		inline constexpr masked_single_int &operator>>=(T _val) { val = (val >> _val) & mask; return *this; }
+		constexpr masked_single_int &operator*=(T _val) { val = (val * _val) & mask; return *this; }
+		constexpr masked_single_int &operator/=(T _val) { val = (val / _val) & mask; return *this; }
+		constexpr masked_single_int &operator%=(T _val) { val = (val % _val) & mask; return *this; }
+
+		constexpr masked_single_int &operator&=(T _val) { val = (val & _val) & mask; return *this; }
+		constexpr masked_single_int &operator|=(T _val) { val = (val | _val) & mask; return *this; }
+		constexpr masked_single_int &operator^=(T _val) { val = (val ^ _val) & mask; return *this; }
+
+		constexpr masked_single_int &operator<<=(T _val) { val = (val << _val) & mask; return *this; }
+		constexpr masked_single_int &operator>>=(T _val) { val = (val >> _val) & mask; return *this; }
 	};
 	
 	// given a desired number of bits (power of 2), simulates it with 2 ints of half that size - sign flag marks signed/unsigned
@@ -186,15 +188,15 @@ namespace BiggerInts
 
 	public: // -- promotion constructors -- //
 
-		inline constexpr double_int(std::uint8_t val) noexcept : high((ZEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(std::uint16_t val) noexcept : high((ZEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(std::uint32_t val) noexcept : high((ZEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(std::uint64_t val) noexcept : high((ZEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(unsigned short val) noexcept : high((ZEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(unsigned int val) noexcept : high((ZEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(unsigned long val) noexcept : high((ZEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(unsigned long long val) noexcept : high((ZEXT_TYPE)0), low(val) {}
 		
-		inline constexpr double_int(std::int8_t val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(std::int16_t val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(std::int32_t val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(std::int64_t val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(signed short val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(signed int val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(signed long val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
+		inline constexpr double_int(signed long long val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
 
 		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int(const double_int<_bits, false> &val) noexcept : high((ZEXT_TYPE)0), low(val) {}
 		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int(const double_int<_bits, true> &val) noexcept : high(is_neg(val) ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
@@ -203,15 +205,15 @@ namespace BiggerInts
 
 	public: // -- promotion assignment -- //
 
-		inline constexpr double_int &operator=(std::uint8_t val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::uint16_t val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::uint32_t val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::uint64_t val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(unsigned short val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(unsigned int val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(unsigned long val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(unsigned long long val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
 
-		inline constexpr double_int &operator=(std::int8_t val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::int16_t val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::int32_t val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(std::int64_t val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(signed short val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(signed int val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(signed long val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
+		inline constexpr double_int &operator=(signed long long val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
 		
 		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, false> &val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
 		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, true> &val) noexcept { high = is_neg(val) ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
@@ -220,15 +222,15 @@ namespace BiggerInts
 
 	public: // -- demotion conversion -- //
 
-		inline constexpr explicit operator std::uint8_t() const noexcept { return (std::uint8_t)low64(*this); }
-		inline constexpr explicit operator std::uint16_t() const noexcept { return (std::uint16_t)low64(*this); }
-		inline constexpr explicit operator std::uint32_t() const noexcept { return (std::uint32_t)low64(*this); }
-		inline constexpr explicit operator std::uint64_t() const noexcept { return (std::uint64_t)low64(*this); }
+		inline constexpr explicit operator unsigned short() const noexcept { return (unsigned short)low64(*this); }
+		inline constexpr explicit operator unsigned int() const noexcept { return (unsigned int)low64(*this); }
+		inline constexpr explicit operator unsigned long() const noexcept { return (unsigned long)low64(*this); }
+		inline constexpr explicit operator unsigned long long() const noexcept { return (unsigned long long)low64(*this); }
 
-		inline constexpr explicit operator std::int8_t() const noexcept { return (std::int8_t)low64(*this); }
-		inline constexpr explicit operator std::int16_t() const noexcept { return (std::int16_t)low64(*this); }
-		inline constexpr explicit operator std::int32_t() const noexcept { return (std::int32_t)low64(*this); }
-		inline constexpr explicit operator std::int64_t() const noexcept { return (std::int64_t)low64(*this); }
+		inline constexpr explicit operator signed short() const noexcept { return (signed short)low64(*this); }
+		inline constexpr explicit operator signed int() const noexcept { return (signed int)low64(*this); }
+		inline constexpr explicit operator signed long() const noexcept { return (signed long)low64(*this); }
+		inline constexpr explicit operator signed long long() const noexcept { return (signed long long)low64(*this); }
 
 		template<u64 _bits, bool _sign, std::enable_if_t<(_bits < bits), int> = 0>
 		inline constexpr explicit operator double_int<_bits, _sign>() const noexcept
@@ -249,15 +251,15 @@ namespace BiggerInts
 		template<u64 bits> inline constexpr double_int<bits, sign> operator op(type a, const double_int<bits, sign> &b) noexcept { return (double_int<bits, sign>)a op b; }
 	// does all the standard shorthands for a given op
 	#define SHORTERHAND_BINARY_FORMATTER(op) \
-		SHORTHAND_BINARY_FORMATTER(op, false, std::uint64_t) \
-		SHORTHAND_BINARY_FORMATTER(op, false, std::uint32_t) \
-		SHORTHAND_BINARY_FORMATTER(op, false, std::uint16_t) \
-		SHORTHAND_BINARY_FORMATTER(op, false, std::uint8_t) \
+		SHORTHAND_BINARY_FORMATTER(op, false, unsigned short) \
+		SHORTHAND_BINARY_FORMATTER(op, false, unsigned int) \
+		SHORTHAND_BINARY_FORMATTER(op, false, unsigned long) \
+		SHORTHAND_BINARY_FORMATTER(op, false, unsigned long long) \
 		\
-		SHORTHAND_BINARY_FORMATTER(op, true, std::int64_t) \
-		SHORTHAND_BINARY_FORMATTER(op, true, std::int32_t) \
-		SHORTHAND_BINARY_FORMATTER(op, true, std::int16_t) \
-		SHORTHAND_BINARY_FORMATTER(op, true, std::int8_t)
+		SHORTHAND_BINARY_FORMATTER(op, true, signed short) \
+		SHORTHAND_BINARY_FORMATTER(op, true, signed int) \
+		SHORTHAND_BINARY_FORMATTER(op, true, signed long) \
+		SHORTHAND_BINARY_FORMATTER(op, true, signed long long)
 
 	// -- inc/dec -- //
 
@@ -377,10 +379,10 @@ namespace BiggerInts
 
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, const T &b) noexcept { a &= (double_int<bits, sign>)b; return a; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint64_t b) noexcept { a = low64(a) & b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint32_t b) noexcept { a = low64(a) & b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint16_t b) noexcept { a = low64(a) & b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, std::uint8_t b) noexcept { a = low64(a) & b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, unsigned short b) noexcept { a = low64(a) & b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, unsigned int b) noexcept { a = low64(a) & b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, unsigned long b) noexcept { a = low64(a) & b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, unsigned long long b) noexcept { a = low64(a) & b; return a; }
 	
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator&(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res &= b; return res; }
 
@@ -403,10 +405,10 @@ namespace BiggerInts
 
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, const T &b) noexcept { a |= (double_int<bits, sign>)b; return a; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint64_t b) noexcept { ref_low64(a) |= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint32_t b) noexcept { ref_low64(a) |= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint16_t b) noexcept { ref_low64(a) |= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, std::uint8_t b) noexcept { ref_low64(a) |= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, unsigned short b) noexcept { ref_low64(a) |= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, unsigned int b) noexcept { ref_low64(a) |= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, unsigned long b) noexcept { ref_low64(a) |= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, unsigned long long b) noexcept { ref_low64(a) |= b; return a; }
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator|(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res |= b; return res; }
 
@@ -414,27 +416,30 @@ namespace BiggerInts
 
 	// -- xor -- //
 
-	template<u64 bits, bool sign1, bool sign2> inline constexpr auto operator^=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept -> std::enable_if_t<(COMPACT(sign1) && COMPACT(sign2) && bits >= BITWISE_LOOP_THRESH), double_int<bits, sign1>&>
+	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator^=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 	{
-		u64 *dest = (u64*)&a, *src = (u64*)&b;
-		for (u64 i = 0; i < bits / 64; ++i) dest[i] ^= src[i];
-		return a;
-	}
-	template<u64 bits, bool sign1, bool sign2> inline constexpr auto operator^=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept->std::enable_if_t<(!COMPACT(sign1) || !COMPACT(sign2) || bits < BITWISE_LOOP_THRESH), double_int<bits, sign1>&>
-	{
-		a.low ^= b.low;
-		a.high ^= b.high;
-		return a;
+		if constexpr (COMPACT(sign1) && COMPACT(sign2) && bits >= BITWISE_LOOP_THRESH)
+		{
+			u64 *dest = (u64*)&a, *src = (u64*)&b;
+			for (u64 i = 0; i < bits / 64; ++i) dest[i] ^= src[i];
+			return a;
+		}
+		else
+		{
+			a.low ^= b.low;
+			a.high ^= b.high;
+			return a;
+		}
 	}
 
 	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, const T &b) noexcept { a ^= (double_int<bits, sign>)b; return a; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint64_t b) noexcept { ref_low64(a) ^= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint32_t b) noexcept { ref_low64(a) ^= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint16_t b) noexcept { ref_low64(a) ^= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, std::uint8_t b) noexcept { ref_low64(a) ^= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, unsigned short b) noexcept { ref_low64(a) ^= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, unsigned int b) noexcept { ref_low64(a) ^= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, unsigned long b) noexcept { ref_low64(a) ^= b; return a; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, unsigned long long b) noexcept { ref_low64(a) ^= b; return a; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator^(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res ^= b; return res; }
+	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator^(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { auto res = a; res ^= b; return res; }
 
 	SHORTERHAND_BINARY_FORMATTER(^)
 
@@ -686,18 +691,23 @@ namespace BiggerInts
 	}
 
 	// utility function used internally - no divide by zero check
-	template<u64 bits> inline constexpr auto divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den) -> std::enable_if_t<(COMPACT(false) && bits >= DIVMOD_BLOCK_SKIP_THRESH), std::pair<double_int<bits, false>, double_int<bits, false>>>
+	template<u64 bits> inline constexpr std::pair<double_int<bits, false>, double_int<bits, false>> divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den)
 	{
-		// chop off any 64-bit blocks that are all zero
-		u64 bit = bits - 1, *ptr = (u64*)&num;
-		for (u64 i = bits / 64; i > 0; bit -= 64)
-			if (ptr[--i]) break;
+		if constexpr (COMPACT(false) && bits >= DIVMOD_BLOCK_SKIP_THRESH)
+		{
+			// chop off any 64-bit blocks that are all zero
+			u64 bit = bits - 1, *ptr = (u64*)&num;
+			for (u64 i = bits / 64; i > 1; bit -= 64)
+			{
+				if (ptr[--i]) break; // if the previous byte is nonzero, we're done
+			}
 
-		return __divmod_unchecked(num, den, bit);
-	}
-	template<u64 bits> inline constexpr auto divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den) -> std::enable_if_t<(!COMPACT(false) || bits < DIVMOD_BLOCK_SKIP_THRESH), std::pair<double_int<bits, false>, double_int<bits, false>>>
-	{
-		return __divmod_unchecked(num, den, bits - 1);
+			return __divmod_unchecked(num, den, bit);
+		}
+		else
+		{
+			return __divmod_unchecked(num, den, bits - 1);
+		}
 	}
 
 	inline constexpr std::pair<std::uint8_t, std::uint8_t> divmod(std::uint8_t num, std::uint8_t den) { return {num / den, num % den}; }
@@ -753,27 +763,30 @@ namespace BiggerInts
 	// cmp() will be equivalent to <=> but works for any version of C++
 	
 	// unsigned compare
-	template<u64 bits> inline constexpr auto cmp(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept -> std::enable_if_t<(COMPACT(false) && bits >= CMP_LOOP_THRESH), int>
+	template<u64 bits> inline constexpr int cmp(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept
 	{
-		u64 *dest = (u64*)&a, *src = (u64*)&b;
-		for (u64 i = bits / 64; i > 0; )
+		if constexpr (COMPACT(false) && bits >= CMP_LOOP_THRESH)
 		{
-			--i;
-			if (dest[i] < src[i]) return -1;
-			else if (dest[i] > src[i]) return 1;
+			u64 *dest = (u64*)&a, *src = (u64*)&b;
+			for (u64 i = bits / 64; i > 0; )
+			{
+				--i;
+				if (dest[i] < src[i]) return -1;
+				else if (dest[i] > src[i]) return 1;
+			}
+			return 0;
 		}
-		return 0;
-	}
-	template<u64 bits> inline constexpr auto cmp(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept -> std::enable_if_t<(!COMPACT(false) || bits < CMP_LOOP_THRESH), int>
-	{
-		return a.high < b.high ? -1 : a.high > b.high ? 1 : a.low < b.low ? -1 : a.low > b.low ? 1 : 0;
+		else
+		{
+			return a.high < b.high ? -1 : a.high > b.high ? 1 : a.low < b.low ? -1 : a.low > b.low ? 1 : 0;
+		}
 	}
 
 	// signed compare
 	template<u64 bits> inline constexpr int cmp(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept
 	{
 		// get unsigned comparison
-		int ucmp = cmp(*(const double_int<bits, false>*)a, *(const double_int<bits, false>*)b);
+		int ucmp = cmp(*(const double_int<bits, false>*)&a, *(const double_int<bits, false>*)&b);
 		// do quick mafs to transform it into a signed comparison
 		return is_neg(a) ^ is_neg(b) ? -ucmp : ucmp;
 	}
@@ -801,16 +814,16 @@ namespace BiggerInts
 		template<u64 bits> inline constexpr bool operator>(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) > 0; } \
 		template<u64 bits> inline constexpr bool operator>=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) >= 0; }
 
-	SHORTHAND_CMP_FORMATTER(false, std::uint64_t)
-	SHORTHAND_CMP_FORMATTER(false, std::uint32_t)
-	SHORTHAND_CMP_FORMATTER(false, std::uint16_t)
-	SHORTHAND_CMP_FORMATTER(false, std::uint8_t)
+	SHORTHAND_CMP_FORMATTER(false, unsigned long long)
+	SHORTHAND_CMP_FORMATTER(false, unsigned long)
+	SHORTHAND_CMP_FORMATTER(false, unsigned int)
+	SHORTHAND_CMP_FORMATTER(false, unsigned short)
 
-	SHORTHAND_CMP_FORMATTER(true, std::int64_t)
-	SHORTHAND_CMP_FORMATTER(true, std::int32_t)
-	SHORTHAND_CMP_FORMATTER(true, std::int16_t)
-	SHORTHAND_CMP_FORMATTER(true, std::int8_t)
-
+	SHORTHAND_CMP_FORMATTER(true, signed long long)
+	SHORTHAND_CMP_FORMATTER(true, signed long)
+	SHORTHAND_CMP_FORMATTER(true, signed int)
+	SHORTHAND_CMP_FORMATTER(true, signed short)
+	
 	// -- io -- //
 
 	// given a hex character, converts it to an integer [0, 15] - returns true if it was a valid hex digit. ch is only meaningful on success.
@@ -1251,15 +1264,19 @@ namespace std
 		static constexpr bool traps = true;
 		static constexpr bool tinyness_before = false;
 
-		static constexpr const BiggerInts::double_int<bits, sign> &min() { return sign ? (BiggerInts::double_int<bits, sign>)1 << (bits - 1) : (BiggerInts::double_int<bits, sign>)0; }
-		static constexpr const BiggerInts::double_int<bits, sign> &lowest() { return min(); }
-		static constexpr const BiggerInts::double_int<bits, sign> &max() { return sign ? ~((BiggerInts::double_int<bits, sign>)1 << (bits - 1)) : ~(BiggerInts::double_int<bits, sign>)0; }
-		static constexpr const BiggerInts::double_int<bits, sign> &epsilon() { return (BiggerInts::double_int<bits, sign>)0; }
-		static constexpr const BiggerInts::double_int<bits, sign> &round_error() { return epsilon(); }
-		static constexpr const BiggerInts::double_int<bits, sign> &infinity() { return epsilon(); }
-		static constexpr const BiggerInts::double_int<bits, sign> &quiet_NaN() { return epsilon(); }
-		static constexpr const BiggerInts::double_int<bits, sign> &signaling_NaN() { return epsilon(); }
-		static constexpr const BiggerInts::double_int<bits, sign> &denorm_min() { return epsilon(); }
+		static constexpr BiggerInts::double_int<bits, sign> _min = sign ? (BiggerInts::double_int<bits, sign>)1 << (bits - 1) : (BiggerInts::double_int<bits, sign>)0;
+		static constexpr BiggerInts::double_int<bits, sign> _max = sign ? ~((BiggerInts::double_int<bits, sign>)1 << (bits - 1)) : ~(BiggerInts::double_int<bits, sign>)0;
+		static constexpr BiggerInts::double_int<bits, sign> _zero = (BiggerInts::double_int<bits, sign>)0;
+
+		static constexpr const auto &min() { return _min; }
+		static constexpr const auto &lowest() { return min(); }
+		static constexpr const auto &max() {  return _max; }
+		static constexpr const auto &epsilon() {  return _zero; }
+		static constexpr const auto &round_error() { return epsilon(); }
+		static constexpr const auto &infinity() { return epsilon(); }
+		static constexpr const auto &quiet_NaN() { return epsilon(); }
+		static constexpr const auto &signaling_NaN() { return epsilon(); }
+		static constexpr const auto &denorm_min() { return epsilon(); }
 	};
 
 	// -- masked_single_int info -- //
@@ -1298,15 +1315,19 @@ namespace std
 		static constexpr bool traps = true;
 		static constexpr bool tinyness_before = false;
 
-		static constexpr const BiggerInts::masked_single_int<T, bits> &min() { return std::is_signed<T>::value ? (T)1 << (bits - 1) : 0; }
-		static constexpr const BiggerInts::masked_single_int<T, bits> &lowest() { return min(); }
-		static constexpr const BiggerInts::masked_single_int<T, bits> &max() { return std::is_signed<T>::value ? ~((T)1 << (bits - 1)) : ~(T)0; }
-		static constexpr const BiggerInts::masked_single_int<T, bits> &epsilon() { return 0; }
-		static constexpr const BiggerInts::masked_single_int<T, bits> &round_error() { return epsilon(); }
-		static constexpr const BiggerInts::masked_single_int<T, bits> &infinity() { return epsilon(); }
-		static constexpr const BiggerInts::masked_single_int<T, bits> &quiet_NaN() { return epsilon(); }
-		static constexpr const BiggerInts::masked_single_int<T, bits> &signaling_NaN() { return epsilon(); }
-		static constexpr const BiggerInts::masked_single_int<T, bits> &denorm_min() { return epsilon(); }
+		static constexpr T _min = std::is_signed<T>::value ? (T)1 << (bits - 1) : 0;
+		static constexpr T _max = std::is_signed<T>::value ? ~((T)1 << (bits - 1)) : ~(T)0;
+		static constexpr T _zero = (T)0;
+
+		static constexpr const auto &min() { return _min; }
+		static constexpr const auto &lowest() { return min(); }
+		static constexpr const auto &max() {  return _max; }
+		static constexpr const auto &epsilon() { return _zero; }
+		static constexpr const auto &round_error() { return epsilon(); }
+		static constexpr const auto &infinity() { return epsilon(); }
+		static constexpr const auto &quiet_NaN() { return epsilon(); }
+		static constexpr const auto &signaling_NaN() { return epsilon(); }
+		static constexpr const auto &denorm_min() { return epsilon(); }
 	};
 }
 
