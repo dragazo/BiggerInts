@@ -173,18 +173,19 @@ namespace BiggerInts
 
 		static_assert(is_pow2(bits) && bits >= 128, "double_int: bits was out of valid domain");
 
-		typedef uint_t<bits / 2> half;
+		typedef uint_t<bits / 2> half_t;
 
-		half low, high;
+		half_t low;
+		half_t high;
 
 	public: // -- core -- //
 
-		inline constexpr double_int() = default;
+		constexpr double_int() = default;
 
-		inline constexpr double_int(const double_int&) = default;
-		inline constexpr double_int &operator=(const double_int&) = default;
+		constexpr double_int(const double_int&) = default;
+		constexpr double_int &operator=(const double_int&) = default;
 
-		inline constexpr explicit operator double_int<bits, !sign>() const noexcept { return *(double_int<bits, !sign>*)this; }
+		constexpr explicit operator double_int<bits, !sign>() const noexcept { double_int<bits, !sign> cpy = *this; return cpy; }
 
 	public: // -- promotion constructors -- //
 
@@ -201,7 +202,8 @@ namespace BiggerInts
 		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int(const double_int<_bits, false> &val) noexcept : high((ZEXT_TYPE)0), low(val) {}
 		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int(const double_int<_bits, true> &val) noexcept : high(is_neg(val) ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
 
-		template<u64 _bits, bool _sign, std::enable_if_t<(bits == _bits), int> = 0> inline constexpr double_int(const double_int<_bits, _sign> &val) noexcept { *this = *(double_int*)&val; }
+		template<bool other_sign>
+		constexpr double_int(const double_int<bits, other_sign> &other) noexcept { low = other.low; high = other.high; }
 
 	public: // -- promotion assignment -- //
 
@@ -218,7 +220,8 @@ namespace BiggerInts
 		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, false> &val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
 		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, true> &val) noexcept { high = is_neg(val) ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
 
-		template<u64 _bits, bool _sign, std::enable_if_t<(bits == _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, _sign> &val) noexcept { *this = *(double_int*)&val; return *this; }
+		template<bool other_sign>
+		constexpr double_int &operator=(const double_int<bits, other_sign> &other) noexcept { low = other.low; high = other.high; return *this; }
 
 	public: // -- demotion conversion -- //
 
@@ -232,11 +235,10 @@ namespace BiggerInts
 		inline constexpr explicit operator signed long() const noexcept { return (signed long)low64(*this); }
 		inline constexpr explicit operator signed long long() const noexcept { return (signed long long)low64(*this); }
 
-		template<u64 _bits, bool _sign, std::enable_if_t<(_bits < bits), int> = 0>
-		inline constexpr explicit operator double_int<_bits, _sign>() const noexcept
+		template<u64 other_bits, bool other_sign, std::enable_if_t<(other_bits < bits), int> = 0>
+		inline constexpr explicit operator double_int<other_bits, other_sign>() const noexcept
 		{
-			// we're casting to a smaller type and low is guaranteed to be at offset 0 for all forms, so we can just reinterpret this
-			return *(double_int<_bits, _sign>*)this;
+			return (double_int<other_bits, other_sign>)low; // recursively select the low branch
 		}
 
 	public: // -- bool conversion -- //
@@ -263,58 +265,28 @@ namespace BiggerInts
 
 	// -- inc/dec -- //
 
-	template<u64 bits, bool sign, std::enable_if_t<COMPACT(sign), int> = 0> inline constexpr double_int<bits, sign> &operator++(double_int<bits, sign> &a) noexcept
-	{
-		// wind up 64-bit blocks - break on the first that doesn't overflow
-		u64 *ptr = (u64*)&a;
-		for (u64 i = 0; i < bits / 64; ++i)
-			if (++ptr[i]) break;
-		return a;
-	}
-	template<u64 bits, bool sign, std::enable_if_t<!COMPACT(sign), int> = 0> inline constexpr double_int<bits, sign> &operator++(double_int<bits, sign> &a) noexcept
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> &operator++(double_int<bits, sign> &a) noexcept
 	{
 		if (!++a.low) ++a.high;
 		return a;
 	}
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> operator++(double_int<bits, sign> &a, int) noexcept { auto cpy = a; ++a; return cpy; }
 
-	template<u64 bits, bool sign, std::enable_if_t<COMPACT(sign), int> = 0> inline constexpr double_int<bits, sign> &operator--(double_int<bits, sign> &a) noexcept
-	{
-		// wind up 64-bit blocks - break on the first that doesn't underflow
-		u64 *ptr = (u64*)&a;
-		for (u64 i = 0; i < bits / 64; ++i)
-			if (ptr[i]--) break;
-		return a;
-	}
-	template<u64 bits, bool sign, std::enable_if_t<!COMPACT(sign), int> = 0> inline constexpr double_int<bits, sign> &operator--(double_int<bits, sign> &a) noexcept
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> &operator--(double_int<bits, sign> &a) noexcept
 	{
 		if (!a.low) --a.high;
 		--a.low;
 		return a;
 	}
-
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator++(double_int<bits, sign> &a, int) noexcept { double_int<bits, sign> val = a; ++a; return val; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator--(double_int<bits, sign> &a, int) noexcept { double_int<bits, sign> val = a; --a; return val; }
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> operator--(double_int<bits, sign> &a, int) noexcept { auto cpy = a; --a; return cpy; }
 
 	// -- add -- //
 
-	template<u64 bits, bool sign1, bool sign2> inline constexpr auto operator+=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept -> std::enable_if_t<(COMPACT(sign1) && COMPACT(sign2) && bits >= ADDSUB_LOOP_THRESH), double_int<bits, sign1>&>
-	{
-		u64 *dest = (u64*)&a, *src = (u64*)&b;
-		u64 i, j;
-
-		for (i = 0; i < bits / 64; ++i)
-		{
-			dest[i] += src[i];
-			if (dest[i] < src[i])
-			{
-				for (j = i + 1; j < bits / 64; ++j)
-					if (++dest[j]) break;
-			}
-		}
-		
-		return a;
-	}
-	template<u64 bits, bool sign1, bool sign2> inline constexpr auto operator+=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept -> std::enable_if_t<(!COMPACT(sign1) || !COMPACT(sign2) || bits < ADDSUB_LOOP_THRESH), double_int<bits, sign1>&>
+	template<u64 bits, bool sign1, bool sign2> constexpr double_int<bits, sign1> &operator+=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 	{
 		a.low += b.low;
 		if (a.low < b.low) ++a.high;
@@ -322,32 +294,18 @@ namespace BiggerInts
 		return a;
 	}
 
-	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator+=(double_int<bits, sign> &a, const T &b) noexcept { a += (double_int<bits, sign>)b; return a; }
+	template<u64 bits, bool sign, typename T>
+	constexpr double_int<bits, sign> &operator+=(double_int<bits, sign> &a, const T &b) noexcept { a += (double_int<bits, sign>)b; return a; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator+(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res += b; return res; }
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> operator+(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res += b; return res; }
 
 	SHORTERHAND_BINARY_FORMATTER(+)
 
 	// -- sub -- //
 
-	template<u64 bits, bool sign1, bool sign2> inline constexpr auto operator-=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept -> std::enable_if_t<(COMPACT(sign1) && COMPACT(sign2) && bits >= ADDSUB_LOOP_THRESH), double_int<bits, sign1>&>
-	{
-		u64 *dest = (u64*)&a, *src = (u64*)&b;
-		u64 i, j;
-
-		for (i = 0; i < bits / 64; ++i)
-		{
-			if (dest[i] < src[i])
-			{
-				for (j = i + 1; j < bits / 64; ++j)
-					if (dest[j]--) break;
-			}
-			dest[i] -= src[i];
-		}
-
-		return a;
-	}
-	template<u64 bits, bool sign1, bool sign2> inline constexpr auto operator-=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept -> std::enable_if_t<(!COMPACT(sign1) || !COMPACT(sign2) || bits < ADDSUB_LOOP_THRESH), double_int<bits, sign1>&>
+	template<u64 bits, bool sign1, bool sign2>
+	constexpr double_int<bits, sign1> &operator-=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 	{
 		if (a.low < b.low) --a.high;
 		a.low -= b.low;
@@ -355,130 +313,72 @@ namespace BiggerInts
 		return a;
 	}
 	
+	template<u64 bits, bool sign, typename T>
+	constexpr double_int<bits, sign> &operator-=(double_int<bits, sign> &a, const T &b) noexcept { a -= (double_int<bits, sign>)b; return a; }
 
-	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator-=(double_int<bits, sign> &a, const T &b) noexcept { a -= (double_int<bits, sign>)b; return a; }
-
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator-(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res -= b; return res; }
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> operator-(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res -= b; return res; }
 
 	SHORTERHAND_BINARY_FORMATTER(-)
 
 	// -- and -- //
 
-	template<u64 bits, bool sign1, bool sign2> inline constexpr auto operator&=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept -> std::enable_if_t<(COMPACT(sign1) && COMPACT(sign2) && bits >= BITWISE_LOOP_THRESH), double_int<bits, sign1>&>
-	{
-		u64 *dest = (u64*)&a, *src = (u64*)&b;
-		for (u64 i = 0; i < bits / 64; ++i) dest[i] &= src[i];
-		return a;
-	}
-	template<u64 bits, bool sign1, bool sign2> inline constexpr auto operator&=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept -> std::enable_if_t<(!COMPACT(sign1) || !COMPACT(sign2) || bits < BITWISE_LOOP_THRESH), double_int<bits, sign1>&>
+	template<u64 bits, bool sign1, bool sign2>
+	constexpr double_int<bits, sign1> &operator&=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 	{
 		a.low &= b.low;
 		a.high &= b.high;
 		return a;
 	}
 
-	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, const T &b) noexcept { a &= (double_int<bits, sign>)b; return a; }
+	template<u64 bits, bool sign, typename T>
+	constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, const T &b) noexcept { a &= (double_int<bits, sign>)b; return a; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, unsigned short b) noexcept { a = low64(a) & b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, unsigned int b) noexcept { a = low64(a) & b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, unsigned long b) noexcept { a = low64(a) & b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator&=(double_int<bits, sign> &a, unsigned long long b) noexcept { a = low64(a) & b; return a; }
-	
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator&(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res &= b; return res; }
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> operator&(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res &= b; return res; }
 
 	SHORTERHAND_BINARY_FORMATTER(&)
 
 	// -- or -- //
 
-	template<u64 bits, bool sign1, bool sign2> inline constexpr auto operator|=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept -> std::enable_if_t<(COMPACT(sign1) && COMPACT(sign2) && bits >= BITWISE_LOOP_THRESH), double_int<bits, sign1>&>
-	{
-		u64 *dest = (u64*)&a, *src = (u64*)&b;
-		for (u64 i = 0; i < bits / 64; ++i) dest[i] |= src[i];
-		return a;
-	}
-	template<u64 bits, bool sign1, bool sign2> inline constexpr auto operator|=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept->std::enable_if_t<(!COMPACT(sign1) || !COMPACT(sign2) || bits < BITWISE_LOOP_THRESH), double_int<bits, sign1>&>
+	template<u64 bits, bool sign1, bool sign2>
+	constexpr double_int<bits, sign1> &operator|=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 	{
 		a.low |= b.low;
 		a.high |= b.high;
 		return a;
 	}
 
-	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, const T &b) noexcept { a |= (double_int<bits, sign>)b; return a; }
+	template<u64 bits, bool sign, typename T>
+	constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, const T &b) noexcept { a |= (double_int<bits, sign>)b; return a; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, unsigned short b) noexcept { ref_low64(a) |= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, unsigned int b) noexcept { ref_low64(a) |= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, unsigned long b) noexcept { ref_low64(a) |= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator|=(double_int<bits, sign> &a, unsigned long long b) noexcept { ref_low64(a) |= b; return a; }
-
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator|(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res |= b; return res; }
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> operator|(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { double_int<bits, sign> res = a; res |= b; return res; }
 
 	SHORTERHAND_BINARY_FORMATTER(|)
 
 	// -- xor -- //
 
-	template<u64 bits, bool sign1, bool sign2> inline constexpr double_int<bits, sign1> &operator^=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
+	template<u64 bits, bool sign1, bool sign2>
+	constexpr double_int<bits, sign1> &operator^=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 	{
-		if constexpr (COMPACT(sign1) && COMPACT(sign2) && bits >= BITWISE_LOOP_THRESH)
-		{
-			u64 *dest = (u64*)&a, *src = (u64*)&b;
-			for (u64 i = 0; i < bits / 64; ++i) dest[i] ^= src[i];
-			return a;
-		}
-		else
-		{
-			a.low ^= b.low;
-			a.high ^= b.high;
-			return a;
-		}
+		a.low ^= b.low;
+		a.high ^= b.high;
+		return a;
 	}
 
-	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, const T &b) noexcept { a ^= (double_int<bits, sign>)b; return a; }
+	template<u64 bits, bool sign, typename T>
+	constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, const T &b) noexcept { a ^= (double_int<bits, sign>)b; return a; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, unsigned short b) noexcept { ref_low64(a) ^= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, unsigned int b) noexcept { ref_low64(a) ^= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, unsigned long b) noexcept { ref_low64(a) ^= b; return a; }
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator^=(double_int<bits, sign> &a, unsigned long long b) noexcept { ref_low64(a) ^= b; return a; }
-
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator^(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { auto res = a; res ^= b; return res; }
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> operator^(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { auto res = a; res ^= b; return res; }
 
 	SHORTERHAND_BINARY_FORMATTER(^)
 
 	// -- shl/sal -- //
 
-	template<u64 bits, bool sign, std::enable_if_t<(COMPACT(sign) && bits >= SHIFT_LOOP_THRESH), int> = 0> inline constexpr double_int<bits, sign> &operator<<=(double_int<bits, sign> &val, u64 count) noexcept
-	{
-		u64 *ptr = (u64*)&val;
-
-		// count masked to bits limit - no-op on zero
-		if (count &= bits - 1)
-		{
-			// get number of blocks being traversed
-			u64 blocks = count / 64;
-			// if that's not zero
-			if (blocks != 0)
-			{
-				// shuffle blocks
-				for (u64 i = (bits / 64) - 1; i >= blocks; --i) ptr[i] = ptr[i - blocks];
-				// fill the rest with zero
-				for (u64 i = 0; i < blocks; ++i) ptr[i] = 0;
-			}
-			// count masked to block limit - no-op on zero
-			if (count &= 0x3f)
-			{
-				// perform the intra-block shifting
-				for (u64 i = (bits / 64) - 1; i > blocks; --i)
-				{
-					ptr[i] <<= count;
-					ptr[i] |= ptr[i - 1] >> (64 - count);
-				}
-				// perform the last block separately (avoids an out of bounds error where blocks = 0)
-				ptr[blocks] <<= count;
-			}
-		}
-
-		return val;
-	}
-	template<u64 bits, bool sign, std::enable_if_t<(!COMPACT(sign) || bits < SHIFT_LOOP_THRESH), int> = 0> inline constexpr double_int<bits, sign> &operator<<=(double_int<bits, sign> &val, u64 count) noexcept
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> &operator<<=(double_int<bits, sign> &val, u64 count) noexcept
 	{
 		// count masked to bits limit - no-op on zero
 		if (count &= bits - 1)
@@ -499,45 +399,14 @@ namespace BiggerInts
 		return val;
 	}
 	
-	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> operator<<(const double_int<bits, sign> &a, const T &count) noexcept { double_int<bits, sign> res = a; res <<= (u64)count; return res; }
+	template<u64 bits, bool sign, typename T>
+	constexpr double_int<bits, sign> operator<<(const double_int<bits, sign> &a, const T &count) noexcept { double_int<bits, sign> res = a; res <<= (u64)count; return res; }
 
 	// -- shr/sar -- //
 
 	// shr
-	template<u64 bits> inline constexpr auto operator>>=(double_int<bits, false> &val, u64 count) noexcept -> std::enable_if_t<(COMPACT(false) && bits >= SHIFT_LOOP_THRESH), double_int<bits, false>&>
-	{
-		u64 *ptr = (u64*)&val;
-
-		// count masked to bits limit - no-op on zero
-		if (count &= bits - 1)
-		{
-			// get number of blocks being traversed
-			u64 blocks = count / 64;
-			// if that's not zero
-			if (blocks != 0)
-			{
-				// shuffle blocks
-				for (u64 i = 0; i < (bits / 64) - blocks; ++i) ptr[i] = ptr[i + blocks];
-				// fill the rest with zero
-				for (u64 i = (bits / 64) - blocks; i < (bits / 64); ++i) ptr[i] = 0;
-			}
-			// count masked to block limit - no-op on zero
-			if (count &= 0x3f)
-			{
-				// perform the intra-block shifting
-				for (u64 i = 0; i < (bits / 64) - blocks - 1; ++i)
-				{
-					ptr[i] >>= count;
-					ptr[i] |= ptr[i + 1] << (64 - count);
-				}
-				// perform the last block separately (avoids an out of bounds error where blocks = 0)
-				ptr[(bits / 64) - blocks - 1] >>= count;
-			}
-		}
-
-		return val;
-	}
-	template<u64 bits> inline constexpr auto operator>>=(double_int<bits, false> &val, u64 count) noexcept -> std::enable_if_t<(!COMPACT(false) || bits < SHIFT_LOOP_THRESH), double_int<bits, false>&>
+	template<u64 bits>
+	constexpr double_int<bits, false> &operator>>=(double_int<bits, false> &val, u64 count) noexcept
 	{
 		// count masked to bits limit - no-op on zero
 		if (count &= bits - 1)
@@ -559,42 +428,8 @@ namespace BiggerInts
 	}
 
 	// sar
-	template<u64 bits> inline constexpr auto operator>>=(double_int<bits, true> &val, u64 count) noexcept -> std::enable_if_t<(COMPACT(true) && bits >= SHIFT_LOOP_THRESH), double_int<bits, true>&>
-	{
-		u64 *ptr = (u64*)&val;
-		u64 fill = is_neg(val) ? 0xffffffffffffffff : 0; // value to fill in for sign filling
-
-		// count masked to bits limit - no-op on zero
-		if (count &= bits - 1)
-		{
-			// get number of blocks being traversed
-			u64 blocks = count / 64;
-			// if that's not zero
-			if (blocks != 0)
-			{
-				// shuffle blocks
-				for (u64 i = 0; i < (bits / 64) - blocks; ++i) ptr[i] = ptr[i + blocks];
-				// fill the rest with fill
-				for (u64 i = (bits / 64) - blocks; i < (bits / 64); ++i) ptr[i] = fill;
-			}
-			// count masked to block limit - no-op on zero
-			if (count &= 0x3f)
-			{
-				// perform the intra-block shifting
-				for (u64 i = 0; i < (bits / 64) - blocks - 1; ++i)
-				{
-					ptr[i] >>= count;
-					ptr[i] |= ptr[i + 1] << (64 - count);
-				}
-				// perform the last block separately (avoids an out of bounds error where blocks = 0)
-				ptr[(bits / 64) - blocks - 1] >>= count;
-				ptr[(bits / 64) - blocks - 1] |= fill << (64 - count); // last block must account for fill value
-			}
-		}
-
-		return val;
-	}
-	template<u64 bits> inline constexpr auto operator>>=(double_int<bits, true> &val, u64 count) noexcept -> std::enable_if_t<(!COMPACT(true) || bits < SHIFT_LOOP_THRESH), double_int<bits, true>&>
+	template<u64 bits>
+	constexpr double_int<bits, true> &operator>>=(double_int<bits, true> &val, u64 count) noexcept
 	{
 		// count masked to bits limit - no-op on zero
 		if (count &= bits - 1)
@@ -625,31 +460,36 @@ namespace BiggerInts
 		return val;
 	}
 
-	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> operator>>(const double_int<bits, sign> &a, const T &count) noexcept { double_int<bits, sign> res = a; res >>= (u64)count; return res; }
+	template<u64 bits, bool sign, typename T>
+	constexpr double_int<bits, sign> operator>>(const double_int<bits, sign> &a, const T &count) noexcept { double_int<bits, sign> res = a; res >>= (u64)count; return res; }
 
 	// -- unary -- //
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator+(const double_int<bits, sign> &a) noexcept { return a; }
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> operator+(const double_int<bits, sign> &a) noexcept { return a; }
 
-	template<u64 bits> inline constexpr double_int<bits, true> operator-(const double_int<bits, true> &a) noexcept { double_int<bits, true> res = a; make_neg(res); return res; }
+	template<u64 bits>
+	constexpr double_int<bits, true> operator-(const double_int<bits, true> &a) noexcept { double_int<bits, true> res = a; make_neg(res); return res; }
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> operator~(const double_int<bits, sign> &a) noexcept { double_int<bits, sign> res = a; make_not(res); return res; }
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> operator~(const double_int<bits, sign> &a) noexcept { double_int<bits, sign> res = a; make_not(res); return res; }
 
 	// -- mul -- //
 
-	template<u64 bits> inline constexpr double_int<bits, false> operator*(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept
+	template<u64 bits>
+	constexpr double_int<bits, false> operator*(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept
 	{
 		double_int<bits, false> res = (ZEXT_TYPE)0, _a = a;
 		for (u64 bit = 0; _a; ++bit, _a <<= 1)
 			if (bit_test(b, bit)) res += _a;
 		return res;
 	}
-	template<u64 bits> inline constexpr double_int<bits, true> operator*(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept
+	template<u64 bits>
+	constexpr double_int<bits, true> operator*(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept
 	{
 		// we'll do signed divmod in terms of unsigned
-
-		double_int<bits, false> ua = *(double_int<bits, false>*)&a;
-		double_int<bits, false> ub = *(double_int<bits, false>*)&b;
+		double_int<bits, false> ua = a;
+		double_int<bits, false> ub = b;
 
 		bool neg = false;
 		if (bit_test(ua, bits - 1)) { make_neg(ua); neg = !neg; }
@@ -659,18 +499,22 @@ namespace BiggerInts
 
 		if (neg) make_neg(ua);
 
-		return *(double_int<bits, true>*)&ua;
+		return {a};
 	}
 
 	SHORTERHAND_BINARY_FORMATTER(*)
 
-	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { a = a * b; return a; }
-	template<u64 bits, bool sign, typename T> inline constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const T &b) noexcept { a *= (double_int<bits, sign>)b; return a; }
+	template<u64 bits, bool sign>
+	constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { a = a * b; return a; }
+
+	template<u64 bits, bool sign, typename T>
+	constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const T &b) noexcept { a *= (double_int<bits, sign>)b; return a; }
 
 	// -- divmod -- //
 
 	// helper for divmod_unchecked - takes the bit to start with - don't use this directly
-	template<u64 bits> inline constexpr std::pair<double_int<bits, false>, double_int<bits, false>> __divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den, u64 bit)
+	template<u64 bits>
+	constexpr std::pair<double_int<bits, false>, double_int<bits, false>> __divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den, u64 bit)
 	{
 		std::pair<double_int<bits, false>, double_int<bits, false>> res(0, 0);
 
@@ -691,30 +535,19 @@ namespace BiggerInts
 	}
 
 	// utility function used internally - no divide by zero check
-	template<u64 bits> inline constexpr std::pair<double_int<bits, false>, double_int<bits, false>> divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den)
+	template<u64 bits>
+	constexpr std::pair<double_int<bits, false>, double_int<bits, false>> divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den)
 	{
-		if constexpr (COMPACT(false) && bits >= DIVMOD_BLOCK_SKIP_THRESH)
-		{
-			// chop off any 64-bit blocks that are all zero
-			u64 bit = bits - 1, *ptr = (u64*)&num;
-			for (u64 i = bits / 64; i > 1; bit -= 64)
-			{
-				if (ptr[--i]) break; // if the previous byte is nonzero, we're done
-			}
-
-			return __divmod_unchecked(num, den, bit);
-		}
-		else
-		{
-			return __divmod_unchecked(num, den, bits - 1);
-		}
+		return __divmod_unchecked(num, den, bits - 1);
 	}
 
 	inline constexpr std::pair<std::uint8_t, std::uint8_t> divmod(std::uint8_t num, std::uint8_t den) { return {num / den, num % den}; }
 	inline constexpr std::pair<std::uint16_t, std::uint16_t> divmod(std::uint16_t num, std::uint16_t den) { return {num / den, num % den}; }
 	inline constexpr std::pair<std::uint32_t, std::uint32_t> divmod(std::uint32_t num, std::uint32_t den) { return {num / den, num % den}; }
 	inline constexpr std::pair<std::uint64_t, std::uint64_t> divmod(std::uint64_t num, std::uint64_t den) { return {num / den, num % den}; }
-	template<u64 bits> inline constexpr std::pair<double_int<bits, false>, double_int<bits, false>> divmod(const double_int<bits, false> &num, const double_int<bits, false> &den)
+
+	template<u64 bits>
+	constexpr std::pair<double_int<bits, false>, double_int<bits, false>> divmod(const double_int<bits, false> &num, const double_int<bits, false> &den)
 	{
 		if (!den) throw std::domain_error("divide by zero");
 		return divmod_unchecked(num, den);
@@ -724,12 +557,13 @@ namespace BiggerInts
 	inline constexpr std::pair<std::int16_t, std::int16_t> divmod(std::int16_t num, std::int16_t den) { return {num / den, num % den}; }
 	inline constexpr std::pair<std::int32_t, std::int32_t> divmod(std::int32_t num, std::int32_t den) { return {num / den, num % den}; }
 	inline constexpr std::pair<std::int64_t, std::int64_t> divmod(std::int64_t num, std::int64_t den) { return {num / den, num % den}; }
-	template<u64 bits> inline constexpr std::pair<double_int<bits, true>, double_int<bits, true>> divmod(const double_int<bits, true> &num, const double_int<bits, true> &den)
+
+	template<u64 bits>
+	constexpr std::pair<double_int<bits, true>, double_int<bits, true>> divmod(const double_int<bits, true> &num, const double_int<bits, true> &den)
 	{
 		// we'll do signed divmod in terms of unsigned
-
-		double_int<bits, false> unum = *(double_int<bits, false>*)&num;
-		double_int<bits, false> uden = *(double_int<bits, false>*)&den;
+		double_int<bits, false> unum = num;
+		double_int<bits, false> uden = den;
 
 		bool neg = false;
 		if (bit_test(unum, bits - 1)) { make_neg(unum); neg = !neg; }
@@ -743,7 +577,7 @@ namespace BiggerInts
 			make_neg(res.second);
 		}
 
-		return { *(double_int<bits, true>*)&res.first, *(double_int<bits, true>*)&res.second };
+		return { res.first, res.second };
 	}
 
 	template<u64 bits, bool sign> inline constexpr double_int<bits, sign> &operator/=(double_int<bits, sign> &num, const double_int<bits, sign> &den) { num = divmod(num, den).first; return num; }
@@ -763,56 +597,44 @@ namespace BiggerInts
 	// cmp() will be equivalent to <=> but works for any version of C++
 	
 	// unsigned compare
-	template<u64 bits> inline constexpr int cmp(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept
+	template<u64 bits>
+	constexpr int cmp(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept
 	{
-		if constexpr (COMPACT(false) && bits >= CMP_LOOP_THRESH)
-		{
-			u64 *dest = (u64*)&a, *src = (u64*)&b;
-			for (u64 i = bits / 64; i > 0; )
-			{
-				--i;
-				if (dest[i] < src[i]) return -1;
-				else if (dest[i] > src[i]) return 1;
-			}
-			return 0;
-		}
-		else
-		{
-			return a.high < b.high ? -1 : a.high > b.high ? 1 : a.low < b.low ? -1 : a.low > b.low ? 1 : 0;
-		}
+		return a.high < b.high ? -1 : a.high > b.high ? 1 : a.low < b.low ? -1 : a.low > b.low ? 1 : 0;
 	}
 
 	// signed compare
-	template<u64 bits> inline constexpr int cmp(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept
+	template<u64 bits>
+	constexpr int cmp(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept
 	{
-		// get unsigned comparison
-		int ucmp = cmp(*(const double_int<bits, false>*)&a, *(const double_int<bits, false>*)&b);
-		// do quick mafs to transform it into a signed comparison
-		return is_neg(a) ^ is_neg(b) ? -ucmp : ucmp;
+		// do the comparison in terms of unsigned
+		int ucmp = cmp((double_int<bits, false>)a, (double_int<bits, false>)b);
+
+		return is_neg(a) ^ is_neg(b) ? -ucmp : ucmp; // do quick mafs to transform it into a signed comparison
 	}
 	
-	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator==(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) == 0; }
-	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator!=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) != 0; }
-	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator<(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) < 0; }
-	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator<=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) <= 0; }
-	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator>(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) > 0; }
-	template<u64 bits1, u64 bits2, bool sign> inline constexpr bool operator>=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) >= 0; }
+	template<u64 bits1, u64 bits2, bool sign> constexpr bool operator==(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) == 0; }
+	template<u64 bits1, u64 bits2, bool sign> constexpr bool operator!=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) != 0; }
+	template<u64 bits1, u64 bits2, bool sign> constexpr bool operator<(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) < 0; }
+	template<u64 bits1, u64 bits2, bool sign> constexpr bool operator<=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) <= 0; }
+	template<u64 bits1, u64 bits2, bool sign> constexpr bool operator>(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) > 0; }
+	template<u64 bits1, u64 bits2, bool sign> constexpr bool operator>=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) >= 0; }
 
 	// shorthand for comparing double_int with specified signage to a primitive type
 	#define SHORTHAND_CMP_FORMATTER(sign, type) \
-		template<u64 bits> inline constexpr bool operator==(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) == 0; } \
-		template<u64 bits> inline constexpr bool operator!=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) != 0; } \
-		template<u64 bits> inline constexpr bool operator<(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) < 0; } \
-		template<u64 bits> inline constexpr bool operator<=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) <= 0; } \
-		template<u64 bits> inline constexpr bool operator>(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) > 0; } \
-		template<u64 bits> inline constexpr bool operator>=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) >= 0; } \
+		template<u64 bits> constexpr bool operator==(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) == 0; } \
+		template<u64 bits> constexpr bool operator!=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) != 0; } \
+		template<u64 bits> constexpr bool operator<(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) < 0; } \
+		template<u64 bits> constexpr bool operator<=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) <= 0; } \
+		template<u64 bits> constexpr bool operator>(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) > 0; } \
+		template<u64 bits> constexpr bool operator>=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) >= 0; } \
 		\
-		template<u64 bits> inline constexpr bool operator==(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) == 0; } \
-		template<u64 bits> inline constexpr bool operator!=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) != 0; } \
-		template<u64 bits> inline constexpr bool operator<(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) < 0; } \
-		template<u64 bits> inline constexpr bool operator<=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) <= 0; } \
-		template<u64 bits> inline constexpr bool operator>(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) > 0; } \
-		template<u64 bits> inline constexpr bool operator>=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) >= 0; }
+		template<u64 bits> constexpr bool operator==(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) == 0; } \
+		template<u64 bits> constexpr bool operator!=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) != 0; } \
+		template<u64 bits> constexpr bool operator<(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) < 0; } \
+		template<u64 bits> constexpr bool operator<=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) <= 0; } \
+		template<u64 bits> constexpr bool operator>(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) > 0; } \
+		template<u64 bits> constexpr bool operator>=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) >= 0; }
 
 	SHORTHAND_CMP_FORMATTER(false, unsigned long long)
 	SHORTHAND_CMP_FORMATTER(false, unsigned long)
@@ -835,7 +657,8 @@ namespace BiggerInts
 		return false;
 	}
 
-	template<u64 bits> std::ostream &operator<<(std::ostream &ostr, const double_int<bits, false> &val)
+	template<u64 bits>
+	std::ostream &operator<<(std::ostream &ostr, const double_int<bits, false> &val)
 	{
 		std::string str;
 		int digit, dcount;
@@ -952,10 +775,10 @@ namespace BiggerInts
 		ostr.width(0);
 		return ostr;
 	}
-	template<u64 bits> std::ostream &operator<<(std::ostream &ostr, const double_int<bits, true> &val)
+	template<u64 bits>
+	std::ostream &operator<<(std::ostream &ostr, const double_int<bits, true> &val)
 	{
 		// we'll do signed io in terms of unsigned
-
 		double_int<bits, true> cpy = val;
 
 		// if it's negative make it positing and print the - sign
@@ -973,12 +796,13 @@ namespace BiggerInts
 		}
 
 		// refer to cpy as unsigned
-		ostr << *(double_int<bits, false>*)&cpy;
+		ostr << (double_int<bits, false>)cpy;
 
 		return ostr;
 	}
 	
-	template<u64 bits> std::istream &parse_udouble_int(std::istream &istr, double_int<bits, false> &val, bool noskipws = false)
+	template<u64 bits>
+	std::istream &parse_udouble_int(std::istream &istr, double_int<bits, false> &val, bool noskipws = false)
 	{
 		val = 0; // start by zeroing value
 		int digit, num_digits;
@@ -1114,7 +938,9 @@ namespace BiggerInts
 		else if (ch == '+') istr.get();
 
 		// parse the value (and don't skip ws since we already did that)
-		parse_udouble_int(istr, *(double_int<bits, false>*)&val, true);
+		double_int<bits, false> tmp;
+		parse_udouble_int(istr, tmp, true);
+		val = tmp; // store the tmp parse location back to val
 
 		// account for sign in result
 		if (neg) make_neg(val);
@@ -1125,14 +951,8 @@ namespace BiggerInts
 	// -- extra utilities -- //
 
 	// helper function for bool conversion (SFINAE wasn't working inside the class definition)
-	template<u64 bits, bool sign, std::enable_if_t<(COMPACT(sign) && bits >= BOOL_LOOP_THRESH), int> = 0> inline constexpr bool to_bool(const double_int<bits, sign> &val) noexcept
-	{
-		u64 *ptr = (u64*)&val;
-		for (u64 i = 0; i < bits / 64; ++i)
-			if (ptr[i]) return true;
-		return false;
-	}
-	template<u64 bits, bool sign, std::enable_if_t<(!COMPACT(sign) || bits < BOOL_LOOP_THRESH), int> = 0> inline constexpr bool to_bool(const double_int<bits, sign> &val) noexcept { return val.low || val.high; }
+	template<u64 bits, bool sign>
+	constexpr bool to_bool(const double_int<bits, sign> &val) noexcept { return val.low || val.high; }
 
 	// counts the number of set bits
 	inline constexpr u64 num_set_bits(u64 val) noexcept
@@ -1141,24 +961,17 @@ namespace BiggerInts
 		for (; val; ++num, val = val & (val - 1));
 		return num;
 	}
-	template<u64 bits, bool sign> inline constexpr u64 num_set_bits(const double_int<bits, sign> &val) noexcept { return num_set_bits(val.low) + num_set_bits(val.high); }
+
+	template<u64 bits, bool sign>
+	constexpr u64 num_set_bits(const double_int<bits, sign> &val) noexcept { return num_set_bits(val.low) + num_set_bits(val.high); }
 
 	// gets the number of 64-bit blocks with significant bits (i.e. not including leading zero blocks)
-	template<u64 bits, bool sign, std::enable_if_t<COMPACT(sign), int> = 0> inline constexpr u64 num_blocks(const double_int<bits, sign> &val) noexcept
-	{
-		// get pointer to u64 blocks (if compact, will be little-endian wrt 64-bit blocks)
-		u64 *ptr = (u64*)&val;
-		// go backwards through blocks (starting at high blocks) and stop on the first non-zero one
-		for (int num = bits / 64; num > 0; --num)
-			if (ptr[num - 1]) return num;
-		// otherwise, value is bit-zero
-		return 0;
-	}
-	template<u64 bits, bool sign, std::enable_if_t<!COMPACT(sign), int> = 0> inline constexpr u64 num_blocks(const double_int<bits, sign> &val) noexcept
+	template<u64 bits, bool sign>
+	constexpr u64 num_blocks(const double_int<bits, sign> &val) noexcept
 	{
 		// start at zero, return when we've shifted out all the significant blocks
 		double_int<bits, sign> cpy = val;
-		int num;
+		u64 num = 0;
 		for (num = 0; cpy; ++num, cpy >>= 64);
 		return num;
 	}
@@ -1166,62 +979,68 @@ namespace BiggerInts
 	// -- block access -- //
 
 	// gets the low 64-bit word of a given value
-	template<u64 bits, bool sign> inline constexpr u64 low64(const double_int<bits, sign> &val) noexcept
-	{
-		// because the low half always comes first, the entire recursive definition for any number of bits is little-endian wrt 64-bit blocks
-		return *(u64*)&val;
-	}
+	template<u64 bits, bool sign>
+	constexpr u64 low64(const double_int<bits, sign> &val) noexcept { return low64(val.low); }
+	template<bool sign>
+	constexpr u64 low64(const double_int<128, sign> &val) noexcept { return val.low; }
+
 	// same as low64() but returns by reference
-	template<u64 bits, bool sign> inline constexpr u64 &ref_low64(double_int<bits, sign> &val) noexcept
-	{
-		// because the low half always comes first, the entire recursive definition for any number of bits is little-endian wrt 64-bit blocks
-		return *(u64*)&val;
-	}
+	template<u64 bits, bool sign>
+	constexpr u64 &ref_low64(double_int<bits, sign> &val) noexcept { return ref_low64(val.low); }
+	template<bool sign>
+	constexpr u64 &ref_low64(double_int<128, sign> &val) noexcept { return val.low; }
+
+	// gets the high 64-bit word of a given value
+	template<u64 bits, bool sign>
+	constexpr u64 high64(const double_int<bits, sign> &val) noexcept { return high64(val.high); }
+	template<bool sign>
+	constexpr u64 high64(const double_int<128, sign> &val) noexcept { return val.high; }
+
+	// same as high64() but returns by reference
+	template<u64 bits, bool sign>
+	constexpr u64 &ref_high64(const double_int<bits, sign> &val) noexcept { return high64(val.high); }
+	template<bool sign>
+	constexpr u64 &ref_high64(const double_int<128, sign> &val) noexcept { return val.high; }
 
 	// -- in-place unary -- //
 	
-	template<u64 bits, bool sign, std::enable_if_t<(COMPACT(sign) && bits >= NOT_LOOP_THRESH), int> = 0> inline constexpr void make_not(double_int<bits, sign> &val) noexcept
-	{
-		u64 *ptr = (u64*)&val;
-		for (u64 i = 0; i < bits / 64; ++i) ptr[i] = ~ptr[i];
-	}
-	template<u64 bits, bool sign, std::enable_if_t<(!COMPACT(sign) || bits < NOT_LOOP_THRESH), int> = 0> inline constexpr void make_not(double_int<bits, sign> &val) noexcept
+	// performs an in-place bitwise not
+	template<u64 bits, bool sign>
+	constexpr void make_not(double_int<bits, sign> &val) noexcept
 	{
 		make_not(val.low);
 		make_not(val.high);
 	}
-	template<bool sign> inline constexpr void make_not(double_int<128, sign> &val) noexcept { val.low = ~val.low; val.high = ~val.high; }
+	template<bool sign>
+	constexpr void make_not(double_int<128, sign> &val) noexcept { val.low = ~val.low; val.high = ~val.high; }
 
-	template<u64 bits, bool sign> inline constexpr void make_neg(double_int<bits, sign> &val) noexcept { make_not(val); ++val; }
+	// takes the 2's complement negative of the value in-place
+	template<u64 bits, bool sign>
+	constexpr void make_neg(double_int<bits, sign> &val) noexcept { make_not(val); ++val; }
 
 	// -- bit tests -- //
 
-	inline constexpr bool bit_test(std::uint64_t val, u64 bit) noexcept { return (val >> bit) & 1; }
-	template<u64 bits, bool sign, std::enable_if_t<COMPACT(sign), int> = 0> inline constexpr bool bit_test(const double_int<bits, sign> &val, u64 bit) noexcept
+	inline constexpr bool bit_test(u64 val, u64 bit) noexcept { return (val >> bit) & 1; }
+
+	template<u64 bits, bool sign>
+	constexpr bool bit_test(const double_int<bits, sign> &val, u64 bit) noexcept
 	{
-		bit &= bits - 1;
-		return bit_test(((u64*)&val)[bit >> 6], bit & 0x3f);
-	}
-	template<u64 bits, bool sign, std::enable_if_t<!COMPACT(sign), int> = 0> inline constexpr bool bit_test(const double_int<bits, sign> &val, u64 bit) noexcept
-	{
-		bit &= bits - 1;
+		bit &= bits - 1; // mask to modulo bits
 		return bit >= bits / 2 ? bit_test(val.high, bit - bits / 2) : bit_test(val.low, bit);
 	}
 	
-	inline constexpr void bit_set(std::uint64_t &val, u64 bit) noexcept { val |= (std::uint64_t)1 << bit; }
-	template<u64 bits, bool sign, std::enable_if_t<COMPACT(sign), int> = 0> inline constexpr void bit_set(double_int<bits, sign> &val, u64 bit) noexcept
+	inline constexpr void bit_set(u64 &val, u64 bit) noexcept { val |= (u64)1 << bit; }
+
+	template<u64 bits, bool sign>
+	constexpr void bit_set(double_int<bits, sign> &val, u64 bit) noexcept
 	{
-		bit &= bits - 1;
-		return bit_set(((u64*)&val)[bit >> 6], bit & 0x3f);
-	}
-	template<u64 bits, bool sign, std::enable_if_t<!COMPACT(sign), int> = 0> inline constexpr void bit_set(double_int<bits, sign> &val, u64 bit) noexcept
-	{
-		bit &= bits - 1;
+		bit &= bits - 1; // mask to modulo bits
 		if (bit >= bits / 2) bit_set(val.high, bit - bits / 2); else bit_set(val.low, bit);
 	}
 
-	template<u64 bits, bool sign, std::enable_if_t<COMPACT(sign), int> = 0> inline constexpr bool is_neg(const double_int<bits, sign> &val) noexcept { return ((u64*)&val)[bits / 64 - 1] & 0x8000000000000000; }
-	template<u64 bits, bool sign, std::enable_if_t<!COMPACT(sign), int> = 0> inline constexpr bool is_neg(const double_int<bits, sign> &val) noexcept { return bit_test(val, bits - 1); }
+	// determines if the value is negative under 2's complement (i.e. high bit is set)
+	template<u64 bits, bool sign>
+	constexpr bool is_neg(const double_int<bits, sign> &val) noexcept { return high64(val) & 0x8000000000000000; }
 }
 
 // -- std info definitions -- //
