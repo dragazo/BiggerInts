@@ -1,3 +1,3 @@
 test:
-	g++ -O4 -o test.exe -Wpedantic -Wreturn-type -Wdeprecated *.cpp -std=c++17
+	g++ -O4 -o test.exe -Wall *.cpp -std=c++17
 

@@ -189,68 +189,72 @@ namespace BiggerInts
 
 	public: // -- promotion constructors -- //
 
-		inline constexpr double_int(unsigned short val) noexcept : high((ZEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(unsigned int val) noexcept : high((ZEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(unsigned long val) noexcept : high((ZEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(unsigned long long val) noexcept : high((ZEXT_TYPE)0), low(val) {}
+		constexpr double_int(unsigned short val) noexcept : low(val), high((ZEXT_TYPE)0) {}
+		constexpr double_int(unsigned int val) noexcept : low(val), high((ZEXT_TYPE)0) {}
+		constexpr double_int(unsigned long val) noexcept : low(val), high((ZEXT_TYPE)0) {}
+		constexpr double_int(unsigned long long val) noexcept : low(val), high((ZEXT_TYPE)0) {}
 		
-		inline constexpr double_int(signed short val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(signed int val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(signed long val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
-		inline constexpr double_int(signed long long val) noexcept : high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
+		constexpr double_int(signed short val) noexcept : low(val), high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0) {}
+		constexpr double_int(signed int val) noexcept : low(val), high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0) {}
+		constexpr double_int(signed long val) noexcept : low(val), high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0) {}
+		constexpr double_int(signed long long val) noexcept : low(val), high(val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0) {}
 
-		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int(const double_int<_bits, false> &val) noexcept : high((ZEXT_TYPE)0), low(val) {}
-		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int(const double_int<_bits, true> &val) noexcept : high(is_neg(val) ? (SEXT_TYPE)-1 : (SEXT_TYPE)0), low(val) {}
+		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0>
+		constexpr double_int(const double_int<_bits, false> &val) noexcept : low(val), high((ZEXT_TYPE)0) {}
+		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0>
+		constexpr double_int(const double_int<_bits, true> &val) noexcept : low(val), high(is_neg(val) ? (SEXT_TYPE)-1 : (SEXT_TYPE)0) {}
 
 		template<bool other_sign>
 		constexpr double_int(const double_int<bits, other_sign> &other) noexcept { low = other.low; high = other.high; }
 
 	public: // -- promotion assignment -- //
 
-		inline constexpr double_int &operator=(unsigned short val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(unsigned int val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(unsigned long val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(unsigned long long val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
+		constexpr double_int &operator=(unsigned short val) noexcept { low = val; high = (ZEXT_TYPE)0; return *this; }
+		constexpr double_int &operator=(unsigned int val) noexcept { low = val; high = (ZEXT_TYPE)0; return *this; }
+		constexpr double_int &operator=(unsigned long val) noexcept { low = val; high = (ZEXT_TYPE)0; return *this; }
+		constexpr double_int &operator=(unsigned long long val) noexcept { low = val; high = (ZEXT_TYPE)0; return *this; }
 
-		inline constexpr double_int &operator=(signed short val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(signed int val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(signed long val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
-		inline constexpr double_int &operator=(signed long long val) noexcept { high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
+		constexpr double_int &operator=(signed short val) noexcept { low = val; high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; return *this; }
+		constexpr double_int &operator=(signed int val) noexcept { low = val; high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; return *this; }
+		constexpr double_int &operator=(signed long val) noexcept { low = val; high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; return *this; }
+		constexpr double_int &operator=(signed long long val) noexcept { low = val; high = val < 0 ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; return *this; }
 		
-		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, false> &val) noexcept { high = (ZEXT_TYPE)0; low = val; return *this; }
-		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0> inline constexpr double_int &operator=(const double_int<_bits, true> &val) noexcept { high = is_neg(val) ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; low = val; return *this; }
+		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0>
+		constexpr double_int &operator=(const double_int<_bits, false> &val) noexcept { low = val; high = (ZEXT_TYPE)0; return *this; }
+		template<u64 _bits, std::enable_if_t<(bits > _bits), int> = 0>
+		constexpr double_int &operator=(const double_int<_bits, true> &val) noexcept { low = val; high = is_neg(val) ? (SEXT_TYPE)-1 : (SEXT_TYPE)0; return *this; }
 
 		template<bool other_sign>
 		constexpr double_int &operator=(const double_int<bits, other_sign> &other) noexcept { low = other.low; high = other.high; return *this; }
 
 	public: // -- demotion conversion -- //
 
-		inline constexpr explicit operator unsigned short() const noexcept { return (unsigned short)low64(*this); }
-		inline constexpr explicit operator unsigned int() const noexcept { return (unsigned int)low64(*this); }
-		inline constexpr explicit operator unsigned long() const noexcept { return (unsigned long)low64(*this); }
-		inline constexpr explicit operator unsigned long long() const noexcept { return (unsigned long long)low64(*this); }
+		constexpr explicit operator unsigned short() const noexcept { return (unsigned short)low; }
+		constexpr explicit operator unsigned int() const noexcept { return (unsigned int)low; }
+		constexpr explicit operator unsigned long() const noexcept { return (unsigned long)low; }
+		constexpr explicit operator unsigned long long() const noexcept { return (unsigned long long)low; }
 
-		inline constexpr explicit operator signed short() const noexcept { return (signed short)low64(*this); }
-		inline constexpr explicit operator signed int() const noexcept { return (signed int)low64(*this); }
-		inline constexpr explicit operator signed long() const noexcept { return (signed long)low64(*this); }
-		inline constexpr explicit operator signed long long() const noexcept { return (signed long long)low64(*this); }
+		constexpr explicit operator signed short() const noexcept { return (signed short)low; }
+		constexpr explicit operator signed int() const noexcept { return (signed int)low; }
+		constexpr explicit operator signed long() const noexcept { return (signed long)low; }
+		constexpr explicit operator signed long long() const noexcept { return (signed long long)low; }
 
 		template<u64 other_bits, bool other_sign, std::enable_if_t<(other_bits < bits), int> = 0>
-		inline constexpr explicit operator double_int<other_bits, other_sign>() const noexcept
+		constexpr explicit operator double_int<other_bits, other_sign>() const noexcept
 		{
 			return (double_int<other_bits, other_sign>)low; // recursively select the low branch
 		}
 
 	public: // -- bool conversion -- //
 
-		inline constexpr explicit operator bool() const noexcept { return to_bool(*this); }
-		inline constexpr friend bool operator!(const double_int &a) noexcept { return !to_bool(a); }
+		constexpr explicit operator bool() const noexcept { return to_bool(*this); }
+		constexpr friend bool operator!(const double_int &a) noexcept { return !to_bool(a); }
 	};
 
 	// shorthand for binary ops +, -, *, etc. will refer to a form that uses both sides of double_int
 	#define SHORTHAND_BINARY_FORMATTER(op, sign, type) \
-		template<u64 bits> inline constexpr double_int<bits, sign> operator op(const double_int<bits, sign> &a, type b) noexcept { return a op (double_int<bits, sign>)b; } \
-		template<u64 bits> inline constexpr double_int<bits, sign> operator op(type a, const double_int<bits, sign> &b) noexcept { return (double_int<bits, sign>)a op b; }
+		template<u64 bits> constexpr double_int<bits, sign> operator op(const double_int<bits, sign> &a, type b) noexcept { return a op (double_int<bits, sign>)b; } \
+		template<u64 bits> constexpr double_int<bits, sign> operator op(type a, const double_int<bits, sign> &b) noexcept { return (double_int<bits, sign>)a op b; }
 	// does all the standard shorthands for a given op
 	#define SHORTERHAND_BINARY_FORMATTER(op) \
 		SHORTHAND_BINARY_FORMATTER(op, false, unsigned short) \
