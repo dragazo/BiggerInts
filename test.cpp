@@ -32,10 +32,43 @@ std::string tostr(Args &&...args)
 int main(int argc, const char *argv[])
 {
 	using namespace BiggerInts;
-	
+
+	assert(tostr(uint_t<128>(2) * uint_t<128>(13)) == "26");
+	assert(tostr(uint_t<128>(2) + uint_t<128>(13)) == "15");
+	assert(tostr(uint_t<128>(2) / uint_t<128>(13)) == "0");
+	assert(tostr(uint_t<128>(2) % uint_t<128>(13)) == "2");
+
+	assert(tostr(uint_t<128>(52) * uint_t<128>(3)) == "156");
+	assert(tostr(uint_t<128>(52) + uint_t<128>(3)) == "55");
+	assert(tostr(uint_t<128>(52) / uint_t<128>(3)) == "17");
+	assert(tostr(uint_t<128>(52) % uint_t<128>(3)) == "1");
+
+	assert(tostr(int_t<128>(2) * int_t<128>(-13)) == "-26");
+	assert(tostr(int_t<128>(2) + int_t<128>(-13)) == "-11");
+	assert(tostr(int_t<128>(2) / int_t<128>(-13)) == "0");
+	assert(tostr(int_t<128>(2) % int_t<128>(13)) == "2");
+
+	assert(tostr(int_t<128>(2) & int_t<128>(-13)) == "2");
+	assert(tostr(int_t<128>(2) | int_t<128>(-13)) == "-13");
+	assert(tostr(int_t<128>(2) ^ int_t<128>(-13)) == "-15");
+
+	assert(tostr(int_t<128>(-13) << 1) == "-26");
+	assert(tostr(int_t<128>(-13) << 2) == "-52");
+
+	assert(tostr(int_t<128>(-13) >> 1) == "-7");
+	assert(tostr(int_t<128>(-13) >> 2) == "-4");
+
+	{
+		static_assert(std::is_same<decltype(uint_t<128>::high), std::uint64_t>::value);
+		static_assert(std::is_same<decltype(uint_t<128>::low), std::uint64_t>::value);
+
+		static_assert(std::is_same<decltype(int_t<128>::high), std::uint64_t>::value);
+		static_assert(std::is_same<decltype(int_t<128>::low), std::uint64_t>::value);
+	}
+
 	uint_t<8192> big_mul = 947563412;
 	assert(tostr(big_mul) == "947563412");
-
+	
 	big_mul *= big_mul;
 	assert(tostr(big_mul) == "897876419761081744");
 

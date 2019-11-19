@@ -442,7 +442,7 @@ namespace BiggerInts
 			{
 				val.low = val.high;
 				val.low >>= count - bits / 2;
-				if (is_neg(val.high)) // fill with sign bit
+				if (is_neg(val)) // fill with sign bit
 				{
 					val.high = (SEXT_TYPE)-1;
 					if (count != bits / 2) val.low |= val.high << (bits - count);
@@ -453,7 +453,7 @@ namespace BiggerInts
 			{
 				val.low >>= count;
 				val.low |= val.high << (bits / 2 - count);
-				if (is_neg(val.high)) // fill with sign bit
+				if (is_neg(val)) // fill with sign bit
 				{
 					val.high >>= count;
 					val.high |= (decltype(val.high))((SEXT_TYPE)-1) << (bits / 2 - count);
@@ -491,7 +491,7 @@ namespace BiggerInts
 	template<u64 bits>
 	constexpr double_int<bits, true> operator*(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept
 	{
-		// we'll do signed divmod in terms of unsigned
+		// we'll do signed multiply in terms of unsigned
 		double_int<bits, false> ua = a;
 		double_int<bits, false> ub = b;
 
@@ -503,7 +503,7 @@ namespace BiggerInts
 
 		if (neg) make_neg(ua);
 
-		return {a};
+		return {ua};
 	}
 
 	SHORTERHAND_BINARY_FORMATTER(*)
