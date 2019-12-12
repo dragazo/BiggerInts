@@ -36,44 +36,29 @@ namespace BiggerInts
 		template<typename T, std::uint64_t bits> struct masked_single_int;
 		template<std::uint64_t bits, bool sign> struct double_int;
 
-		// -- block access -- //
-
-		// gets the low 64-bit word of a given value
-		template<std::uint64_t bits, bool sign>
-		constexpr std::uint64_t low64(const double_int<bits, sign> &val) noexcept { if constexpr (bits == 128) return val.low; else return low64(val.low); }
-		// as low64() but returns by reference
-		template<std::uint64_t bits, bool sign>
-		constexpr std::uint64_t &ref_low64(double_int<bits, sign> &val) noexcept { if constexpr (bits == 128) return val.low; else return ref_low64(val.low); }
-
-		// gets the high 64-bit word of a given value
-		template<std::uint64_t bits, bool sign>
-		constexpr std::uint64_t high64(const double_int<bits, sign> &val) noexcept { if constexpr (bits == 128) return val.high; else return high64(val.high); }
-
 		// -- bit manip -- //
 
 		// checks if a bit is set
-		inline constexpr bool bit_test_unchecked(std::uint64_t val, std::uint64_t bit) noexcept { return (val >> bit) & 1; }
 		template<std::uint64_t bits, bool sign>
 		constexpr bool bit_test_unchecked(const double_int<bits, sign> &val, std::uint64_t bit) noexcept
 		{
-			return bit >= bits / 2 ? bit_test_unchecked(val.high, bit - bits / 2) : bit_test_unchecked(val.low, bit);
+			return (val.blocks[bit / 64] >> (bit % 64)) & 1;
 		}
 		template<std::uint64_t bits, bool sign>
 		constexpr bool bit_test(const double_int<bits, sign> &val, std::uint64_t bit) noexcept { return bit_test_unchecked(val, bit & (bits - 1)); }
 
 		// sets the specified bit
-		inline constexpr void bit_set_unchecked(std::uint64_t &val, std::uint64_t bit) noexcept { val |= (std::uint64_t)1 << bit; }
 		template<std::uint64_t bits, bool sign>
 		constexpr void bit_set_unchecked(double_int<bits, sign> &val, std::uint64_t bit) noexcept
 		{
-			if (bit >= bits / 2) bit_set_unchecked(val.high, bit - bits / 2); else bit_set_unchecked(val.low, bit);
+			val.blocks[bit / 64] |= (std::uint64_t)1 << (bit % 64);
 		}
 		template<std::uint64_t bits, bool sign>
 		constexpr void bit_set(double_int<bits, sign> &val, std::uint64_t bit) noexcept { bit_set_unchecked(val, bit & (bits - 1)); }
 
 		// determines if the value is negative under 2's complement (i.e. high bit is set)
 		template<std::uint64_t bits, bool sign>
-		constexpr bool is_neg(const double_int<bits, sign> &val) noexcept { return high64(val) & 0x8000000000000000; }
+		constexpr bool is_neg(const double_int<bits, sign> &val) noexcept { return val.blocks[bits / 64 - 1] & 0x8000000000000000; }
 
 		// -- helpers -- //
 
@@ -112,16 +97,17 @@ namespace BiggerInts
 		template<std::uint64_t bits>
 		constexpr std::pair<double_int<bits, false>, double_int<bits, false>> _divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den, std::uint64_t bit)
 		{
-			std::pair<double_int<bits, false>, double_int<bits, false>> res(0, 0);
+			std::pair<double_int<bits, false>, double_int<bits, false>> res(0u, 0u);
 
 			while (true)
 			{
 				res.second <<= 1;
-				if (bit_test(num, bit)) ++ref_low64(res.second);
+				if (bit_test(num, bit)) ++res.second.blocks[0];
 
 				if (res.second >= den)
 				{
 					res.second -= den;
+					assert(!detail::is_neg(res.second));
 					bit_set(res.first, bit);
 				}
 
@@ -171,16 +157,7 @@ namespace BiggerInts
 		template<std::uint64_t bits, bool sign>
 		constexpr void make_not(double_int<bits, sign> &val) noexcept
 		{
-			if constexpr (bits == 128)
-			{
-				val.low = ~val.low;
-				val.high = ~val.high;
-			}
-			else
-			{
-				make_not(val.low);
-				make_not(val.high);
-			}
+			for (std::size_t i = 0; i < bits / 64; ++i) val.blocks[i] = ~val.blocks[i];
 		}
 
 		// takes the 2's complement negative of the value in-place
@@ -193,7 +170,6 @@ namespace BiggerInts
 
 	namespace detail
 	{
-
 		// contains an integral constant that represents the number of bits in a given (supported) (integral) type
 		template<typename T> struct bit_count {};
 
@@ -260,10 +236,7 @@ namespace BiggerInts
 
 			static_assert(detail::is_pow2(bits) && bits >= 128, "double_int: bits was out of valid domain");
 
-			typedef uint_t<bits / 2> half_t;
-
-			half_t low;
-			half_t high;
+			std::uint64_t blocks[bits / 64];
 
 		public: // -- core -- //
 
@@ -272,69 +245,95 @@ namespace BiggerInts
 			constexpr double_int(const double_int&) noexcept = default;
 			constexpr double_int &operator=(const double_int&) noexcept = default;
 
-			constexpr explicit operator double_int<bits, !sign>() const noexcept { double_int<bits, !sign> cpy = *this; return cpy; }
+			constexpr double_int(const double_int<bits, !sign> &other) noexcept
+			{
+				for (std::size_t i = 0; i < bits / 64; ++i) blocks[i] = other.blocks[i];
+			}
+			constexpr double_int &operator=(const double_int<bits, !sign> &other) noexcept
+			{
+				for (std::size_t i = 0; i < bits / 64; ++i) blocks[i] = other.blocks[i];
+				return *this;
+			}
 
 		public: // -- promotion constructors -- //
 
-			constexpr double_int(unsigned short val) noexcept : low(val), high(0u) {}
-			constexpr double_int(unsigned int val) noexcept : low(val), high(0u) {}
-			constexpr double_int(unsigned long val) noexcept : low(val), high(0u) {}
-			constexpr double_int(unsigned long long val) noexcept : low(val), high(0u) {}
+			constexpr double_int(std::uint16_t val) noexcept : double_int((std::uint64_t)val) {}
+			constexpr double_int(std::uint32_t val) noexcept : double_int((std::uint64_t)val) {}
+			constexpr double_int(std::uint64_t val) noexcept : blocks{}
+			{
+				blocks[0] = val;
+				for (std::size_t i = 1; i < bits / 64; ++i) blocks[i] = 0;
+			}
 
-			constexpr double_int(signed short val) noexcept : low(val), high(val < 0 ? -1 : 0) {}
-			constexpr double_int(signed int val) noexcept : low(val), high(val < 0 ? -1 : 0) {}
-			constexpr double_int(signed long val) noexcept : low(val), high(val < 0 ? -1 : 0) {}
-			constexpr double_int(signed long long val) noexcept : low(val), high(val < 0 ? -1 : 0) {}
+			constexpr double_int(std::int16_t val) noexcept : double_int((std::int64_t)val) {}
+			constexpr double_int(std::int32_t val) noexcept : double_int((std::int64_t)val) {}
+			constexpr double_int(std::int64_t val) noexcept : blocks{}
+			{
+				blocks[0] = val;
+				std::uint64_t fill = val < 0 ? -1 : 0;
+				for (std::size_t i = 1; i < bits / 64; ++i) blocks[i] = fill;
+			}
 
-			template<std::uint64_t _bits, std::enable_if_t<(bits > _bits), int> = 0>
-				constexpr double_int(const double_int<_bits, false> &val) noexcept : low(val), high(0u) {}
-				template<std::uint64_t _bits, std::enable_if_t<(bits > _bits), int> = 0>
-				constexpr double_int(const double_int<_bits, true> &val) noexcept : low(val), high(is_neg(val) ? -1 : 0) {}
-
-				template<bool other_sign>
-				constexpr double_int(const double_int<bits, other_sign> &other) noexcept { low = other.low; high = other.high; }
+			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits > _bits), int> = 0>
+			constexpr double_int(const double_int<_bits, _sign> &other)
+			{
+				for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
+				std::uint64_t fill;
+				if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0; else fill = 0;
+				for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
+				return *this;
+			}
 
 		public: // -- promotion assignment -- //
 
-			constexpr double_int &operator=(unsigned short val) noexcept { low = val; high = 0u; return *this; }
-			constexpr double_int &operator=(unsigned int val) noexcept { low = val; high = 0u; return *this; }
-			constexpr double_int &operator=(unsigned long val) noexcept { low = val; high = 0u; return *this; }
-			constexpr double_int &operator=(unsigned long long val) noexcept { low = val; high = 0u; return *this; }
+			constexpr double_int &operator=(std::uint16_t val) noexcept { *this = (std::uint64_t)val; return *this; }
+			constexpr double_int &operator=(std::uint32_t val) noexcept { *this = (std::uint64_t)val; return *this; }
+			constexpr double_int &operator=(std::uint64_t val) noexcept
+			{
+				blocks[0] = val;
+				for (std::size_t i = 1; i < bits / 64; ++i) blocks[i] = 0;
+				return *this;
+			}
 
-			constexpr double_int &operator=(signed short val) noexcept { low = val; high = val < 0 ? -1 : 0; return *this; }
-			constexpr double_int &operator=(signed int val) noexcept { low = val; high = val < 0 ? -1 : 0; return *this; }
-			constexpr double_int &operator=(signed long val) noexcept { low = val; high = val < 0 ? -1 : 0; return *this; }
-			constexpr double_int &operator=(signed long long val) noexcept { low = val; high = val < 0 ? -1 : 0; return *this; }
+			constexpr double_int &operator=(std::int16_t val) noexcept { *this = (std::uint64_t)val; return *this; }
+			constexpr double_int &operator=(std::int32_t val) noexcept { *this = (std::uint64_t)val; return *this; }
+			constexpr double_int &operator=(std::int64_t val) noexcept
+			{
+				blocks[0] = val;
+				std::uint64_t fill = val < 0 ? -1 : 0;
+				for (std::size_t i = 1; i < bits / 64; ++i) blocks[i] = fill;
+				return *this;
+			}
 
-			template<std::uint64_t _bits, std::enable_if_t<(bits > _bits), int> = 0>
-				constexpr double_int &operator=(const double_int<_bits, false> &val) noexcept { low = val; high = 0u; return *this; }
-				template<std::uint64_t _bits, std::enable_if_t<(bits > _bits), int> = 0>
-				constexpr double_int &operator=(const double_int<_bits, true> &val) noexcept { low = val; high = is_neg(val) ? -1 : 0; return *this; }
-
-				template<bool other_sign>
-				constexpr double_int &operator=(const double_int<bits, other_sign> &other) noexcept { low = other.low; high = other.high; return *this; }
+			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits > _bits), int> = 0>
+			constexpr double_int &operator=(const double_int<_bits, _sign> &other) noexcept
+			{
+				for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
+				std::uint64_t fill;
+				if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0; else fill = 0;
+				for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
+				return *this;
+			}
 
 		public: // -- demotion conversion -- //
 
-			constexpr explicit operator unsigned short() const noexcept { return (unsigned short)low; }
-			constexpr explicit operator unsigned int() const noexcept { return (unsigned int)low; }
-			constexpr explicit operator unsigned long() const noexcept { return (unsigned long)low; }
-			constexpr explicit operator unsigned long long() const noexcept { return (unsigned long long)low; }
+			constexpr explicit operator unsigned short() const noexcept { return (unsigned short)blocks[0]; }
+			constexpr explicit operator unsigned int() const noexcept { return (unsigned int)blocks[0]; }
+			constexpr explicit operator unsigned long() const noexcept { return (unsigned long)blocks[0]; }
+			constexpr explicit operator unsigned long long() const noexcept { return (unsigned long long)blocks[0]; }
 
-			constexpr explicit operator signed short() const noexcept { return (signed short)low; }
-			constexpr explicit operator signed int() const noexcept { return (signed int)low; }
-			constexpr explicit operator signed long() const noexcept { return (signed long)low; }
-			constexpr explicit operator signed long long() const noexcept { return (signed long long)low; }
-
-			template<std::uint64_t other_bits, bool other_sign, std::enable_if_t<(other_bits < bits), int> = 0>
-				constexpr explicit operator double_int<other_bits, other_sign>() const noexcept
-				{
-					return (double_int<other_bits, other_sign>)low; // recursively select the low branch
-				}
+			constexpr explicit operator signed short() const noexcept { return (signed short)blocks[0]; }
+			constexpr explicit operator signed int() const noexcept { return (signed int)blocks[0]; }
+			constexpr explicit operator signed long() const noexcept { return (signed long)blocks[0]; }
+			constexpr explicit operator signed long long() const noexcept { return (signed long long)blocks[0]; }
 
 		public: // -- bool conversion -- //
 
-			constexpr explicit operator bool() const noexcept { return detail::to_bool(*this); }
+			constexpr explicit operator bool() const noexcept
+			{
+				for (std::size_t i = 0; i < bits / 64; ++i) if (blocks[i]) return true;
+				return false;
+			}
 			constexpr friend bool operator!(const double_int &a) noexcept { return !(bool)a; }
 
 		public: // -- static utilities -- //
@@ -366,8 +365,6 @@ namespace BiggerInts
 			}
 		};
 
-
-
 		// shorthand for binary ops +, -, *, etc. will refer to a form that uses both sides of double_int
 		#define SHORTHAND_BINARY_FORMATTER(op, sign, type) \
 		template<std::uint64_t bits> constexpr double_int<bits, sign> operator op(const double_int<bits, sign> &a, type b) noexcept { return a op (double_int<bits, sign>)b; } \
@@ -389,7 +386,7 @@ namespace BiggerInts
 		template<std::uint64_t bits, bool sign>
 		constexpr double_int<bits, sign> &operator++(double_int<bits, sign> &a) noexcept
 		{
-			if (!++a.low) ++a.high;
+			for (std::size_t i = 0; i < bits / 64; ++i) if (++a.blocks[i]) break;
 			return a;
 		}
 		template<std::uint64_t bits, bool sign>
@@ -398,8 +395,7 @@ namespace BiggerInts
 		template<std::uint64_t bits, bool sign>
 		constexpr double_int<bits, sign> &operator--(double_int<bits, sign> &a) noexcept
 		{
-			if (!a.low) --a.high;
-			--a.low;
+			for (std::size_t i = 0; i < bits / 64; ++i)	if (a.blocks[i]--) break;
 			return a;
 		}
 		template<std::uint64_t bits, bool sign>
@@ -409,9 +405,12 @@ namespace BiggerInts
 
 		template<std::uint64_t bits, bool sign1, bool sign2> constexpr double_int<bits, sign1> &operator+=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
-			a.low += b.low;
-			if (a.low < b.low) ++a.high;
-			a.high += b.high;
+			std::uint64_t carry = 0;
+			for (std::size_t i = 0; i < bits / 64; ++i)
+			{
+				std::uint64_t v = b.blocks[i] + carry;
+				carry = (a.blocks[i] += v) < v || v < carry ? 1 : 0;
+			}
 			return a;
 		}
 
@@ -423,14 +422,17 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(+)
 
-			// -- sub -- //
+		// -- sub -- //
 
-			template<std::uint64_t bits, bool sign1, bool sign2>
+		template<std::uint64_t bits, bool sign1, bool sign2>
 		constexpr double_int<bits, sign1> &operator-=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
-			if (a.low < b.low) --a.high;
-			a.low -= b.low;
-			a.high -= b.high;
+			std::uint64_t carry = 1;
+			for (std::size_t i = 0; i < bits / 64; ++i)
+			{
+				std::uint64_t v = ~b.blocks[i] + carry;
+				carry = (a.blocks[i] += v) < v || v < carry ? 1 : 0;
+			}
 			return a;
 		}
 
@@ -442,13 +444,12 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(-)
 
-			// -- and -- //
+		// -- and -- //
 
-			template<std::uint64_t bits, bool sign1, bool sign2>
+		template<std::uint64_t bits, bool sign1, bool sign2>
 		constexpr double_int<bits, sign1> &operator&=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
-			a.low &= b.low;
-			a.high &= b.high;
+			for (std::size_t i = 0; i < bits / 64; ++i) a.blocks[i] &= b.blocks[i];
 			return a;
 		}
 
@@ -460,13 +461,12 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(&)
 
-			// -- or -- //
+		// -- or -- //
 
-			template<std::uint64_t bits, bool sign1, bool sign2>
+		template<std::uint64_t bits, bool sign1, bool sign2>
 		constexpr double_int<bits, sign1> &operator|=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
-			a.low |= b.low;
-			a.high |= b.high;
+			for (std::size_t i = 0; i < bits / 64; ++i) a.blocks[i] |= b.blocks[i];
 			return a;
 		}
 
@@ -478,13 +478,12 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(| )
 
-			// -- xor -- //
+		// -- xor -- //
 
-			template<std::uint64_t bits, bool sign1, bool sign2>
+		template<std::uint64_t bits, bool sign1, bool sign2>
 		constexpr double_int<bits, sign1> &operator^=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
-			a.low ^= b.low;
-			a.high ^= b.high;
+			for (std::size_t i = 0; i < bits / 64; ++i) a.blocks[i] ^= b.blocks[i];
 			return a;
 		}
 
@@ -496,26 +495,23 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(^)
 
-			// -- shl/sal -- //
+		// -- shl/sal -- //
 
-			template<std::uint64_t bits, bool sign>
+		template<std::uint64_t bits, bool sign>
 		constexpr double_int<bits, sign> &operator<<=(double_int<bits, sign> &val, std::uint64_t count) noexcept
 		{
-			// count masked to bits limit - no-op on zero
-			if (count &= bits - 1)
+			count &= bits - 1;
+			if (count >= 64)
 			{
-				if (count >= bits / 2)
-				{
-					val.high = val.low;
-					val.high <<= count - bits / 2;
-					val.low = 0u;
-				}
-				else
-				{
-					val.high <<= count;
-					val.high |= val.low >> (bits / 2 - count);
-					val.low <<= count;
-				}
+				std::size_t full = count / 64;
+				for (std::size_t i = bits / 64; i-- > full; ) val.blocks[i] = val.blocks[i - full];
+				for (std::size_t i = full; i > 0;) val.blocks[--i] = 0;
+				count &= 63;
+			}
+			if (count)
+			{
+				for (std::size_t i = bits / 64 - 1; i > 0; --i) val.blocks[i] = (val.blocks[i] << count) | (val.blocks[i - 1] >> (64 - count));
+				val.blocks[0] <<= count;
 			}
 			return val;
 		}
@@ -529,21 +525,18 @@ namespace BiggerInts
 		template<std::uint64_t bits>
 		constexpr double_int<bits, false> &operator>>=(double_int<bits, false> &val, std::uint64_t count) noexcept
 		{
-			// count masked to bits limit - no-op on zero
-			if (count &= bits - 1)
+			count &= bits - 1;
+			if (count >= 64)
 			{
-				if (count >= bits / 2)
-				{
-					val.low = val.high;
-					val.low >>= count - bits / 2;
-					val.high = 0u;
-				}
-				else
-				{
-					val.low >>= count;
-					val.low |= val.high << (bits / 2 - count);
-					val.high >>= count;
-				}
+				std::size_t full = count / 64;
+				for (std::size_t i = 0; i < bits / 64 - full; ++i) val.blocks[i] = val.blocks[i + full];
+				for (std::size_t i = bits / 64 - full; i < bits / 64; ++i) val.blocks[i] = 0;
+				count &= 63;
+			}
+			if (count)
+			{
+				for (std::size_t i = 0; i < bits / 64 - 1; ++i) val.blocks[i] = (val.blocks[i] >> count) | (val.blocks[i + 1] << (64 - count));
+				val.blocks[bits / 64 - 1] >>= count;
 			}
 			return val;
 		}
@@ -552,31 +545,19 @@ namespace BiggerInts
 		template<std::uint64_t bits>
 		constexpr double_int<bits, true> &operator>>=(double_int<bits, true> &val, std::uint64_t count) noexcept
 		{
-			// count masked to bits limit - no-op on zero
-			if (count &= bits - 1)
+			count &= bits - 1;
+			const std::uint64_t fill = (val.blocks[bits / 64 - 1] & 0x8000000000000000) ? -1 : 0;
+			if (count >= 64)
 			{
-				if (count >= bits / 2)
-				{
-					val.low = val.high;
-					val.low >>= count - bits / 2;
-					if (detail::is_neg(val)) // fill with sign bit
-					{
-						val.high = -1;
-						if (count != bits / 2) val.low |= val.high << (bits - count);
-					}
-					else val.high = 0;
-				}
-				else
-				{
-					val.low >>= count;
-					val.low |= val.high << (bits / 2 - count);
-					if (detail::is_neg(val)) // fill with sign bit
-					{
-						val.high >>= count;
-						val.high |= (decltype(val.high))(-1) << (bits / 2 - count);
-					}
-					else val.high >>= count;
-				}
+				std::size_t full = count / 64;
+				for (std::size_t i = 0; i < bits / 64 - full; ++i) val.blocks[i] = val.blocks[i + full];
+				for (std::size_t i = bits / 64 - full; i < bits / 64; ++i) val.blocks[i] = fill;
+				count &= 63;
+			}
+			if (count)
+			{
+				for (std::size_t i = 0; i < bits / 64 - 1; ++i) val.blocks[i] = (val.blocks[i] >> count) | (val.blocks[i + 1] << (64 - count));
+				val.blocks[bits / 64 - 1] = (val.blocks[bits / 64 - 1] >> count) | (fill << (64 - count));
 			}
 			return val;
 		}
@@ -625,7 +606,7 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(*)
 
-			template<std::uint64_t bits, bool sign>
+		template<std::uint64_t bits, bool sign>
 		constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { a = a * b; return a; }
 
 		template<std::uint64_t bits, bool sign, typename T>
@@ -690,25 +671,21 @@ namespace BiggerInts
 		template<std::uint64_t bits>
 		constexpr int cmp(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept
 		{
-			if constexpr (bits == 128)
-			{
-				return a.high < b.high ? -1 : a.high > b.high ? 1 : a.low < b.low ? -1 : a.low > b.low ? 1 : 0;
-			}
-			else
-			{
-				int temp = cmp(a.high, b.high);
-				return temp != 0 ? temp : cmp(a.low, b.low);
-			}
+			for (std::size_t i = bits / 64; i-- > 0;) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i] ? -1 : 1;
+			return 0;
 		}
 
 		// signed compare
 		template<std::uint64_t bits>
 		constexpr int cmp(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept
 		{
-			// do the comparison in terms of unsigned
-			int ucmp = cmp((double_int<bits, false>)a, (double_int<bits, false>)b);
-
-			return detail::is_neg(a) ^ detail::is_neg(b) ? -ucmp : ucmp; // do quick mafs to transform it into a signed comparison
+			for (std::size_t i = bits / 64; i-- > 0;)
+				if (a.blocks[i] != b.blocks[i])
+				{
+					int ucmp = a.blocks[i] < b.blocks[i] ? -1 : 1;
+					return detail::is_neg(a) ^ detail::is_neg(b) ? -ucmp : ucmp; // do quick mafs to transform it into a signed comparison
+				}
+			return 0;
 		}
 
 		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator==(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) == 0; }
@@ -735,19 +712,19 @@ namespace BiggerInts
 		template<std::uint64_t bits> constexpr bool operator>=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) >= 0; }
 
 		SHORTHAND_CMP_FORMATTER(false, unsigned long long)
-			SHORTHAND_CMP_FORMATTER(false, unsigned long)
-			SHORTHAND_CMP_FORMATTER(false, unsigned int)
-			SHORTHAND_CMP_FORMATTER(false, unsigned short)
+		SHORTHAND_CMP_FORMATTER(false, unsigned long)
+		SHORTHAND_CMP_FORMATTER(false, unsigned int)
+		SHORTHAND_CMP_FORMATTER(false, unsigned short)
 
-			SHORTHAND_CMP_FORMATTER(true, signed long long)
-			SHORTHAND_CMP_FORMATTER(true, signed long)
-			SHORTHAND_CMP_FORMATTER(true, signed int)
-			SHORTHAND_CMP_FORMATTER(true, signed short)
+		SHORTHAND_CMP_FORMATTER(true, signed long long)
+		SHORTHAND_CMP_FORMATTER(true, signed long)
+		SHORTHAND_CMP_FORMATTER(true, signed int)
+		SHORTHAND_CMP_FORMATTER(true, signed short)
 
-			// -- io -- //
+		// -- io -- //
 
-			// given a hex character, converts it to an integer [0, 15] - returns true if it was a valid hex digit. ch is only meaningful on success.
-			inline constexpr bool ext_hex(int &ch) noexcept
+		// given a hex character, converts it to an integer [0, 15] - returns true if it was a valid hex digit. ch is only meaningful on success.
+		inline constexpr bool ext_hex(int &ch) noexcept
 		{
 			if (ch >= '0' && ch <= '9') { ch -= '0'; return true; }
 			ch |= 32;
@@ -773,7 +750,7 @@ namespace BiggerInts
 				while (true)
 				{
 					// get a block
-					block = detail::low64(cpy) & 0777777777777777777777;
+					block = cpy.blocks[0] & 0777777777777777777777;
 					cpy >>= 63;
 					dcount = 0;
 
@@ -800,7 +777,7 @@ namespace BiggerInts
 				while (true)
 				{
 					// get a block
-					block = detail::low64(cpy);
+					block = cpy.blocks[0];
 					cpy >>= 64;
 					dcount = 0;
 
@@ -836,7 +813,7 @@ namespace BiggerInts
 				{
 					// get a block
 					temp = detail::divmod_unchecked(temp.first, base);
-					block = detail::low64(temp.second);
+					block = temp.second.blocks[0];
 					dcount = 0;
 
 					// write the block - do-while to ensure 0 gets printed
@@ -931,7 +908,7 @@ namespace BiggerInts
 					if (num_digits != 0)
 					{
 						// detect overflow
-						if (detail::high64(val) >> (std::uint64_t)(64 - 3 * num_digits)) { istr.setstate(std::ios::failbit); return istr; }
+						if (val.blocks[bits / 64 - 1] >> (std::uint64_t)(64 - 3 * num_digits)) { istr.setstate(std::ios::failbit); return istr; }
 
 						// incorporate it into value
 						val <<= (std::uint64_t)(3 * num_digits);
@@ -965,7 +942,7 @@ namespace BiggerInts
 					if (num_digits != 0)
 					{
 						// detect overflow
-						if (detail::high64(val) >> (std::uint64_t)(64 - 4 * num_digits)) { istr.setstate(std::ios::failbit); return istr; }
+						if (val.blocks[bits / 64 - 1] >> (std::uint64_t)(64 - 4 * num_digits)) { istr.setstate(std::ios::failbit); return istr; }
 
 						// incorporate it into value
 						val <<= (std::uint64_t)(4 * num_digits);
@@ -1007,13 +984,13 @@ namespace BiggerInts
 						bigval += block;
 
 						// detect overflow
-						if (bigval.high) { istr.setstate(std::ios::failbit); return istr; }
+						if (bigval.blocks[bits / 64]) { istr.setstate(std::ios::failbit); return istr; }
 					}
 
 					if (num_digits < 19) break;
 				}
 
-				val = bigval.low; // copy low half of bigval to result
+				val = (decltype(val))bigval; // copy low half of bigval to result
 			}
 			else // if no base specified, determine it from the suffix
 			{
@@ -1058,7 +1035,7 @@ namespace BiggerInts
 
 			// parse the value (and don't skip ws since we already did that)
 			double_int<bits, false> tmp;
-			parse_udouble_int(istr, tmp, true);
+			if (!parse_udouble_int(istr, tmp, true)) return istr;
 			val = tmp; // store the tmp parse location back to val
 
 			// account for sign in result
