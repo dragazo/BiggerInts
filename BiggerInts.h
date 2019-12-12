@@ -9,10 +9,13 @@
 #include <type_traits>
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <utility>
 #include <exception>
 #include <stdexcept>
 #include <algorithm>
+#include <string_view>
+#include <cctype>
 
 /*
 
@@ -180,10 +183,10 @@ namespace BiggerInts
 
 	public: // -- core -- //
 
-		constexpr double_int() = default;
+		constexpr double_int() noexcept = default;
 
-		constexpr double_int(const double_int&) = default;
-		constexpr double_int &operator=(const double_int&) = default;
+		constexpr double_int(const double_int&) noexcept = default;
+		constexpr double_int &operator=(const double_int&) noexcept = default;
 
 		constexpr explicit operator double_int<bits, !sign>() const noexcept { double_int<bits, !sign> cpy = *this; return cpy; }
 
@@ -249,6 +252,34 @@ namespace BiggerInts
 
 		constexpr explicit operator bool() const noexcept { return to_bool(*this); }
 		constexpr friend bool operator!(const double_int &a) noexcept { return !to_bool(a); }
+
+	public: // -- static utilities -- //
+
+		// attempts to parse the string into an integer value - returns true on successful parse.
+		// base must be 10 (dec), 16 (hex), 8 (oct), or 0 to automatically determine base from C-style prefix in str.
+		static bool try_parse(double_int &res, std::string_view str, int base = 10)
+		{
+			std::istringstream ss(std::string(str.begin(), str.end())); // unfortunately istringstream requires a copy because stdlib is dumb
+
+			if (base == 10) {}
+			else if (base == 16) ss.setf(std::ios::hex, std::ios::basefield);
+			else if (base == 8) ss.setf(std::ios::oct, std::ios::basefield);
+			else if (base == 0) ss.unsetf(std::ios::basefield);
+			else throw std::invalid_argument("unrecognized base specified");
+
+			ss >> res;
+			if (!ss) return false; // parse needs to succeed
+			while (std::isspace((unsigned char)ss.peek())) ss.get();
+			if (!ss.eof()) return false; // we need to have parsed the entire string
+			return true;
+		}
+		// as try_parse() but throws std::invalid_argument on failure
+		static double_int parse(std::string_view str, int base = 10)
+		{
+			double_int res;
+			if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string");
+			return res;
+		}
 	};
 
 	// shorthand for binary ops +, -, *, etc. will refer to a form that uses both sides of double_int
@@ -795,7 +826,7 @@ namespace BiggerInts
 		// otherwise, is positive. print the + sign if showpos is set
 		else if (ostr.flags() & std::ios::showpos)
 		{
-			ostr.put('+');// put the + sign and dec width by 1
+			ostr.put('+'); // put the + sign and dec width by 1
 			if (ostr.width() > 0) ostr.width(ostr.width() - 1);
 		}
 
@@ -808,7 +839,7 @@ namespace BiggerInts
 	template<u64 bits>
 	std::istream &parse_udouble_int(std::istream &istr, double_int<bits, false> &val, bool noskipws = false)
 	{
-		val = 0; // start by zeroing value
+		val = 0u; // start by zeroing value
 		int digit, num_digits;
 		u64 block;
 
@@ -837,9 +868,15 @@ namespace BiggerInts
 					block <<= 3;
 					block |= digit - '0';
 				}
-				// incorporate it into value
-				val <<= (u64)(3 * num_digits);
-				val |= block;
+				if (num_digits != 0)
+				{
+					// detect overflow
+					if (high64(val) >> (u64)(64 - 3 * num_digits)) { istr.setstate(std::ios::failbit); return istr; }
+
+					// incorporate it into value
+					val <<= (u64)(3 * num_digits);
+					val |= block;
+				}
 
 				if (num_digits < 21) break;
 			}
@@ -865,9 +902,15 @@ namespace BiggerInts
 					block <<= 4;
 					block |= digit;
 				}
-				// incorporate it into value
-				val <<= (u64)(4 * num_digits);
-				val |= block;
+				if (num_digits != 0)
+				{
+					// detect overflow
+					if (high64(val) >> (u64)(64 - 4 * num_digits)) { istr.setstate(std::ios::failbit); return istr; }
+
+					// incorporate it into value
+					val <<= (u64)(4 * num_digits);
+					val |= block;
+				}
 
 				if (num_digits < 16) break;
 			}
@@ -876,13 +919,16 @@ namespace BiggerInts
 		{
 			parse_dec:
 
+			double_int<bits * 2, false> bigval = 0u; // perform multiply/add in terms of a larger int type to easily tell if we overflow
+
 			// first char must be an dec digit - don't extract
 			if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
 			if (digit < '0' || digit > '9') { istr.setstate(std::ios::failbit); return istr; }
 
 			while (true)
 			{
-				block = 0; // read a block of 19 dec digits
+				block = 0;     // read a block of 19 dec digits
+				u64 scale = 1; // scale factor to apply to val for block incorporation (see below)
 				for (num_digits = 0; num_digits < 19; ++num_digits)
 				{
 					// get the digit and make sure it's in range - only extract it if it's good
@@ -890,15 +936,24 @@ namespace BiggerInts
 					if (digit < '0' || digit > '9') break;
 					istr.get();
 
+					scale *= 10;
 					block *= 10;
 					block += digit - '0';
 				}
-				// incorporate it into value
-				val *= (double_int<bits, false>)(u64)std::pow((u64)10, (u64)num_digits);
-				val += (double_int<bits, false>)block;
+				if (num_digits != 0)
+				{
+					// incorporate it into big value
+					bigval *= scale;
+					bigval += block;
+
+					// detect overflow
+					if (bigval.high) { istr.setstate(std::ios::failbit); return istr; }
+				}
 
 				if (num_digits < 19) break;
 			}
+
+			val = bigval.low; // copy low half of bigval to result
 		}
 		else // if no base specified, determine it from the suffix
 		{
@@ -948,6 +1003,9 @@ namespace BiggerInts
 
 		// account for sign in result
 		if (neg) make_neg(val);
+
+		// check for signed overflow
+		if ((bool)(high64(val) & 0x8000000000000000) != neg) { istr.setstate(std::ios::failbit); return istr; }
 
 		return istr;
 	}
