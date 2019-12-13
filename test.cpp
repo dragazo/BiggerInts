@@ -35,6 +35,13 @@ int main(int argc, const char *argv[])
 {
 	using namespace BiggerInts;
 
+	assert(detail::highest_set_bit(0) == 0);
+	for (std::size_t i = 0; i < 64; ++i)
+	{
+		assert(detail::highest_set_bit((std::uint64_t)1 << i) == i);
+	}
+	assert(detail::highest_set_bit(uint_t<512>(0)) == 0);
+
 	assert(tostr(uint_t<128>(2) * uint_t<128>(13)) == "26");
 	assert(tostr(uint_t<128>(2) + uint_t<128>(13)) == "15");
 	assert(tostr(uint_t<128>(2) / uint_t<128>(13)) == "0");

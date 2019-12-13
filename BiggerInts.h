@@ -33,6 +33,15 @@ namespace BiggerInts
 {
 	namespace detail
 	{
+		// -- compilation switches -- //
+
+		// divmod() performs lots of bit shifting. many of these operations (on average) can be grouped together to run faster.
+		// however this _may_ have some overhead that would actually make it slower for smaller integer types.
+		// bit counts at or above this value will use the algorithm that minimizes the total number of shifts during divmod().
+		static inline constexpr std::uint64_t divmod_shift_count_thresh = 256;
+
+		// --------------------------------
+		
 		template<typename T, std::uint64_t bits> struct masked_single_int;
 		template<std::uint64_t bits, bool sign> struct double_int;
 
@@ -59,6 +68,25 @@ namespace BiggerInts
 		// determines if the value is negative under 2's complement (i.e. high bit is set)
 		template<std::uint64_t bits, bool sign>
 		constexpr bool is_neg(const double_int<bits, sign> &val) noexcept { return val.blocks[bits / 64 - 1] & 0x8000000000000000; }
+
+		// determines the index of the highest set bit
+		inline constexpr std::size_t highest_set_bit(std::uint64_t val)
+		{
+			std::size_t i = 32, res = 0;
+			for (; i > 0; i >>= 1)
+			{
+				std::uint64_t v = val >> i;
+				if (v) { val = v; res += i; }
+			}
+			return res;
+		}
+		template<std::uint64_t bits, bool sign>
+		constexpr std::size_t highest_set_bit(const double_int<bits, sign> &val) noexcept
+		{
+			std::size_t i = bits / 64;
+			while (i-- > 0) if (val.blocks[i]) return i * 64 + highest_set_bit(val.blocks[i]);
+			return 0;
+		}
 
 		// -- helpers -- //
 
@@ -95,32 +123,66 @@ namespace BiggerInts
 
 		// helper for divmod_unchecked - takes the bit to start with - don't use this directly
 		template<std::uint64_t bits>
-		constexpr std::pair<double_int<bits, false>, double_int<bits, false>> _divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den, std::uint64_t bit)
-		{
-			std::pair<double_int<bits, false>, double_int<bits, false>> res(0u, 0u);
-
-			while (true)
-			{
-				res.second <<= 1;
-				if (bit_test(num, bit)) ++res.second.blocks[0];
-
-				if (res.second >= den)
-				{
-					res.second -= den;
-					assert(!detail::is_neg(res.second));
-					bit_set(res.first, bit);
-				}
-
-				if (bit-- == 0) break;
-			}
-			return res;
-		}
-
-		// utility function used internally - no divide by zero check
-		template<std::uint64_t bits>
 		constexpr std::pair<double_int<bits, false>, double_int<bits, false>> divmod_unchecked(const double_int<bits, false> &num, const double_int<bits, false> &den)
 		{
-			return _divmod_unchecked(num, den, bits - 1);
+			std::pair<double_int<bits, false>, double_int<bits, false>> res(0u, 0u);
+			
+			std::uint64_t bit = highest_set_bit(num);
+
+			// select algorithm at compile time
+			if constexpr (bits >= divmod_shift_count_thresh)
+			{
+				const std::size_t den_highest_bit = highest_set_bit(den);
+				std::size_t res_second_highest_bit = 0;
+				std::size_t shift_count = 0;
+
+				while (true)
+				{
+					++shift_count;
+					if (bit_test(num, bit))
+					{
+						res.second <<= shift_count;
+						res_second_highest_bit += shift_count;
+						shift_count = 0;
+						++res.second.blocks[0];
+					}
+					else if (res_second_highest_bit + shift_count >= den_highest_bit)
+					{
+						res.second <<= shift_count;
+						res_second_highest_bit += shift_count;
+						shift_count = 0;
+					}
+
+					if (res.second >= den)
+					{
+						res.second -= den;
+						res_second_highest_bit = highest_set_bit(res.second);
+						bit_set(res.first, bit);
+					}
+
+					if (bit-- == 0) break;
+				}
+
+				res.second <<= shift_count;
+			}
+			else
+			{
+				while (true)
+				{
+					res.second <<= 1;
+					if (bit_test(num, bit)) ++res.second.blocks[0];
+
+					if (res.second >= den)
+					{
+						res.second -= den;
+						bit_set(res.first, bit);
+					}
+
+					if (bit-- == 0) break;
+				}
+			}
+
+			return res;
 		}
 
 		// -- extra utilities -- //
