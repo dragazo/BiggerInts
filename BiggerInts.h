@@ -39,6 +39,8 @@ namespace BiggerInts
 		// however this _may_ have some overhead that would actually make it slower for smaller integer types.
 		// bit counts at or above this value will use the algorithm that minimizes the total number of shifts during divmod().
 		static inline constexpr std::uint64_t divmod_shift_count_thresh = 256;
+		// same as above but for multiplication.
+		static inline constexpr std::uint64_t multiply_shift_count_thresh = 512;
 
 		// --------------------------------
 		
@@ -663,12 +665,42 @@ namespace BiggerInts
 		// -- mul -- //
 
 		template<std::uint64_t bits>
+		constexpr double_int<bits, false> _multiply(const double_int<bits, false> *a, const double_int<bits, false> *b) noexcept
+		{
+			std::uint64_t b_high_bit = highest_set_bit(*b);
+
+			if (std::uint64_t a_high_bit = highest_set_bit(*a); a_high_bit < b_high_bit)
+			{
+				std::swap(a, b);
+				b_high_bit = a_high_bit;
+			}
+
+			if constexpr (bits >= multiply_shift_count_thresh)
+			{
+				double_int<bits, false> res = 0u, _a = *a;
+				std::size_t shift_count = 0;
+				for (std::uint64_t bit = 0; bit <= b_high_bit; ++bit, ++shift_count)
+					if (detail::bit_test(*b, bit))
+					{
+						_a <<= shift_count;
+						shift_count = 0;
+						res += _a;
+					}
+				return res;
+			}
+			else
+			{
+				double_int<bits, false> res = 0u, _a = *a;
+				for (std::uint64_t bit = 0; bit <= b_high_bit; ++bit, _a <<= 1)
+					if (detail::bit_test(*b, bit)) res += _a;
+				return res;
+			}
+		}
+
+		template<std::uint64_t bits>
 		constexpr double_int<bits, false> operator*(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept
 		{
-			double_int<bits, false> res = 0u, _a = a;
-			for (std::uint64_t bit = 0; _a; ++bit, _a <<= 1)
-				if (detail::bit_test(b, bit)) res += _a;
-			return res;
+			return detail::_multiply(&a, &b);
 		}
 		template<std::uint64_t bits>
 		constexpr double_int<bits, true> operator*(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept

@@ -10,6 +10,8 @@
 
 #include "BiggerInts.h"
 
+using namespace BiggerInts;
+
 #define COMMA ,
 
 #define assert_throws(except, expr) try { expr; std::cerr << "didn't throw\n"; assert(false); } catch (const except&) {} catch (...) { std::cerr << "threw wrong type\n"; assert(false); }
@@ -17,9 +19,8 @@
 #define test_fail(expr, expected, name) { std::cerr << "Failed Test: " << (name) << " " expr " -> " << res << " != " << (expected) << '\n'; }
 #define test(expr, expected, name) { auto res = (expr); if(res != (expected)) test_fail(expr, expected, name); }
 
-#define t_start auto _t = std::chrono::high_resolution_clock::now();
-#define t_end auto _dt = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - _t).count();
-#define t_print(expr, count) { std::cout << #expr " -> " << (expr) << " : " << _dt << "ms\n"; }
+#define t_start auto _t = std::chrono::high_resolution_clock::now()
+#define t_end(name, cnt) { auto _dt = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - _t).count(); std::cerr << name ": " << _dt << "ms (" << cnt << " iterations)\n"; }
 
 #define t_test(init, expr, count) { init; t_start; for(int i = 0; i < count; ++i) (expr); t_end; t_print(expr, count); }
 
@@ -31,9 +32,123 @@ std::string tostr(const Args &...args)
 	return ostr.str();
 }
 
+template<typename BinaryFunction>
+void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2, std::size_t count_3, BinaryFunction f)
+{
+	{
+		uint_t<128> vals[] =
+		{
+			uint_t<128>::parse("164953864532146553885641326541323564132"),
+			uint_t<128>::parse("68573958787958483948687979685743988795"),
+			uint_t<128>::parse("47785319425432789132452387667540040594"),
+			uint_t<128>::parse("62641345234867594511231243576678624112"),
+			uint_t<128>::parse("12642723264275675264211264237286172641"),
+			uint_t<128>::parse("41672765971459452836324591059442640942"),
+			uint_t<128>::parse("46176276219426832272141594256267216412"),
+			uint_t<128>::parse("16126745353512798654214787864567825452"),
+			uint_t<128>::parse("13786541237897643215487675429731824613"),
+			uint_t<128>::parse("45389783215348783514264316267678795642"),
+			uint_t<128>::parse("26461343345768768645949213234357678665"),
+			uint_t<128>::parse("45676597896543534326162612343537367866"),
+			uint_t<128>::parse("16435738689456523313264567898883765642"),
+			uint_t<128>::parse("46567383388656261334357573838366565421"),
+		};
+
+		uint_t<128> val2 = uint_t<128>::parse("165798541236525214");
+		decltype(f(vals[0], vals[0])) dd;
+
+		t_start;
+		for (std::size_t i = 0; i < count_1; ++i)
+		{
+			for (const auto &v : vals)
+			{
+				dd = f(v, val2);
+				dd = f(val2, v);
+				dd = f(v, v);
+				dd = f(val2, val2);
+			}
+		}
+		t_end(name << " unsigned 128", count_1);
+	}
+
+	{
+		uint_t<256> vals[] =
+		{
+			uint_t<256>::parse("16495386453214655388564132657894532123546789897856532123548786534241323564132"),
+			uint_t<256>::parse("68573958787958483948687979685743456879789253125456795321234537897865149088795"),
+			uint_t<256>::parse("47785319425432789132452387662354568686531231234567898998686525252521750040594"),
+			uint_t<256>::parse("62641345234867595653789352121111040400456054511231243235464748687576678624112"),
+			uint_t<256>::parse("12642723264275606435798655323342606031302620024626783175264211264237286172641"),
+			uint_t<256>::parse("41672765971459452836324591059406343537667837237611632347685660909991442640942"),
+			uint_t<256>::parse("46176276219426832272141594256267006162343037603776858790046132642672704216412"),
+			uint_t<256>::parse("16126745353512706456790768664624426526567679254020425698654214787864567825452"),
+			uint_t<256>::parse("13786541237897643215480666435034357737389796460345034303430457675429731824613"),
+			uint_t<256>::parse("45389783215348783514060649676056783783378666546506443031332264316267678795642"),
+			uint_t<256>::parse("26461343345768768645949213246533037502642462567285494136406726534234357678665"),
+			uint_t<256>::parse("45676597896543534326162612343506645726780246243623123126452738607954037367866"),
+			uint_t<256>::parse("16435738689456523313264560646727382642602642564253728672940256457898883765642"),
+			uint_t<256>::parse("46567383388656261334357573830646507628607249504146296456425675972608366565421"),
+		};
+
+		uint_t<256> val2 = uint_t<256>::parse("16579862451765276262462456641541236525214");
+		decltype(f(vals[0], vals[0])) dd;
+
+		t_start;
+		for (std::size_t i = 0; i < count_2; ++i)
+		{
+			for (const auto &v : vals)
+			{
+				dd = f(v, val2);
+				dd = f(val2, v);
+				dd = f(v, v);
+				dd = f(val2, val2);
+			}
+		}
+		t_end(name << " unsigned 256", count_2);
+	}
+
+	{
+		uint_t<8192> vals[] =
+		{
+			uint_t<8192>::parse("16495386453214655388564132657894532123546789897856532123548786534241323564132"),
+			uint_t<8192>::parse("68573958787958483948687979685743456879789253125456795321234537897865149088795"),
+			uint_t<8192>::parse("47785319425432789132452387662354568686531231234567898998686525252521750040594"),
+			uint_t<8192>::parse("62641345234867595653789352121111040400456054511231243235464748687576678624112"),
+			uint_t<8192>::parse("12642723264275606435798655323342606031302620024626783175264211264237286172641"),
+			uint_t<8192>::parse("41672765971459452836324591059406343537667837237611632347685660909991442640942"),
+			uint_t<8192>::parse("46176276219426832272141594256267006162343037603776858790046132642672704216412"),
+			uint_t<8192>::parse("16126745353512706456790768664624426526567679254020425698654214787864567825452"),
+			uint_t<8192>::parse("13786541237897643215480666435034357737389796460345034303430457675429731824613"),
+			uint_t<8192>::parse("45389783215348783514060649676056783783378666546506443031332264316267678795642"),
+			uint_t<8192>::parse("26461343345768768645949213246533037502642462567285494136406726534234357678665"),
+			uint_t<8192>::parse("45676597896543534326162612343506645726780246243623123126452738607954037367866"),
+			uint_t<8192>::parse("16435738689456523313264560646727382642602642564253728672940256457898883765642"),
+			uint_t<8192>::parse("46567383388656261334357573830646507628607249504146296456425675972608366565421"),
+		};
+
+		uint_t<8192> val2 = uint_t<8192>::parse("16579862451765276262462456641541236525214");
+		decltype(f(vals[0], vals[0])) dd;
+
+		t_start;
+		for (std::size_t i = 0; i < count_3; ++i)
+		{
+			for (const auto &v : vals)
+			{
+				dd = f(v, val2);
+				dd = f(val2, v);
+				dd = f(v, v);
+				dd = f(val2, val2);
+			}
+		}
+		t_end(name << " unsigned 8192 (small)", count_3);
+	}
+
+	std::cerr << '\n';
+}
+
 int main(int argc, const char *argv[])
 {
-	using namespace BiggerInts;
+	
 
 	assert(detail::highest_set_bit(0) == 0);
 	for (std::size_t i = 0; i < 64; ++i)
@@ -387,8 +502,14 @@ int main(int argc, const char *argv[])
 		assert(s4 == -64);
 	}
 
+	// -- benchmarks -- //
+
+	benchmark_binary("divmod  ", 40000, 20000, 1000, [](const auto &a, const auto &b) { return detail::divmod(a, b); });
+	benchmark_binary("multiply", 100000, 20000, 1000, [](const auto &a, const auto &b) { return a * b; });
+
 	// -- all tests completed -- //
 
-	std::cerr << "\n\nall tests completed successfully\n";
+	std::cerr << "all tests completed successfully\n";
+	std::cin.get();
 	return 0;
 }
