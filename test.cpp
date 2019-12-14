@@ -328,6 +328,65 @@ int main(int argc, const char *argv[])
 		assert(!int_t<512>::try_parse(s, "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048"));
 	}
 
+	// -- promotion tests -- //
+
+	{
+		auto f128 = [](auto v) {
+			using namespace BiggerInts;
+			typedef std::conditional_t<std::is_signed_v<decltype(v)>, int_t<128>, uint_t<128>> tt;
+
+			tt val = v;
+			tt val2(v);
+			tt val3{ v };
+			assert(val == v);
+			assert(val2 == v);
+			assert(val3 == v);
+		};
+		auto ff = [&](long long v)
+		{
+			f128((unsigned short)v);
+			f128((unsigned int)v);
+			f128((unsigned long)v);
+			f128((unsigned long long)v);
+
+			f128((short)v);
+			f128((int)v);
+			f128((long)v);
+			f128((long long)v);
+		};
+		ff(46);
+		ff(-46);
+	}
+
+	// -- demotion tests -- //
+	
+	{
+		uint_t<256> u6 = 64;
+		uint_t<128> u5 = (uint_t<128>)u6;
+		uint_t<128> u5_1(u6);
+		uint_t<128> u5_2{ u6 };
+		u5 = (uint_t<128>)u6;
+		unsigned long long u4 = (unsigned long long)u5;
+
+		assert(u6 == 64u);
+		assert(u5 == 64u);
+		assert(u5_1 == 64u);
+		assert(u5_2 == 64u);
+		assert(u4 == 64u);
+
+		int_t<256> s6 = -64;
+		int_t<128> s5 = (int_t<128>)s6;
+		int_t<128> s5_1(s6);
+		int_t<128> s5_2{ s6 };
+		long long s4 = (long long)s5;
+
+		assert(s6 == -64);
+		assert(s5 == -64);
+		assert(s5_1 == -64);
+		assert(s5_2 == -64);
+		assert(s4 == -64);
+	}
+
 	// -- all tests completed -- //
 
 	std::cerr << "\n\nall tests completed successfully\n";

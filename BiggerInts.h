@@ -225,6 +225,17 @@ namespace BiggerInts
 		// takes the 2's complement negative of the value in-place
 		template<std::uint64_t bits, bool sign>
 		constexpr void make_neg(double_int<bits, sign> &val) noexcept { make_not(val); ++val; }
+
+		// checks if T is a built-in integer type (signed or unsigned)
+		template<typename T> struct is_builtin_int : std::false_type {};
+		template<> struct is_builtin_int<unsigned short> : std::true_type {};
+		template<> struct is_builtin_int<unsigned int> : std::true_type {};
+		template<> struct is_builtin_int<unsigned long> : std::true_type {};
+		template<> struct is_builtin_int<unsigned long long> : std::true_type {};
+		template<> struct is_builtin_int<short> : std::true_type {};
+		template<> struct is_builtin_int<int> : std::true_type {};
+		template<> struct is_builtin_int<long> : std::true_type {};
+		template<> struct is_builtin_int<long long> : std::true_type {};
 	}
 
 	template<std::uint64_t bits> using uint_t = decltype(detail::returns_proper_type<bits, false>());
@@ -319,17 +330,19 @@ namespace BiggerInts
 
 		public: // -- promotion constructors -- //
 
-			constexpr double_int(std::uint16_t val) noexcept : double_int((std::uint64_t)val) {}
-			constexpr double_int(std::uint32_t val) noexcept : double_int((std::uint64_t)val) {}
-			constexpr double_int(std::uint64_t val) noexcept : blocks{}
+			constexpr double_int(unsigned short val) noexcept : double_int((unsigned long long)val) {}
+			constexpr double_int(unsigned int val) noexcept : double_int((unsigned long long)val) {}
+			constexpr double_int(unsigned long val) noexcept : double_int((unsigned long long)val) {}
+			constexpr double_int(unsigned long long val) noexcept : blocks{}
 			{
 				blocks[0] = val;
 				for (std::size_t i = 1; i < bits / 64; ++i) blocks[i] = 0;
 			}
 
-			constexpr double_int(std::int16_t val) noexcept : double_int((std::int64_t)val) {}
-			constexpr double_int(std::int32_t val) noexcept : double_int((std::int64_t)val) {}
-			constexpr double_int(std::int64_t val) noexcept : blocks{}
+			constexpr double_int(signed short val) noexcept : double_int((signed long long)val) {}
+			constexpr double_int(signed int val) noexcept : double_int((signed long long)val) {}
+			constexpr double_int(signed long val) noexcept : double_int((signed long long)val) {}
+			constexpr double_int(signed long long val) noexcept : blocks{}
 			{
 				blocks[0] = val;
 				std::uint64_t fill = val < 0 ? -1 : 0;
@@ -337,29 +350,31 @@ namespace BiggerInts
 			}
 
 			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits > _bits), int> = 0>
-			constexpr double_int(const double_int<_bits, _sign> &other)
+			constexpr double_int(const double_int<_bits, _sign> &other) noexcept : blocks{}
 			{
 				for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
-				std::uint64_t fill;
-				if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0; else fill = 0;
+				std::uint64_t fill = 0;
+				if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0;
 				for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
 				return *this;
 			}
 
 		public: // -- promotion assignment -- //
 
-			constexpr double_int &operator=(std::uint16_t val) noexcept { *this = (std::uint64_t)val; return *this; }
-			constexpr double_int &operator=(std::uint32_t val) noexcept { *this = (std::uint64_t)val; return *this; }
-			constexpr double_int &operator=(std::uint64_t val) noexcept
+			constexpr double_int &operator=(unsigned short val) noexcept { *this = (unsigned long long)val; return *this; }
+			constexpr double_int &operator=(unsigned int val) noexcept { *this = (unsigned long long)val; return *this; }
+			constexpr double_int &operator=(unsigned long val) noexcept { *this = (unsigned long long)val; return *this; }
+			constexpr double_int &operator=(unsigned long long val) noexcept
 			{
 				blocks[0] = val;
 				for (std::size_t i = 1; i < bits / 64; ++i) blocks[i] = 0;
 				return *this;
 			}
 
-			constexpr double_int &operator=(std::int16_t val) noexcept { *this = (std::uint64_t)val; return *this; }
-			constexpr double_int &operator=(std::int32_t val) noexcept { *this = (std::uint64_t)val; return *this; }
-			constexpr double_int &operator=(std::int64_t val) noexcept
+			constexpr double_int &operator=(signed short val) noexcept { *this = (signed long long)val; return *this; }
+			constexpr double_int &operator=(signed int val) noexcept { *this = (signed long long)val; return *this; }
+			constexpr double_int &operator=(signed long val) noexcept { *this = (signed long long)val; return *this; }
+			constexpr double_int &operator=(signed long long val) noexcept
 			{
 				blocks[0] = val;
 				std::uint64_t fill = val < 0 ? -1 : 0;
@@ -375,6 +390,14 @@ namespace BiggerInts
 				if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0; else fill = 0;
 				for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
 				return *this;
+			}
+
+		public: // -- double_int demotions -- //
+
+			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits < _bits), int> = 0>
+			constexpr explicit double_int(const double_int<_bits, _sign> &other) noexcept : blocks{}
+			{
+				for (std::size_t i = 0; i < bits / 64; ++i) blocks[i] = other.blocks[i];
 			}
 
 		public: // -- demotion conversion -- //
@@ -415,8 +438,7 @@ namespace BiggerInts
 				ss >> res;
 				if (!ss) return false; // parse needs to succeed
 				while (std::isspace((unsigned char)ss.peek())) ss.get();
-				if (!ss.eof()) return false; // we need to have parsed the entire string
-				return true;
+				return ss.eof(); // we need to have parsed the entire string
 			}
 			// as try_parse() but throws std::invalid_argument on failure
 			static double_int parse(std::string_view str, int base = 10)
@@ -729,59 +751,113 @@ namespace BiggerInts
 
 		// cmp() will be equivalent to <=> but works for any version of C++
 
-		// unsigned compare
-		template<std::uint64_t bits>
-		constexpr int cmp(const double_int<bits, false> &a, const double_int<bits, false> &b) noexcept
+		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>
+		constexpr int cmp(const double_int<bits_1, sign> &a, const double_int<bits_2, sign> &b) noexcept
 		{
-			for (std::size_t i = bits / 64; i-- > 0;) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i] ? -1 : 1;
-			return 0;
-		}
-
-		// signed compare
-		template<std::uint64_t bits>
-		constexpr int cmp(const double_int<bits, true> &a, const double_int<bits, true> &b) noexcept
-		{
-			for (std::size_t i = bits / 64; i-- > 0;)
-				if (a.blocks[i] != b.blocks[i])
+			if constexpr (bits_2 > bits_1) return -cmp(b, a); // wolog let a be at least as large as b (in physical size)
+			else
+			{
+				if constexpr (bits_1 > bits_2)
 				{
-					int ucmp = a.blocks[i] < b.blocks[i] ? -1 : 1;
-					return detail::is_neg(a) ^ detail::is_neg(b) ? -ucmp : ucmp; // do quick mafs to transform it into a signed comparison
+					std::uint64_t fill = 0;
+					if constexpr (sign) fill = detail::is_neg(b) ? 0xffffffffffffffffull : 0ull;
+					for (std::size_t i = bits_1 / 64; i-- > bits_2 / 64; ) if (a.blocks[i] != fill)
+					{
+						if constexpr (!sign) return 1;
+						else return detail::is_neg(a) ? -1 : 1;
+					}
 				}
+				for (std::size_t i = bits_2 / 64; i-- > 0;) if (a.blocks[i] != b.blocks[i])
+				{
+					if constexpr (!sign) return a.blocks[i] < b.blocks[i] ? -1 : 1;
+					else return a.blocks[i] < b.blocks[i] ? 1 : -1;
+				}
+				return 0;
+			}
+		}
+		template<std::uint64_t bits, bool sign>
+		constexpr int cmp(const double_int<bits, sign> &a, std::conditional_t<sign, long long, unsigned long long> val) noexcept
+		{
+			std::uint64_t fill = 0;
+			if constexpr (sign) fill = val < 0 ? 0xffffffffffffffffull : 0ull;
+			for (std::size_t i = bits / 64 - 1; i > 0; --i) if (a.blocks[i] != fill)
+			{
+				if constexpr (!sign) return 1;
+				else return detail::is_neg(a) ? -1 : 1;
+			}
+			if (a.blocks[0] != (std::uint64_t)val)
+			{
+				if constexpr (!sign) return a.blocks[0] < (std::uint64_t)val ? -1 : 1;
+				else return a.blocks[0] < (std::uint64_t)val ? 1 : -1;
+			}
 			return 0;
 		}
+		template<std::uint64_t bits, bool sign>
+		constexpr int cmp(const double_int<bits, sign> &a, std::conditional_t<sign, long, unsigned long> val) noexcept { return cmp(a, (std::conditional_t<sign, long long, unsigned long long>)val); }
+		template<std::uint64_t bits, bool sign>
+		constexpr int cmp(const double_int<bits, sign> &a, std::conditional_t<sign, int, unsigned int> val) noexcept { return cmp(a, (std::conditional_t<sign, long long, unsigned long long>)val); }
+		template<std::uint64_t bits, bool sign>
+		constexpr int cmp(const double_int<bits, sign> &a, std::conditional_t<sign, short, unsigned short> val) noexcept { return cmp(a, (std::conditional_t<sign, long long, unsigned long long>)val); }
 
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator==(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) == 0; }
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator!=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) != 0; }
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator<(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) < 0; }
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator<=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) <= 0; }
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator>(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) > 0; }
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator>=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp<std::max(bits1, bits2)>(a, b) >= 0; }
+		template<std::uint64_t bits, bool sign>
+		constexpr int cmp(std::conditional_t<sign, long long, unsigned long long> val, const double_int<bits, sign> &a) noexcept { return -cmp(a, (std::conditional_t<sign, long long, unsigned long long>)val); }
+		template<std::uint64_t bits, bool sign>
+		constexpr int cmp(std::conditional_t<sign, long, unsigned long> val, const double_int<bits, sign> &a) noexcept { return -cmp(a, (std::conditional_t<sign, long long, unsigned long long>)val); }
+		template<std::uint64_t bits, bool sign>
+		constexpr int cmp(std::conditional_t<sign, int, unsigned int> val, const double_int<bits, sign> &a) noexcept { return -cmp(a, (std::conditional_t<sign, long long, unsigned long long>)val); }
+		template<std::uint64_t bits, bool sign>
+		constexpr int cmp(std::conditional_t<sign, short, unsigned short> val, const double_int<bits, sign> &a) noexcept { return -cmp(a, (std::conditional_t<sign, long long, unsigned long long>)val); }
 
-		// shorthand for comparing double_int with specified signage to a primitive type
-		#define SHORTHAND_CMP_FORMATTER(sign, type) \
-		template<std::uint64_t bits> constexpr bool operator==(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) == 0; } \
-		template<std::uint64_t bits> constexpr bool operator!=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) != 0; } \
-		template<std::uint64_t bits> constexpr bool operator<(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) < 0; } \
-		template<std::uint64_t bits> constexpr bool operator<=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) <= 0; } \
-		template<std::uint64_t bits> constexpr bool operator>(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) > 0; } \
-		template<std::uint64_t bits> constexpr bool operator>=(const double_int<bits, sign> &a, type b) noexcept { return cmp(a, (double_int<bits, sign>)b) >= 0; } \
+		template<std::uint64_t bits, bool sign> constexpr int cmp(const double_int<bits, sign> &a, std::conditional_t<!sign, long long, unsigned long long> val) noexcept = delete;
+		template<std::uint64_t bits, bool sign> constexpr int cmp(const double_int<bits, sign> &a, std::conditional_t<!sign, long, unsigned long> val) noexcept = delete;
+		template<std::uint64_t bits, bool sign> constexpr int cmp(const double_int<bits, sign> &a, std::conditional_t<!sign, int, unsigned int> val) noexcept = delete;
+		template<std::uint64_t bits, bool sign> constexpr int cmp(const double_int<bits, sign> &a, std::conditional_t<!sign, short, unsigned short> val) noexcept = delete;
+
+		template<std::uint64_t bits, bool sign> constexpr int cmp(std::conditional_t<!sign, long long, unsigned long long> val, const double_int<bits, sign> &a) noexcept = delete;
+		template<std::uint64_t bits, bool sign> constexpr int cmp(std::conditional_t<!sign, long, unsigned long> val, const double_int<bits, sign> &a) noexcept = delete;
+		template<std::uint64_t bits, bool sign> constexpr int cmp(std::conditional_t<!sign, int, unsigned int> val, const double_int<bits, sign> &a) noexcept = delete;
+		template<std::uint64_t bits, bool sign> constexpr int cmp(std::conditional_t<!sign, short, unsigned short> val, const double_int<bits, sign> &a) noexcept = delete;
+		
+		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator==(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp(a, b) == 0; }
+		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator!=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp(a, b) != 0; }
+		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator<(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp(a, b) < 0; }
+		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator<=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp(a, b) <= 0; }
+		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator>(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp(a, b) > 0; }
+		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator>=(const double_int<bits1, sign> &a, const double_int<bits2, sign> &b) noexcept { return cmp(a, b) >= 0; }
+
+		#define DRAGAZO_BIGGERINTS_DI_BI_CMP_SHORTHAND(T) \
+		template<std::uint64_t bits, bool sign> constexpr bool operator==(const double_int<bits, sign> &a, std::conditional_t<sign, T, unsigned T> b) { return cmp(a, b) == 0; } \
+		template<std::uint64_t bits, bool sign> constexpr bool operator!=(const double_int<bits, sign> &a, std::conditional_t<sign, T, unsigned T> b) { return cmp(a, b) != 0; } \
+		template<std::uint64_t bits, bool sign> constexpr bool operator<(const double_int<bits, sign> &a, std::conditional_t<sign, T, unsigned T> b) { return cmp(a, b) < 0; } \
+		template<std::uint64_t bits, bool sign> constexpr bool operator<=(const double_int<bits, sign> &a, std::conditional_t<sign, T, unsigned T> b) { return cmp(a, b) <= 0; } \
+		template<std::uint64_t bits, bool sign> constexpr bool operator>(const double_int<bits, sign> &a, std::conditional_t<sign, T, unsigned T> b) { return cmp(a, b) > 0; } \
+		template<std::uint64_t bits, bool sign> constexpr bool operator>=(const double_int<bits, sign> &a, std::conditional_t<sign, T, unsigned T> b) { return cmp(a, b) >= 0; } \
 		\
-		template<std::uint64_t bits> constexpr bool operator==(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) == 0; } \
-		template<std::uint64_t bits> constexpr bool operator!=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) != 0; } \
-		template<std::uint64_t bits> constexpr bool operator<(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) < 0; } \
-		template<std::uint64_t bits> constexpr bool operator<=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) <= 0; } \
-		template<std::uint64_t bits> constexpr bool operator>(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) > 0; } \
-		template<std::uint64_t bits> constexpr bool operator>=(type a, const double_int<bits, sign> &b) noexcept { return cmp((double_int<bits, sign>)a, b) >= 0; }
+		template<std::uint64_t bits, bool sign> constexpr bool operator==(std::conditional_t<sign, T, unsigned T> a, const double_int<bits, sign> &b) { return cmp(a, b) == 0; } \
+		template<std::uint64_t bits, bool sign> constexpr bool operator!=(std::conditional_t<sign, T, unsigned T> a, const double_int<bits, sign> &b) { return cmp(a, b) != 0; } \
+		template<std::uint64_t bits, bool sign> constexpr bool operator<(std::conditional_t<sign, T, unsigned T> a, const double_int<bits, sign> &b) { return cmp(a, b) < 0; } \
+		template<std::uint64_t bits, bool sign> constexpr bool operator<=(std::conditional_t<sign, T, unsigned T> a, const double_int<bits, sign> &b) { return cmp(a, b) <= 0; } \
+		template<std::uint64_t bits, bool sign> constexpr bool operator>(std::conditional_t<sign, T, unsigned T> a, const double_int<bits, sign> &b) { return cmp(a, b) > 0; } \
+		template<std::uint64_t bits, bool sign> constexpr bool operator>=(std::conditional_t<sign, T, unsigned T> a, const double_int<bits, sign> &b) { return cmp(a, b) >= 0; } \
+		\
+		template<std::uint64_t bits, bool sign> constexpr bool operator==(const double_int<bits, sign> &a, std::conditional_t<!sign, T, unsigned T> b) = delete; \
+		template<std::uint64_t bits, bool sign> constexpr bool operator!=(const double_int<bits, sign> &a, std::conditional_t<!sign, T, unsigned T> b) = delete; \
+		template<std::uint64_t bits, bool sign> constexpr bool operator<(const double_int<bits, sign> &a, std::conditional_t<!sign, T, unsigned T> b) = delete; \
+		template<std::uint64_t bits, bool sign> constexpr bool operator<=(const double_int<bits, sign> &a, std::conditional_t<!sign, T, unsigned T> b) = delete; \
+		template<std::uint64_t bits, bool sign> constexpr bool operator>(const double_int<bits, sign> &a, std::conditional_t<!sign, T, unsigned T> b) = delete; \
+		template<std::uint64_t bits, bool sign> constexpr bool operator>=(const double_int<bits, sign> &a, std::conditional_t<!sign, T, unsigned T> b) = delete; \
+		\
+		template<std::uint64_t bits, bool sign> constexpr bool operator==(std::conditional_t<!sign, T, unsigned T> a, const double_int<bits, sign> &b) = delete; \
+		template<std::uint64_t bits, bool sign> constexpr bool operator!=(std::conditional_t<!sign, T, unsigned T> a, const double_int<bits, sign> &b) = delete; \
+		template<std::uint64_t bits, bool sign> constexpr bool operator<(std::conditional_t<!sign, T, unsigned T> a, const double_int<bits, sign> &b) = delete; \
+		template<std::uint64_t bits, bool sign> constexpr bool operator<=(std::conditional_t<!sign, T, unsigned T> a, const double_int<bits, sign> &b) = delete; \
+		template<std::uint64_t bits, bool sign> constexpr bool operator>(std::conditional_t<!sign, T, unsigned T> a, const double_int<bits, sign> &b) = delete; \
+		template<std::uint64_t bits, bool sign> constexpr bool operator>=(std::conditional_t<!sign, T, unsigned T> a, const double_int<bits, sign> &b) = delete;
 
-		SHORTHAND_CMP_FORMATTER(false, unsigned long long)
-		SHORTHAND_CMP_FORMATTER(false, unsigned long)
-		SHORTHAND_CMP_FORMATTER(false, unsigned int)
-		SHORTHAND_CMP_FORMATTER(false, unsigned short)
-
-		SHORTHAND_CMP_FORMATTER(true, signed long long)
-		SHORTHAND_CMP_FORMATTER(true, signed long)
-		SHORTHAND_CMP_FORMATTER(true, signed int)
-		SHORTHAND_CMP_FORMATTER(true, signed short)
+		DRAGAZO_BIGGERINTS_DI_BI_CMP_SHORTHAND(long long)
+		DRAGAZO_BIGGERINTS_DI_BI_CMP_SHORTHAND(long)
+		DRAGAZO_BIGGERINTS_DI_BI_CMP_SHORTHAND(int)
+		DRAGAZO_BIGGERINTS_DI_BI_CMP_SHORTHAND(short)
 
 		// -- io -- //
 
