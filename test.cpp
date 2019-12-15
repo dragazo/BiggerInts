@@ -148,8 +148,6 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 
 int main(int argc, const char *argv[])
 {
-	
-
 	assert(detail::highest_set_bit(0) == 0);
 	for (std::size_t i = 0; i < 64; ++i)
 	{
@@ -159,8 +157,15 @@ int main(int argc, const char *argv[])
 
 	assert(tostr(uint_t<128>(2) * uint_t<128>(13)) == "26");
 	assert(tostr(uint_t<128>(2) + uint_t<128>(13)) == "15");
+	assert(tostr(uint_t<128>(20) - uint_t<128>(13)) == "7");
 	assert(tostr(uint_t<128>(2) / uint_t<128>(13)) == "0");
 	assert(tostr(uint_t<128>(2) % uint_t<128>(13)) == "2");
+
+	assert(tostr(2u * uint_t<128>(13)) == "26");
+	assert(tostr(2u + uint_t<128>(13)) == "15");
+	assert(tostr(20u - uint_t<128>(13)) == "7");
+	assert(tostr(uint_t<128>(2) / 13u) == "0");
+	assert(tostr(uint_t<128>(2) % 13u) == "2");
 
 	assert(tostr(uint_t<128>(52) * uint_t<128>(3)) == "156");
 	assert(tostr(uint_t<128>(52) + uint_t<128>(3)) == "55");
@@ -500,6 +505,35 @@ int main(int argc, const char *argv[])
 		assert(s5_1 == -64);
 		assert(s5_2 == -64);
 		assert(s4 == -64);
+	}
+
+	// -- bigint tests -- //
+
+	{
+		bigint val(46);
+		bigint val_1{ 46 };
+		bigint val_2 = 46;
+
+		assert((unsigned long)val == 46);
+		assert((unsigned int)val_1 == 46);
+		assert((unsigned short)val_2 == 46);
+
+		bigint val_3(-46);
+		bigint val_4{ -46 };
+		bigint val_5 = -46;
+
+		assert((long)val_3 == -46);
+		assert((int)val_4 == -46);
+		assert((short)val_5 == -46);
+
+		for (int i = 46; i >= -99; --i, --val)
+		{
+			assert(val == i);
+		}
+		for (int i = -46; i < 103; ++i, ++val_3)
+		{
+			assert(val_3 == i);
+		}
 	}
 
 	// -- benchmarks -- //

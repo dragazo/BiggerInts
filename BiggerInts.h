@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <string_view>
 #include <cctype>
+#include <vector>
 
 /*
 
@@ -46,6 +47,7 @@ namespace BiggerInts
 		
 		template<typename T, std::uint64_t bits> struct masked_single_int;
 		template<std::uint64_t bits, bool sign> struct double_int;
+		class bigint;
 
 		// -- bit manip -- //
 
@@ -60,10 +62,7 @@ namespace BiggerInts
 
 		// sets the specified bit
 		template<std::uint64_t bits, bool sign>
-		constexpr void bit_set_unchecked(double_int<bits, sign> &val, std::uint64_t bit) noexcept
-		{
-			val.blocks[bit / 64] |= (std::uint64_t)1 << (bit % 64);
-		}
+		constexpr void bit_set_unchecked(double_int<bits, sign> &val, std::uint64_t bit) noexcept { val.blocks[bit / 64] |= (std::uint64_t)1 << (bit % 64); }
 		template<std::uint64_t bits, bool sign>
 		constexpr void bit_set(double_int<bits, sign> &val, std::uint64_t bit) noexcept { bit_set_unchecked(val, bit & (bits - 1)); }
 
@@ -242,6 +241,7 @@ namespace BiggerInts
 
 	template<std::uint64_t bits> using uint_t = decltype(detail::returns_proper_type<bits, false>());
 	template<std::uint64_t bits> using int_t = decltype(detail::returns_proper_type<bits, true>());
+	using bigint = detail::bigint;
 
 	namespace detail
 	{
@@ -451,6 +451,138 @@ namespace BiggerInts
 			}
 		};
 
+		// represents an arbitrarily large (signed) integer type in 2's complement
+		class bigint
+		{
+		public: // -- data -- //
+
+			// the dynamic array of blocks (little-endian). empty array is treated as zero.
+			// at all times must be as small as possible while still preserving the correct signage of the 2's complement value.
+			// users should probably not touch this directly, but is exposed because it's useful for writing extensions.
+			std::vector<std::uint64_t> blocks;
+
+			friend void _collapse(bigint&);
+
+		public: // -- core -- //
+
+			// constructs a new bigint with a value of zero
+			bigint() noexcept {}
+
+			// copies the value of other
+			bigint(const bigint&) = default;
+			bigint &operator=(const bigint&) = default;
+
+			// moves the value of other to this object. the moved-from object is zero after this operation.
+			bigint(bigint&&) = default;
+			bigint &operator=(bigint&&) = default;
+
+		public: // -- promotion constructors -- //
+
+			bigint(unsigned short val) : bigint((unsigned long long)val) {}
+			bigint(unsigned int val) : bigint((unsigned long long)val) {}
+			bigint(unsigned long val) : bigint((unsigned long long)val) {}
+			bigint(unsigned long long val)
+			{
+				if (val)
+				{
+					blocks.push_back(val);
+					if (val & 0x8000000000000000ull) blocks.push_back(0ull);
+				}
+			}
+
+			bigint(short val) : bigint((long long)val) {}
+			bigint(int val) : bigint((long long)val) {}
+			bigint(long val) : bigint((long long)val) {}
+			bigint(long long val)
+			{
+				if (val) blocks.push_back((unsigned long long)val);
+			}
+
+			template<std::uint64_t bits, bool sign>
+			bigint(const double_int<bits, sign> &other) { operator=(other); }
+
+		public: // -- promotion assignment -- //
+
+			bigint &operator=(unsigned short val) { return operator=((unsigned long long)val); }
+			bigint &operator=(unsigned int val) { return operator=((unsigned long long)val); }
+			bigint &operator=(unsigned long val) { return operator=((unsigned long long)val); }
+			bigint &operator=(unsigned long long val)
+			{
+				blocks.clear();
+				if (val)
+				{
+					blocks.push_back(val);
+					if (val & 0x8000000000000000ull) blocks.push_back(0ull);
+				}
+			}
+
+			bigint &operator=(short val) { return operator=((long long)val); }
+			bigint &operator=(int val) { return operator=((long long)val); }
+			bigint &operator=(long val) { return operator=((long long)val); }
+			bigint &operator=(long long val)
+			{
+				blocks.clear();
+				if (val) blocks.push_back((unsigned long long)val);
+			}
+
+			template<std::uint64_t bits, bool sign>
+			bigint &operator=(const double_int<bits, sign> &other)
+			{
+				blocks.assign(std::begin(other.blocks), std::end(other.blocks));
+				if constexpr (!sign)
+				{
+					for (std::size_t i = bits / 64; i > 0 && blocks.back() == 0; --i) blocks.pop_back();
+					if (!blocks.empty() && (blocks.back() & 0x8000000000000000ull)) blocks.push_back(0ull);
+				}
+				else _collapse(*this);
+				return *this;
+			}
+
+		public: // -- demotion conversion -- //
+
+			explicit operator unsigned short() const noexcept { return (unsigned short)(blocks.empty() ? 0ull : blocks[0]); }
+			explicit operator unsigned int() const noexcept { return (unsigned int)(blocks.empty() ? 0ull : blocks[0]); }
+			explicit operator unsigned long() const noexcept { return (unsigned long)(blocks.empty() ? 0ull : blocks[0]); }
+			explicit operator unsigned long long() const noexcept { return (unsigned long long)(blocks.empty() ? 0ull : blocks[0]); }
+
+			explicit operator short() const noexcept { return (short)(blocks.empty() ? 0ull : blocks[0]); }
+			explicit operator int() const noexcept { return (int)(blocks.empty() ? 0ull : blocks[0]); }
+			explicit operator long() const noexcept { return (long)(blocks.empty() ? 0ull : blocks[0]); }
+			explicit operator long long() const noexcept { return (long long)(blocks.empty() ? 0ull : blocks[0]); }
+
+		public: // -- bool conversion -- //
+
+			explicit operator bool() const noexcept { return !blocks.empty(); }
+			friend bool operator!(const bigint &a) { return !(bool)a; }
+		};
+
+		// -- bigint utility definitions -- //
+
+		inline bool is_neg(const bigint &val) noexcept { return !val.blocks.empty() && (val.blocks.back() & 0x8000000000000000); }
+		inline std::size_t highest_set_bit(const bigint &val) noexcept
+		{
+			if (val.blocks.empty()) return 0;
+			if (val.blocks.back()) return (val.blocks.size() - 1) * 64 + highest_set_bit(val.blocks.back());
+			else return (val.blocks.size() - 2) * 64 + highest_set_bit(val.blocks[val.blocks.size() - 2]);
+		}
+
+		// collapses the value in the given bigint to make it satisfy the requirements of the blocks array
+		inline void _collapse(bigint &a)
+		{
+			if (detail::is_neg(a))
+			{
+				for (std::size_t i = a.blocks.size(); --i > 0 && a.blocks[i] == 0xffffffffffffffffull; ) a.blocks.pop_back();
+				if (a.blocks.empty() || !(a.blocks.back() & 0x8000000000000000ull)) a.blocks.push_back(0xffffffffffffffffull);
+			}
+			else
+			{
+				for (std::size_t i = a.blocks.size(); --i > 0 && a.blocks[i] == 0; ) a.blocks.pop_back();
+				if (!a.blocks.empty() && (a.blocks.back() & 0x8000000000000000ull)) a.blocks.push_back(0);
+			}
+		}
+
+		// -- operators -- //
+
 		// shorthand for binary ops +, -, *, etc. will refer to a form that uses both sides of double_int
 		#define SHORTHAND_BINARY_FORMATTER(op, sign, type) \
 		template<std::uint64_t bits> constexpr double_int<bits, sign> operator op(const double_int<bits, sign> &a, type b) noexcept { return a op (double_int<bits, sign>)b; } \
@@ -467,7 +599,7 @@ namespace BiggerInts
 		SHORTHAND_BINARY_FORMATTER(op, true, signed long) \
 		SHORTHAND_BINARY_FORMATTER(op, true, signed long long)
 
-	// -- inc/dec -- //
+		// -- inc/dec -- //
 
 		template<std::uint64_t bits, bool sign>
 		constexpr double_int<bits, sign> &operator++(double_int<bits, sign> &a) noexcept
@@ -476,7 +608,24 @@ namespace BiggerInts
 			return a;
 		}
 		template<std::uint64_t bits, bool sign>
-		constexpr double_int<bits, sign> operator++(double_int<bits, sign> &a, int) noexcept { auto cpy = a; ++a; return cpy; }
+		[[nodiscard]] constexpr double_int<bits, sign> operator++(double_int<bits, sign> &a, int) noexcept { auto cpy = a; ++a; return cpy; }
+
+		inline bigint &operator++(bigint &a)
+		{
+			for (std::size_t i = 1; i < a.blocks.size(); ++i) if (++a.blocks[i - 1]) { _collapse(a); return a; }
+
+			if (a.blocks.empty()) a.blocks.push_back(1ull);
+			else
+			{
+				std::uint64_t high = ++a.blocks.back();
+				if (high == 0) a.blocks.clear();
+				else if (high == 0x8000000000000000ull) a.blocks.push_back(0ull);
+				else _collapse(a);
+			}
+
+			return a;
+		}
+		[[nodiscard]] inline bigint operator++(bigint &a, int) { bigint cpy = a; ++a; return cpy; }
 
 		template<std::uint64_t bits, bool sign>
 		constexpr double_int<bits, sign> &operator--(double_int<bits, sign> &a) noexcept
@@ -485,7 +634,24 @@ namespace BiggerInts
 			return a;
 		}
 		template<std::uint64_t bits, bool sign>
-		constexpr double_int<bits, sign> operator--(double_int<bits, sign> &a, int) noexcept { auto cpy = a; --a; return cpy; }
+		[[nodiscard]] constexpr double_int<bits, sign> operator--(double_int<bits, sign> &a, int) noexcept { auto cpy = a; --a; return cpy; }
+
+		inline bigint &operator--(bigint &a)
+		{
+			for (std::size_t i = 1; i < a.blocks.size(); ++i) if (a.blocks[i - 1]--) { _collapse(a); return a; }
+
+			if (a.blocks.empty()) a.blocks.push_back(0xffffffffffffffffull);
+			else
+			{
+				std::uint64_t high = a.blocks.back()--;
+				/* high == 0 case cannot happen because 0 is represented by empty array and is therefore handled above */
+				if (high == 0x8000000000000000ull) a.blocks.push_back(0xffffffffffffffffull);
+				else _collapse(a);
+			}
+
+			return a;
+		}
+		[[nodiscard]] inline bigint operator--(bigint &a, int) { bigint cpy = a; --a; return cpy; }
 
 		// -- add -- //
 
@@ -890,6 +1056,55 @@ namespace BiggerInts
 		DRAGAZO_BIGGERINTS_DI_BI_CMP_SHORTHAND(long)
 		DRAGAZO_BIGGERINTS_DI_BI_CMP_SHORTHAND(int)
 		DRAGAZO_BIGGERINTS_DI_BI_CMP_SHORTHAND(short)
+
+		inline bool operator==(const bigint &a, const bigint &b) noexcept { return a.blocks == b.blocks; }
+		inline bool operator!=(const bigint &a, const bigint &b) noexcept { return a.blocks != b.blocks; }
+
+		inline bool operator==(const bigint &a, long long val) noexcept
+		{
+			return val == 0 && a.blocks.empty() || a.blocks.size() == 1 && a.blocks[0] == val;
+		}
+		inline bool operator==(const bigint &a, long val) noexcept { return a == (long long)val; }
+		inline bool operator==(const bigint &a, int val) noexcept { return a == (long long)val; }
+		inline bool operator==(const bigint &a, short val) noexcept { return a == (long long)val; }
+
+		inline bool operator==(long long val, const bigint &a) noexcept { return a == val; }
+		inline bool operator==(long val, const bigint &a) noexcept { return a == val; }
+		inline bool operator==(int val, const bigint &a) noexcept { return a == val; }
+		inline bool operator==(short val, const bigint &a) noexcept { return a == val; }
+
+		inline bool operator==(const bigint &a, unsigned long long val) noexcept
+		{
+			return val == 0 && a.blocks.empty() || a.blocks[0] == val && (a.blocks.size() == 1 || a.blocks.size() == 2 && a.blocks[1] == 0);
+		}
+		inline bool operator==(const bigint &a, unsigned long val) noexcept { return a == (unsigned long long)val; }
+		inline bool operator==(const bigint &a, unsigned int val) noexcept { return a == (unsigned long long)val; }
+		inline bool operator==(const bigint &a, unsigned short val) noexcept { return a == (unsigned long long)val; }
+
+		inline bool operator==(unsigned long long val, const bigint &a) noexcept { return a == val; }
+		inline bool operator==(unsigned long val, const bigint &a) noexcept { return a == val; }
+		inline bool operator==(unsigned int val, const bigint &a) noexcept { return a == val; }
+		inline bool operator==(unsigned short val, const bigint &a) noexcept { return a == val; }
+
+		inline bool operator!=(const bigint &a, long long val) noexcept { return !(a == val); }
+		inline bool operator!=(const bigint &a, long val) noexcept { return !(a == val); }
+		inline bool operator!=(const bigint &a, int val) noexcept { return !(a == val); }
+		inline bool operator!=(const bigint &a, short val) noexcept { return !(a == val); }
+
+		inline bool operator!=(long long val, const bigint &a) noexcept { return !(a == val); }
+		inline bool operator!=(long val, const bigint &a) noexcept { return !(a == val); }
+		inline bool operator!=(int val, const bigint &a) noexcept { return !(a == val); }
+		inline bool operator!=(short val, const bigint &a) noexcept { return !(a == val); }
+
+		inline bool operator!=(const bigint &a, unsigned long long val) noexcept { return !(a == val); }
+		inline bool operator!=(const bigint &a, unsigned long val) noexcept { return !(a == val); }
+		inline bool operator!=(const bigint &a, unsigned int val) noexcept { return !(a == val); }
+		inline bool operator!=(const bigint &a, unsigned short val) noexcept { return !(a == val); }
+
+		inline bool operator!=(unsigned long long val, const bigint &a) noexcept { return !(a == val); }
+		inline bool operator!=(unsigned long val, const bigint &a) noexcept { return !(a == val); }
+		inline bool operator!=(unsigned int val, const bigint &a) noexcept { return !(a == val); }
+		inline bool operator!=(unsigned short val, const bigint &a) noexcept { return !(a == val); }
 
 		// -- io -- //
 
