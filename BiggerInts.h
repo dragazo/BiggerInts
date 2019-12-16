@@ -352,14 +352,14 @@ namespace BiggerInts
 			}
 
 			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits > _bits), int> = 0>
-			constexpr double_int(const double_int<_bits, _sign> &other) noexcept : blocks{}
-			{
-				for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
-				std::uint64_t fill = 0;
-				if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0;
-				for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
-				return *this;
-			}
+					constexpr double_int(const double_int<_bits, _sign> &other) noexcept : blocks{}
+					{
+						for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
+						std::uint64_t fill = 0;
+						if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0;
+						for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
+						return *this;
+					}
 
 		public: // -- promotion assignment -- //
 
@@ -385,22 +385,22 @@ namespace BiggerInts
 			}
 
 			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits > _bits), int> = 0>
-			constexpr double_int &operator=(const double_int<_bits, _sign> &other) noexcept
-			{
-				for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
-				std::uint64_t fill;
-				if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0; else fill = 0;
-				for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
-				return *this;
-			}
+					constexpr double_int &operator=(const double_int<_bits, _sign> &other) noexcept
+					{
+						for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
+						std::uint64_t fill;
+						if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0; else fill = 0;
+						for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
+						return *this;
+					}
 
 		public: // -- double_int demotions -- //
 
 			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits < _bits), int> = 0>
-			constexpr explicit double_int(const double_int<_bits, _sign> &other) noexcept : blocks{}
-			{
-				for (std::size_t i = 0; i < bits / 64; ++i) blocks[i] = other.blocks[i];
-			}
+				constexpr explicit double_int(const double_int<_bits, _sign> &other) noexcept : blocks{}
+				{
+					for (std::size_t i = 0; i < bits / 64; ++i) blocks[i] = other.blocks[i];
+				}
 
 		public: // -- demotion conversion -- //
 
@@ -559,12 +559,6 @@ namespace BiggerInts
 		// -- bigint utility definitions -- //
 
 		inline bool is_neg(const bigint &val) noexcept { return !val.blocks.empty() && (val.blocks.back() & 0x8000000000000000); }
-		inline std::size_t highest_set_bit(const bigint &val) noexcept
-		{
-			if (val.blocks.empty()) return 0;
-			if (val.blocks.back()) return (val.blocks.size() - 1) * 64 + highest_set_bit(val.blocks.back());
-			else return (val.blocks.size() - 2) * 64 + highest_set_bit(val.blocks[val.blocks.size() - 2]);
-		}
 
 		// collapses the value in the given bigint to make it satisfy the requirements of the blocks array
 		inline void _collapse(bigint &a)
@@ -578,6 +572,22 @@ namespace BiggerInts
 			{
 				for (std::size_t i = a.blocks.size(); i-- > 0 && a.blocks[i] == 0; ) a.blocks.pop_back();
 				if (!a.blocks.empty() && (a.blocks.back() & 0x8000000000000000ull)) a.blocks.push_back(0);
+			}
+		}
+
+		inline std::size_t highest_set_bit(const bigint &val) noexcept
+		{
+			if (val.blocks.empty()) return 0;
+			if (val.blocks.back()) return (val.blocks.size() - 1) * 64 + highest_set_bit(val.blocks.back());
+			else return (val.blocks.size() - 2) * 64 + highest_set_bit(val.blocks[val.blocks.size() - 2]);
+		}
+		inline void make_not(bigint &a)
+		{
+			if (a.blocks.empty()) a.blocks.push_back(0xffffffffffffffffull);
+			else
+			{
+				for (std::uint64_t &v : a.blocks) v = ~v;
+				_collapse(a);
 			}
 		}
 
@@ -652,6 +662,8 @@ namespace BiggerInts
 			return a;
 		}
 		[[nodiscard]] inline bigint operator--(bigint &a, int) { bigint cpy = a; --a; return cpy; }
+
+		inline void make_neg(bigint &a) { make_not(a); ++a; }
 
 		// -- add -- //
 
@@ -744,9 +756,9 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(+)
 
-		// -- sub -- //
+			// -- sub -- //
 
-		template<std::uint64_t bits, bool sign1, bool sign2>
+			template<std::uint64_t bits, bool sign1, bool sign2>
 		constexpr double_int<bits, sign1> &operator-=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
 			std::uint64_t carry = 1;
@@ -766,9 +778,9 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(-)
 
-		// -- and -- //
+			// -- and -- //
 
-		template<std::uint64_t bits, bool sign1, bool sign2>
+			template<std::uint64_t bits, bool sign1, bool sign2>
 		constexpr double_int<bits, sign1> &operator&=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
 			for (std::size_t i = 0; i < bits / 64; ++i) a.blocks[i] &= b.blocks[i];
@@ -783,9 +795,9 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(&)
 
-		// -- or -- //
+			// -- or -- //
 
-		template<std::uint64_t bits, bool sign1, bool sign2>
+			template<std::uint64_t bits, bool sign1, bool sign2>
 		constexpr double_int<bits, sign1> &operator|=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
 			for (std::size_t i = 0; i < bits / 64; ++i) a.blocks[i] |= b.blocks[i];
@@ -800,9 +812,9 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(| )
 
-		// -- xor -- //
+			// -- xor -- //
 
-		template<std::uint64_t bits, bool sign1, bool sign2>
+			template<std::uint64_t bits, bool sign1, bool sign2>
 		constexpr double_int<bits, sign1> &operator^=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
 			for (std::size_t i = 0; i < bits / 64; ++i) a.blocks[i] ^= b.blocks[i];
@@ -817,9 +829,9 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(^)
 
-		// -- shl/sal -- //
+			// -- shl/sal -- //
 
-		template<std::uint64_t bits, bool sign>
+			template<std::uint64_t bits, bool sign>
 		constexpr double_int<bits, sign> &operator<<=(double_int<bits, sign> &val, std::uint64_t count) noexcept
 		{
 			count &= bits - 1;
@@ -892,11 +904,20 @@ namespace BiggerInts
 		template<std::uint64_t bits, bool sign>
 		constexpr double_int<bits, sign> operator+(const double_int<bits, sign> &a) noexcept { return a; }
 
+		inline bigint operator+(const bigint &a) { return a; }
+		inline bigint operator+(bigint &&a) { return std::move(a); }
+
 		template<std::uint64_t bits>
 		constexpr double_int<bits, true> operator-(const double_int<bits, true> &a) noexcept { double_int<bits, true> res = a; detail::make_neg(res); return res; }
 
+		inline bigint operator-(const bigint &a) { bigint res = a; detail::make_neg(res); return res; }
+		inline bigint operator-(bigint &&a) { bigint res = std::move(a); detail::make_neg(res); return res; }
+
 		template<std::uint64_t bits, bool sign>
 		constexpr double_int<bits, sign> operator~(const double_int<bits, sign> &a) noexcept { double_int<bits, sign> res = a; detail::make_not(res); return res; }
+
+		inline bigint operator~(const bigint &a) { bigint res = a; detail::make_not(res); return res; }
+		inline bigint operator~(bigint &&a) { bigint res = std::move(a); detail::make_not(res); return res; }
 
 		// -- mul -- //
 

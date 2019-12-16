@@ -555,9 +555,21 @@ int main(int argc, const char *argv[])
 		int vals[] = { 0, 2, 0, -4, 1, 233, -1646, -233, 453567, -447453, 35, 2 };
 		constexpr int count = sizeof(vals) / sizeof(*vals);
 		for (int i = 0; i < count; ++i)
-			for (int j = i + 1; j < count; ++j)
+			for (int j = i; j < count; ++j)
 			{
-				assert((bigint)vals[i] + (bigint)vals[j] == vals[i] + vals[j]);
+				bigint sum = (bigint)vals[i] + (bigint)vals[j];
+				assert(sum == vals[i] + vals[j]);
+				assert(vals[i] + vals[j] == 0 ? sum.blocks.size() == 0 : sum.blocks.size() == 1);
+
+				bigint notsum = ~sum;
+				assert(notsum == -(vals[i] + vals[j]) - 1);
+				assert(-(vals[i] + vals[j]) - 1 == 0 ? notsum.blocks.size() == 0 : notsum.blocks.size() == 1);
+
+				bigint negsum = -sum;
+				assert(negsum == -(vals[i] + vals[j]));
+				assert(-(vals[i] + vals[j]) == 0 ? negsum.blocks.size() == 0 : negsum.blocks.size() == 1);
+
+				assert(notsum + 1 == negsum);
 			}
 	}
 
