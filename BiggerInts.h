@@ -678,17 +678,18 @@ namespace BiggerInts
 			return a;
 		}
 
-		inline bigint &operator+=(bigint &a, const bigint &b)
+		template<bool subtract>
+		bigint &_add(bigint &a, const bigint &b)
 		{
 			std::size_t min = std::min(a.blocks.size(), b.blocks.size());
 			const bool a_neg = detail::is_neg(a);
-			const bool b_neg = detail::is_neg(b);
+			const bool b_neg = subtract ^ detail::is_neg(b);
 
 			// compute addition on the mutually covered range
-			std::uint64_t carry = 0;
+			std::uint64_t carry = subtract ? 1 : 0;
 			for (std::size_t i = 0; i < min; ++i)
 			{
-				std::uint64_t v = b.blocks[i] + carry;
+				std::uint64_t v = (subtract ? ~b.blocks[i] : b.blocks[i]) + carry;
 				carry = (a.blocks[i] += v) < v || v < carry ? 1 : 0;
 			}
 
@@ -698,7 +699,7 @@ namespace BiggerInts
 				a.blocks.resize(b.blocks.size(), a_neg ? -1 : 0);
 				for (std::size_t i = min; i < a.blocks.size(); ++i)
 				{
-					std::uint64_t v = b.blocks[i] + carry;
+					std::uint64_t v = (subtract ? ~b.blocks[i] : b.blocks[i]) + carry;
 					carry = (a.blocks[i] += v) < v || v < carry ? 1 : 0;
 				}
 			}
@@ -712,7 +713,7 @@ namespace BiggerInts
 				}
 			}
 
-			// perform addition on te infinite prefix blocks
+			// perform addition on the infinite prefix blocks
 			if (!a_neg && !b_neg)
 			{
 				if (carry) a.blocks.push_back(1ull);
@@ -739,6 +740,8 @@ namespace BiggerInts
 			return a;
 		}
 
+		inline bigint &operator+=(bigint &a, const bigint &b) { return _add<false>(a, b); }
+
 		inline bigint operator+(const bigint &a, const bigint &b) { bigint cpy = a; cpy += b; return cpy; }
 		inline bigint operator+(bigint &&a, const bigint &b) { bigint cpy = std::move(a); cpy += b; return cpy; }
 		inline bigint operator+(const bigint &a, bigint &&b) { bigint cpy = std::move(b); cpy += a; return cpy; }
@@ -756,9 +759,9 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(+)
 
-			// -- sub -- //
+		// -- sub -- //
 
-			template<std::uint64_t bits, bool sign1, bool sign2>
+		template<std::uint64_t bits, bool sign1, bool sign2>
 		constexpr double_int<bits, sign1> &operator-=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
 			std::uint64_t carry = 1;
@@ -770,6 +773,13 @@ namespace BiggerInts
 			return a;
 		}
 
+		inline bigint &operator-=(bigint &a, const bigint &b) { return _add<true>(a, b); }
+
+		inline bigint operator-(const bigint &a, const bigint &b) { bigint cpy = a; cpy -= b; return cpy; }
+		inline bigint operator-(bigint &&a, const bigint &b) { bigint cpy = std::move(a); cpy -= b; return cpy; }
+		inline bigint operator-(const bigint &a, bigint &&b) { bigint cpy = std::move(b); cpy -= a; detail::make_neg(cpy); return cpy; } // not sure if this is faster than just making a dynamically-allocated copy
+		inline bigint operator-(bigint &&a, bigint &&b) { bigint cpy = std::move(a); cpy -= b; return cpy; }
+
 		template<std::uint64_t bits, bool sign, typename T>
 		constexpr double_int<bits, sign> &operator-=(double_int<bits, sign> &a, const T &b) noexcept { a -= (double_int<bits, sign>)b; return a; }
 
@@ -778,9 +788,9 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(-)
 
-			// -- and -- //
+		// -- and -- //
 
-			template<std::uint64_t bits, bool sign1, bool sign2>
+		template<std::uint64_t bits, bool sign1, bool sign2>
 		constexpr double_int<bits, sign1> &operator&=(double_int<bits, sign1> &a, const double_int<bits, sign2> &b) noexcept
 		{
 			for (std::size_t i = 0; i < bits / 64; ++i) a.blocks[i] &= b.blocks[i];

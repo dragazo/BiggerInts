@@ -555,7 +555,7 @@ int main(int argc, const char *argv[])
 		int vals[] = { 0, 2, 0, -4, 1, 233, -1646, -233, 453567, -447453, 35, 2 };
 		constexpr int count = sizeof(vals) / sizeof(*vals);
 		for (int i = 0; i < count; ++i)
-			for (int j = i; j < count; ++j)
+			for (int j = 0; j < count; ++j)
 			{
 				bigint sum = (bigint)vals[i] + (bigint)vals[j];
 				assert(sum == vals[i] + vals[j]);
@@ -570,7 +570,75 @@ int main(int argc, const char *argv[])
 				assert(-(vals[i] + vals[j]) == 0 ? negsum.blocks.size() == 0 : negsum.blocks.size() == 1);
 
 				assert(notsum + 1 == negsum);
+
+				bigint diff = (bigint)vals[i] - (bigint)vals[j];
+				assert(diff == vals[i] - vals[j]);
+				assert(vals[i] - vals[j] == 0 ? diff.blocks.size() == 0 : diff.blocks.size() == 1);
 			}
+
+		{
+			bigint bigpos = (bigint)0x8000000000000000ull;
+			assert(bigpos.blocks.size() == 2);
+			assert(bigpos.blocks[0] == 0x8000000000000000ull);
+			assert(bigpos.blocks[1] == 0ull);
+			assert(bigpos == 0x8000000000000000ull);
+		}
+
+		{
+			bigint bigpos = (bigint)std::numeric_limits<std::int64_t>::max() + (bigint)std::numeric_limits<std::int64_t>::max();
+			assert(bigpos.blocks.size() == 2);
+			assert(bigpos.blocks[0] == 0xfffffffffffffffeull);
+			assert(bigpos.blocks[1] == 0);
+		}
+
+		{
+			bigint min = (bigint)std::numeric_limits<std::int64_t>::min();
+			assert(min.blocks.size() == 1);
+			assert(min.blocks[0] == 0x8000000000000000ull);
+			assert(min == std::numeric_limits<std::int64_t>::min());
+		}
+
+		{
+			bigint bigneg = (bigint)0 - (bigint)std::numeric_limits<std::int64_t>::min();
+			assert(bigneg.blocks.size() == 2);
+			assert(bigneg.blocks[0] == 0x8000000000000000ull);
+			assert(bigneg.blocks[1] == 0ull);
+		}
+
+		{
+			bigint bigneg = (bigint)(-1) - (bigint)std::numeric_limits<std::int64_t>::min();
+			assert(bigneg.blocks.size() == 1);
+			assert(bigneg.blocks[0] == 0x7fffffffffffffffull);
+		}
+
+		{
+			bigint bigneg = (bigint)(1) - (bigint)std::numeric_limits<std::int64_t>::min();
+			assert(bigneg.blocks.size() == 2);
+			assert(bigneg.blocks[0] == 0x8000000000000001ull);
+			assert(bigneg.blocks[1] == 0ull);
+		}
+
+		{
+			bigint bigneg = (bigint)(std::numeric_limits<std::int64_t>::min()) - (bigint)std::numeric_limits<std::int64_t>::min();
+			assert(bigneg == 0);
+			assert(bigneg.blocks.size() == 0);
+		}
+
+		{
+			bigint bigneg = (bigint)(std::numeric_limits<std::int64_t>::min()) - (bigint)0x8000000000000000ull;
+			assert(bigneg != 0);
+			assert(!(bigneg == 0));
+			assert(bigneg.blocks.size() == 2);
+			assert(bigneg.blocks[0] == 0ull);
+			assert(bigneg.blocks[1] == 0xffffffffffffffffull);
+		}
+
+		{
+			bigint bigneg = (bigint)(std::numeric_limits<std::int64_t>::min()) - -(bigint)0x8000000000000000ull;
+			assert(bigneg == 0);
+			assert(!(bigneg != 0));
+			assert(bigneg.blocks.size() == 0);
+		}
 	}
 
 	// -- benchmarks -- //
