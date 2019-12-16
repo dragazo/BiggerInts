@@ -552,7 +552,7 @@ int main(int argc, const char *argv[])
 	}
 
 	{
-		int vals[] = { 0, 2, 0, -4, 1, 233, -1646, -233, 453567, -447453, 35, 2 };
+		long long vals[] = { 0, 2, 0, -4, 1, 233, -1646, -233, 453567, -447453, 35, 2 };
 		constexpr int count = sizeof(vals) / sizeof(*vals);
 		for (int i = 0; i < count; ++i)
 			for (int j = 0; j < count; ++j)
@@ -574,6 +574,10 @@ int main(int argc, const char *argv[])
 				bigint diff = (bigint)vals[i] - (bigint)vals[j];
 				assert(diff == vals[i] - vals[j]);
 				assert(vals[i] - vals[j] == 0 ? diff.blocks.size() == 0 : diff.blocks.size() == 1);
+
+				bigint prod = (bigint)vals[i] * (bigint)vals[j];
+				assert(prod == vals[i] * vals[j]);
+				assert(vals[i] * vals[j] == 0 ? prod.blocks.size() == 0 : prod.blocks.size() == 1);
 			}
 
 		{
@@ -640,7 +644,7 @@ int main(int argc, const char *argv[])
 			assert(bigneg.blocks.size() == 0);
 		}
 	}
-
+	
 	// -- benchmarks -- //
 
 	benchmark_binary("divmod  ", 40000, 20000, 1000, [](const auto &a, const auto &b) { return detail::divmod(a, b); });
