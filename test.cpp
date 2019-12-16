@@ -510,6 +510,21 @@ int main(int argc, const char *argv[])
 	// -- bigint tests -- //
 
 	{
+		uint_t<256> v = 0u;
+		bigint big = v;
+		assert(!detail::is_neg(big));
+		assert(big.blocks.size() == 0);
+		assert(big == 0);
+		assert(detail::highest_set_bit(big) == 0);
+
+		int_t<256> sv = -1;
+		big = sv;
+		assert(detail::is_neg(big));
+		assert(big.blocks.size() == 1);
+		assert(big == -1);
+	}
+
+	{
 		bigint val(46);
 		bigint val_1{ 46 };
 		bigint val_2 = 46;
@@ -534,6 +549,16 @@ int main(int argc, const char *argv[])
 		{
 			assert(val_3 == i);
 		}
+	}
+
+	{
+		int vals[] = { 0, 2, 0, -4, 1, 233, -1646, -233, 453567, -447453, 35, 2 };
+		constexpr int count = sizeof(vals) / sizeof(*vals);
+		for (int i = 0; i < count; ++i)
+			for (int j = i + 1; j < count; ++j)
+			{
+				assert((bigint)vals[i] + (bigint)vals[j] == vals[i] + vals[j]);
+			}
 	}
 
 	// -- benchmarks -- //

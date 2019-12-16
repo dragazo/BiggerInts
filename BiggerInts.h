@@ -531,7 +531,7 @@ namespace BiggerInts
 				blocks.assign(std::begin(other.blocks), std::end(other.blocks));
 				if constexpr (!sign)
 				{
-					for (std::size_t i = bits / 64; i > 0 && blocks.back() == 0; --i) blocks.pop_back();
+					while (!blocks.empty() && blocks.back() == 0) blocks.pop_back();
 					if (!blocks.empty() && (blocks.back() & 0x8000000000000000ull)) blocks.push_back(0ull);
 				}
 				else _collapse(*this);
@@ -571,12 +571,12 @@ namespace BiggerInts
 		{
 			if (detail::is_neg(a))
 			{
-				for (std::size_t i = a.blocks.size(); --i > 0 && a.blocks[i] == 0xffffffffffffffffull; ) a.blocks.pop_back();
+				for (std::size_t i = a.blocks.size(); i-- > 0 && a.blocks[i] == 0xffffffffffffffffull; ) a.blocks.pop_back();
 				if (a.blocks.empty() || !(a.blocks.back() & 0x8000000000000000ull)) a.blocks.push_back(0xffffffffffffffffull);
 			}
 			else
 			{
-				for (std::size_t i = a.blocks.size(); --i > 0 && a.blocks[i] == 0; ) a.blocks.pop_back();
+				for (std::size_t i = a.blocks.size(); i-- > 0 && a.blocks[i] == 0; ) a.blocks.pop_back();
 				if (!a.blocks.empty() && (a.blocks.back() & 0x8000000000000000ull)) a.blocks.push_back(0);
 			}
 		}
@@ -664,6 +664,76 @@ namespace BiggerInts
 				carry = (a.blocks[i] += v) < v || v < carry ? 1 : 0;
 			}
 			return a;
+		}
+
+		inline bigint &operator+=(bigint &a, const bigint &b)
+		{
+			std::size_t min = std::min(a.blocks.size(), b.blocks.size());
+			const bool a_neg = detail::is_neg(a);
+			const bool b_neg = detail::is_neg(b);
+
+			// compute addition on the mutually covered range
+			std::uint64_t carry = 0;
+			for (std::size_t i = 0; i < min; ++i)
+			{
+				std::uint64_t v = b.blocks[i] + carry;
+				carry = (a.blocks[i] += v) < v || v < carry ? 1 : 0;
+			}
+
+			// perform addition on the extended range (ghost blocks)
+			if (a.blocks.size() < b.blocks.size())
+			{
+				a.blocks.resize(b.blocks.size(), a_neg ? -1 : 0);
+				for (std::size_t i = min; i < a.blocks.size(); ++i)
+				{
+					std::uint64_t v = b.blocks[i] + carry;
+					carry = (a.blocks[i] += v) < v || v < carry ? 1 : 0;
+				}
+			}
+			else if (a.blocks.size() > b.blocks.size())
+			{
+				std::size_t ghost = b_neg ? -1 : 0;
+				for (std::size_t i = min; i < a.blocks.size(); ++i)
+				{
+					std::uint64_t v = ghost + carry;
+					carry = (a.blocks[i] += v) < v || v < carry ? 1 : 0;
+				}
+			}
+
+			// perform addition on te infinite prefix blocks
+			if (!a_neg && !b_neg)
+			{
+				if (carry) a.blocks.push_back(1ull);
+				else if (detail::is_neg(a)) a.blocks.push_back(0ull); // value of a has changed and might be negative now
+			}
+			else if (a_neg && b_neg)
+			{
+				if (!carry) a.blocks.push_back(0xfffffffffffffffeull);
+				else if (!detail::is_neg(a)) a.blocks.push_back(0xffffffffffffffffull); // value of a has changed and might be negative now
+			}
+			else
+			{
+				if (carry)
+				{
+					if (detail::is_neg(a)) a.blocks.push_back(0ull);
+				}
+				else
+				{
+					if (!detail::is_neg(a)) a.blocks.push_back(0xffffffffffffffffull);
+				}
+			}
+
+			_collapse(a);
+			return a;
+		}
+
+		inline bigint operator+(const bigint &a, const bigint &b) { bigint cpy = a; cpy += b; return cpy; }
+		inline bigint operator+(bigint &&a, const bigint &b) { bigint cpy = std::move(a); cpy += b; return cpy; }
+		inline bigint operator+(const bigint &a, bigint &&b) { bigint cpy = std::move(b); cpy += a; return cpy; }
+		inline bigint operator+(bigint &&a, bigint &&b)
+		{
+			if (a.blocks.size() >= b.blocks.size()) { bigint cpy = std::move(a); cpy += b; return cpy; }
+			else { bigint cpy = std::move(b); cpy += a; return cpy; }
 		}
 
 		template<std::uint64_t bits, bool sign, typename T>
