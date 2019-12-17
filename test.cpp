@@ -20,7 +20,7 @@ using namespace BiggerInts;
 #define test(expr, expected, name) { auto res = (expr); if(res != (expected)) test_fail(expr, expected, name); }
 
 #define t_start auto _t = std::chrono::high_resolution_clock::now()
-#define t_end(name, cnt) { auto _dt = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - _t).count(); std::cerr << name ": " << _dt << "ms (" << cnt << " iterations)\n"; }
+#define t_end(name, cnt) { auto _dt = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - _t).count(); std::cerr << name ": " << _dt << " us (" << cnt << " iterations) avg: " << (_dt / (cnt)) << " us\n"; }
 
 #define t_test(init, expr, count) { init; t_start; for(int i = 0; i < count; ++i) (expr); t_end; t_print(expr, count); }
 
@@ -56,7 +56,7 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 
 		uint_t<128> val2 = uint_t<128>::parse("165798541236525214");
 		decltype(f(vals[0], vals[0])) dd;
-
+		
 		t_start;
 		for (std::size_t i = 0; i < count_1; ++i)
 		{
@@ -415,14 +415,42 @@ int main(int argc, const char *argv[])
 	}
 
 	{
-		uint_t<512> u;
+		const char *strs[] = 
+		{
+			"67039039649712985497870124991029230637396829102961966888617807218608820150367734884009371490834517138450159290932430254268769414059732849732168245030420",
+			"6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042000",
+			"6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048"
+		};
 
-		u = uint_t<512>::parse("67039039649712985497870124991029230637396829102961966888617807218608820150367734884009371490834517138450159290932430254268769414059732849732168245030420");
-		assert(tostr(u) == "67039039649712985497870124991029230637396829102961966888617807218608820150367734884009371490834517138450159290932430254268769414059732849732168245030420");
+		uint_t<512> u;
+		bigint b;
+
+		u = uint_t<512>::parse(strs[0]);
+		assert(u.blocks[0] == 5165088340638674452);
+		assert(u.blocks[1] == 1475739525896764129);
+		assert(u.blocks[2] == 16233134784864405422);
+		assert(u.blocks[3] == 12543785970122495098);
+		assert(u.blocks[4] == 8854437155380584775);
+		assert(u.blocks[5] == 5165088340638674452);
+		assert(u.blocks[6] == 1475739525896764129);
+		assert(u.blocks[7] == 92233720368547758);
+		assert(tostr(u) == strs[0]);
 		u *= 100ull;
-		assert(tostr(u) == "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042000");
+		assert(tostr(u) == strs[1]);
 		u += 48ull;
-		assert(tostr(u) == "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
+		assert(tostr(u) == strs[2]);
+
+		b = bigint::parse(strs[0]);
+		assert(b.blocks.size() == 8);
+		assert(b.blocks[0] == 5165088340638674452);
+		assert(b.blocks[1] == 1475739525896764129);
+		assert(b.blocks[2] == 16233134784864405422);
+		assert(b.blocks[3] == 12543785970122495098);
+		assert(b.blocks[4] == 8854437155380584775);
+		assert(b.blocks[5] == 5165088340638674452);
+		assert(b.blocks[6] == 1475739525896764129);
+		assert(b.blocks[7] == 92233720368547758);
+		assert(tostr(b) == strs[0]);
 	}
 
 	// overflow parsing tests
@@ -630,31 +658,53 @@ int main(int argc, const char *argv[])
 				assert(sum + 1 > sum);
 				assert(sum > sum - 1);
 				assert(sum - 1 < sum);
+				assert(tostr(sum) == tostr(vals[i] + vals[j]));
 
 				bigint notsum = ~sum;
 				assert(notsum == -(vals[i] + vals[j]) - 1);
 				assert(-(vals[i] + vals[j]) - 1 == 0 ? notsum.blocks.size() == 0 : notsum.blocks.size() == 1);
+				assert(tostr(notsum) == tostr(-(vals[i] + vals[j]) - 1));
 
 				bigint negsum = -sum;
 				assert(negsum == -(vals[i] + vals[j]));
 				assert(-(vals[i] + vals[j]) == 0 ? negsum.blocks.size() == 0 : negsum.blocks.size() == 1);
+				assert(tostr(negsum) == tostr(-(vals[i] + vals[j])));
 
 				assert(notsum + 1 == negsum);
+				assert(tostr(notsum + 1) == tostr(negsum));
 
 				bigint diff = (bigint)vals[i] - (bigint)vals[j];
 				assert(diff == vals[i] - vals[j]);
 				assert(vals[i] - vals[j] == 0 ? diff.blocks.size() == 0 : diff.blocks.size() == 1);
+				assert(tostr(diff) == tostr(vals[i] - vals[j]));
 
 				bigint prod = (bigint)vals[i] * (bigint)vals[j];
 				assert(prod == vals[i] * vals[j]);
 				assert(vals[i] * vals[j] == 0 ? prod.blocks.size() == 0 : prod.blocks.size() == 1);
+				assert(tostr(prod) == tostr(vals[i] * vals[j]));
 
 				if (vals[j] != 0)
 				{
 					bigint quo = (bigint)vals[i] / (bigint)vals[j];
 					assert(quo == vals[i] / vals[j]);
 					assert(vals[i] / vals[j] == 0 ? quo.blocks.size() == 0 : quo.blocks.size() == 1);
+					assert(tostr(quo) == tostr(vals[i] / vals[j]));
 				}
+
+				bigint band = (bigint)vals[i] & (bigint)vals[j];
+				assert(band == (vals[i] & vals[j]));
+				assert((vals[i] & vals[j]) == 0 ? band.blocks.size() == 0 : band.blocks.size() == 1);
+				assert(tostr(band) == tostr(vals[i] & vals[j]));
+
+				bigint bor = (bigint)vals[i] | (bigint)vals[j];
+				assert(bor == (vals[i] | vals[j]));
+				assert((vals[i] | vals[j]) == 0 ? bor.blocks.size() == 0 : bor.blocks.size() == 1);
+				assert(tostr(bor) == tostr(vals[i] | vals[j]));
+
+				bigint bxor = (bigint)vals[i] ^ (bigint)vals[j];
+				assert(bxor == (vals[i] ^ vals[j]));
+				assert((vals[i] ^ vals[j]) == 0 ? bxor.blocks.size() == 0 : bxor.blocks.size() == 1);
+				assert(tostr(bxor) == tostr(vals[i] ^ vals[j]));
 			}
 
 		{
