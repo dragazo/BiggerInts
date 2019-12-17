@@ -1085,6 +1085,126 @@ namespace BiggerInts
 		template<std::uint64_t bits, bool sign, typename T>
 		constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const T &b) noexcept { a *= (double_int<bits, sign>)b; return a; }
 
+		inline int cmp(const bigint &a, const bigint &b) noexcept
+		{
+			const bool a_neg = detail::is_neg(a);
+			const bool b_neg = detail::is_neg(b);
+			if (a_neg ^ b_neg) return a_neg ? -1 : 1; // if they have different signs we know right away
+
+			if (a.blocks.size() > b.blocks.size()) return a_neg ? -1 : 1; // if a has higher magnitude than b we can tell from the sign
+			if (a.blocks.size() < b.blocks.size()) return a_neg ? 1 : -1; // similarly
+
+			for (std::size_t i = a.blocks.size(); i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i] ? -1 : 1; // otherwise base decision on first different block
+
+			return 0; // otherwise they're equal
+		}
+
+		inline bool operator<(const bigint &a, const bigint &b) noexcept { return cmp(a, b) < 0; }
+		inline bool operator<=(const bigint &a, const bigint &b) noexcept { return cmp(a, b) <= 0; }
+		inline bool operator>(const bigint &a, const bigint &b) noexcept { return cmp(a, b) > 0; }
+		inline bool operator>=(const bigint &a, const bigint &b) noexcept { return cmp(a, b) >= 0; }
+
+		inline std::pair<bigint, bigint> divmod_unchecked_positive(const bigint &num, const bigint &den)
+		{
+			std::pair<bigint, bigint> res; // default constructed to (0, 0)
+
+			std::uint64_t bit = highest_set_bit(num);
+
+			const std::size_t den_highest_bit = highest_set_bit(den);
+			std::size_t res_second_highest_bit = 0;
+			std::size_t shift_count = 0;
+
+			while (true)
+			{
+				++shift_count;
+				if (bit_test(num, bit)) // no unchecked equivalent because arbitrary precision
+				{
+					res.second <<= shift_count;
+					res_second_highest_bit += shift_count;
+					shift_count = 0;
+					++res.second;
+				}
+				else if (res_second_highest_bit + shift_count >= den_highest_bit)
+				{
+					res.second <<= shift_count;
+					res_second_highest_bit += shift_count;
+					shift_count = 0;
+				}
+
+				if (res.second >= den)
+				{
+					res.second -= den;
+					res_second_highest_bit = highest_set_bit(res.second);
+					bit_set(res.first, bit); // no unchecked equivalent because arbitrary precision
+				}
+
+				if (bit-- == 0) break;
+			}
+
+			res.second <<= shift_count;
+
+			return res;
+		}
+		template<typename U, typename V, std::enable_if_t<std::is_same_v<std::decay_t<U>, bigint> && std::is_same_v<std::decay_t<V>, bigint>, int> = 0>
+		inline std::pair<bigint, bigint> divmod_unchecked_unknown(U &&a, V &&b)
+		{
+			const bool a_neg = detail::is_neg(a);
+			const bool b_neg = detail::is_neg(b);
+
+			if (a_neg && b_neg)
+			{
+				bigint a_cpy = std::forward<U>(a);
+				bigint b_cpy = std::forward<V>(b);
+				detail::make_neg(a_cpy);
+				detail::make_neg(b_cpy);
+
+				return detail::divmod_unchecked_positive(a_cpy, b_cpy);
+			}
+			else if (a_neg)
+			{
+				bigint a_cpy = std::forward<U>(a);
+				detail::make_neg(a_cpy);
+
+				auto res = detail::divmod_unchecked_positive(a_cpy, b);
+				detail::make_neg(res.first);
+				detail::make_neg(res.second);
+				return res;
+			}
+			else if (b_neg)
+			{
+				bigint b_cpy = std::forward<V>(b);
+				detail::make_neg(b_cpy);
+
+				auto res = detail::divmod_unchecked_positive(a, b_cpy);
+				detail::make_neg(res.first);
+				detail::make_neg(res.second);
+				return res;
+			}
+			else return detail::divmod_unchecked_positive(a, b);
+		}
+		template<typename U, typename V, std::enable_if_t<std::is_same_v<std::decay_t<U>, bigint> && std::is_same_v<std::decay_t<V>, bigint>, int> = 0>
+		inline std::pair<bigint, bigint> divmod(U &&a, V &&b)
+		{
+			if (!b) throw std::domain_error("divide by zero");
+			return divmod_unchecked_unknown(std::forward<U>(a), std::forward<V>(b));
+		}
+
+		inline bigint operator/(const bigint &num, const bigint &den) { return detail::divmod(num, den).first; }
+		inline bigint operator/(bigint &&num, const bigint &den) { return detail::divmod(std::move(num), den).first; }
+		inline bigint operator/(const bigint &num, bigint &&den) { return detail::divmod(num, std::move(den)).first; }
+		inline bigint operator/(bigint &&num, bigint &&den) { return detail::divmod(std::move(num), std::move(den)).first; }
+
+		inline bigint operator%(const bigint &num, const bigint &den) { return detail::divmod(num, den).second; }
+		inline bigint operator%(bigint &&num, const bigint &den) { return detail::divmod(std::move(num), den).second; }
+		inline bigint operator%(const bigint &num, bigint &&den) { return detail::divmod(num, std::move(den)).second; }
+		inline bigint operator%(bigint &&num, bigint &&den) { return detail::divmod(std::move(num), std::move(den)).second; }
+
+		inline bigint &operator/=(bigint &num, const bigint &den) { auto temp = std::move(num) / den; num = std::move(temp); return num; }
+		inline bigint &operator/=(bigint &num, bigint &&den) { auto temp = std::move(num) / std::move(den); num = std::move(temp); return num; }
+
+		inline bigint &operator%=(bigint &num, const bigint &den) { auto temp = std::move(num) % den; num = std::move(temp); return num; }
+		inline bigint &operator%=(bigint &num, bigint &&den) { auto temp = std::move(num) % std::move(den); num = std::move(temp); return num; }
+
 		inline constexpr std::pair<std::uint8_t, std::uint8_t> divmod(std::uint8_t num, std::uint8_t den) { return { num / den, num % den }; }
 		inline constexpr std::pair<std::uint16_t, std::uint16_t> divmod(std::uint16_t num, std::uint16_t den) { return { num / den, num % den }; }
 		inline constexpr std::pair<std::uint32_t, std::uint32_t> divmod(std::uint32_t num, std::uint32_t den) { return { num / den, num % den }; }
@@ -1133,8 +1253,8 @@ namespace BiggerInts
 		template<std::uint64_t bits, bool sign> inline constexpr double_int<bits, sign> operator/(const double_int<bits, sign> &num, const double_int<bits, sign> &den) { return divmod(num, den).first; }
 		template<std::uint64_t bits, bool sign> inline constexpr double_int<bits, sign> operator%(const double_int<bits, sign> &num, const double_int<bits, sign> &den) { return divmod(num, den).second; }
 
-		SHORTERHAND_BINARY_FORMATTER(/ )
-			SHORTERHAND_BINARY_FORMATTER(%)
+		SHORTERHAND_BINARY_FORMATTER(/)
+		SHORTERHAND_BINARY_FORMATTER(%)
 
 		// -- cmp -- //
 
@@ -1146,22 +1266,27 @@ namespace BiggerInts
 			if constexpr (bits_2 > bits_1) return -cmp(b, a); // wolog let a be at least as large as b (in physical size)
 			else
 			{
+				if constexpr (sign)
+				{
+					const bool a_neg = detail::is_neg(a);
+					const bool b_neg = detail::is_neg(b);
+					if (a_neg ^ b_neg) return a_neg ? -1 : 1; // if they have different signs we know right away
+				}
+
 				if constexpr (bits_1 > bits_2)
 				{
 					std::uint64_t fill = 0;
 					if constexpr (sign) fill = detail::is_neg(b) ? 0xffffffffffffffffull : 0ull;
-					for (std::size_t i = bits_1 / 64; i-- > bits_2 / 64; ) if (a.blocks[i] != fill)
+					for (std::size_t i = bits_1 / 64; i-- > bits_2 / 64; ) if (a.blocks[i] != fill) // if a has higher magnitude than b we can tell (immediately for unsigned, or from sign bit for signed)
 					{
 						if constexpr (!sign) return 1;
 						else return detail::is_neg(a) ? -1 : 1;
 					}
 				}
-				for (std::size_t i = bits_2 / 64; i-- > 0;) if (a.blocks[i] != b.blocks[i])
-				{
-					if constexpr (!sign) return a.blocks[i] < b.blocks[i] ? -1 : 1;
-					else return a.blocks[i] < b.blocks[i] ? 1 : -1;
-				}
-				return 0;
+
+				for (std::size_t i = bits_2 / 64; i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i] ? -1 : 1; // otherwise base becision on first different block
+
+				return 0; // otherwise they're equal
 			}
 		}
 		template<std::uint64_t bits, bool sign>

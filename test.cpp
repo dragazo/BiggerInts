@@ -552,7 +552,68 @@ int main(int argc, const char *argv[])
 	}
 
 	{
-		long long vals[] = { 0, 2, 0, -4, 1, 233, -1646, -233, 453567, -447453, 35, 2 };
+		for (int i = 1; i < 102; ++i)
+		{
+			uint_t<256> v = i;
+			assert(v == v);
+			assert(!(v != v));
+			assert(v <= v);
+			assert(v >= v);
+			assert(!(v < v));
+			assert(!(v > v));
+
+			uint_t<256> vm1 = v;
+			--vm1;
+			uint_t<256> vp1 = v;
+			++vp1;
+
+			assert(vm1 < v);
+			assert(v < vp1);
+			assert(vm1 < vp1);
+			assert(vm1 <= v);
+			assert(v <= vp1);
+			assert(vm1 <= vp1);
+
+			assert(vp1 > v);
+			assert(v > vm1);
+			assert(vp1 > vm1);
+			assert(vp1 >= v);
+			assert(v >= vm1);
+			assert(vp1 >= vm1);
+		}
+		for (int i = -43; i < 56; ++i)
+		{
+			int_t<256> v = i;
+			assert(v == v);
+			assert(!(v != v));
+			assert(v <= v);
+			assert(v >= v);
+			assert(!(v < v));
+			assert(!(v > v));
+
+			int_t<256> vm1 = v;
+			--vm1;
+			int_t<256> vp1 = v;
+			++vp1;
+
+			assert(vm1 < v);
+			assert(v < vp1);
+			assert(vm1 < vp1);
+			assert(vm1 <= v);
+			assert(v <= vp1);
+			assert(vm1 <= vp1);
+
+			assert(vp1 > v);
+			assert(v > vm1);
+			assert(vp1 > vm1);
+			assert(vp1 >= v);
+			assert(v >= vm1);
+			assert(vp1 >= vm1);
+		}
+	}
+
+	{
+		long long vals[] = { 0, 2, -4, 1, 233, -1646, -233, 453567, -447453, 35, 2, -2, -1 };
 		constexpr int count = sizeof(vals) / sizeof(*vals);
 		for (int i = 0; i < count; ++i)
 			for (int j = 0; j < count; ++j)
@@ -560,6 +621,15 @@ int main(int argc, const char *argv[])
 				bigint sum = (bigint)vals[i] + (bigint)vals[j];
 				assert(sum == vals[i] + vals[j]);
 				assert(vals[i] + vals[j] == 0 ? sum.blocks.size() == 0 : sum.blocks.size() == 1);
+				assert(sum <= sum);
+				assert(sum >= sum);
+				assert(sum == sum);
+				assert(!(sum < sum));
+				assert(!(sum > sum));
+				assert(sum < sum + 1);
+				assert(sum + 1 > sum);
+				assert(sum > sum - 1);
+				assert(sum - 1 < sum);
 
 				bigint notsum = ~sum;
 				assert(notsum == -(vals[i] + vals[j]) - 1);
@@ -578,6 +648,13 @@ int main(int argc, const char *argv[])
 				bigint prod = (bigint)vals[i] * (bigint)vals[j];
 				assert(prod == vals[i] * vals[j]);
 				assert(vals[i] * vals[j] == 0 ? prod.blocks.size() == 0 : prod.blocks.size() == 1);
+
+				if (vals[j] != 0)
+				{
+					bigint quo = (bigint)vals[i] / (bigint)vals[j];
+					assert(quo == vals[i] / vals[j]);
+					assert(vals[i] / vals[j] == 0 ? quo.blocks.size() == 0 : quo.blocks.size() == 1);
+				}
 			}
 
 		{
