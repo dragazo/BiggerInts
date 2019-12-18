@@ -546,6 +546,7 @@ namespace BiggerInts
 		public: // -- static utilities -- //
 
 			friend std::istream &operator>>(std::istream&, bigint&);
+			friend bigint _pow(bigint, const bigint&);
 
 			// attempts to parse the string into an integer value - returns true on successful parse.
 			// base must be 10 (dec), 16 (hex), 8 (oct), or 0 to automatically determine base from C-style prefix in str.
@@ -571,6 +572,10 @@ namespace BiggerInts
 				if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string");
 				return res;
 			}
+
+			// computes the result of raising a to the power of b
+			static bigint pow(const bigint &a, const bigint &b) { return _pow(a, b); }
+			static bigint pow(bigint &&a, const bigint &b) { return _pow(std::move(a), b); }
 		};
 
 		// -- bigint utility definitions -- //
@@ -1241,8 +1246,13 @@ namespace BiggerInts
 
 		SHORTERHAND_BINARY_FORMATTER(*)
 
-			inline bigint &operator*=(bigint &a, const bigint &b) { auto temp = std::move(a) * b; a = std::move(temp); return a; }
-			inline bigint &operator*=(bigint &a, bigint &&b) { auto temp = std::move(a) * std::move(b); a = std::move(temp); return a; }
+		inline bigint &operator*=(bigint &a, const bigint &b)
+		{
+			if (&a != &b) a = std::move(a) * b;
+			else a = a * b;
+			return a;
+		}
+		inline bigint &operator*=(bigint &a, bigint &&b) { a = std::move(a) * std::move(b); return a; }
 
 		template<std::uint64_t bits, bool sign>
 		constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { a = a * b; return a; }
@@ -1364,11 +1374,21 @@ namespace BiggerInts
 		inline bigint operator%(const bigint &num, bigint &&den) { return detail::divmod(num, std::move(den)).second; }
 		inline bigint operator%(bigint &&num, bigint &&den) { return detail::divmod(std::move(num), std::move(den)).second; }
 
-		inline bigint &operator/=(bigint &num, const bigint &den) { auto temp = std::move(num) / den; num = std::move(temp); return num; }
-		inline bigint &operator/=(bigint &num, bigint &&den) { auto temp = std::move(num) / std::move(den); num = std::move(temp); return num; }
+		inline bigint &operator/=(bigint &num, const bigint &den)
+		{
+			if (&num != &den) num = std::move(num) / den;
+			else num = num / den;
+			return num;
+		}
+		inline bigint &operator/=(bigint &num, bigint &&den) { num = std::move(num) / std::move(den); return num; }
 
-		inline bigint &operator%=(bigint &num, const bigint &den) { auto temp = std::move(num) % den; num = std::move(temp); return num; }
-		inline bigint &operator%=(bigint &num, bigint &&den) { auto temp = std::move(num) % std::move(den); num = std::move(temp); return num; }
+		inline bigint &operator%=(bigint &num, const bigint &den)
+		{
+			if (&num != &den) num = std::move(num) % den;
+			else num = num % den;
+			return num;
+		}
+		inline bigint &operator%=(bigint &num, bigint &&den) { num = std::move(num) % std::move(den); return num; }
 
 		inline constexpr std::pair<std::uint8_t, std::uint8_t> divmod(std::uint8_t num, std::uint8_t den) { return { num / den, num % den }; }
 		inline constexpr std::pair<std::uint16_t, std::uint16_t> divmod(std::uint16_t num, std::uint16_t den) { return { num / den, num % den }; }
@@ -1964,6 +1984,24 @@ namespace BiggerInts
 		template<std::uint64_t bits>
 		std::istream &operator>>(std::istream &istr, double_int<bits, true> &val) { parse_signed(istr, val); return istr; }
 		inline std::istream &operator>>(std::istream &istr, bigint &val) { parse_signed(istr, val); return istr; }
+
+		// -- misc functions -- //
+
+		inline bigint _pow(bigint a, const bigint &b) // pass by value is intentional
+		{
+			if (detail::is_neg(b)) return {}; // if exponent is negative just return 0
+
+			bigint res = 1;
+			std::uint64_t high_bit = highest_set_bit(b);
+
+			for (std::uint64_t bit = 0; bit <= high_bit+1; ++bit)
+			{
+				if (detail::bit_test(b, bit)) res *= a;
+				a *= a;
+			}
+
+			return res;
+		}
 	}
 }
 

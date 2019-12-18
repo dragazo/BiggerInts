@@ -33,7 +33,7 @@ std::string tostr(const Args &...args)
 }
 
 template<typename BinaryFunction>
-void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2, std::size_t count_3, BinaryFunction f)
+void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2, std::size_t count_3, std::size_t count_4, BinaryFunction f)
 {
 	{
 		uint_t<128> vals[] =
@@ -68,7 +68,43 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 				dd = f(val2, val2);
 			}
 		}
-		t_end(name << " unsigned 128", count_1);
+		t_end("1) " << name << " unsigned 128", count_1);
+	}
+
+	{
+		bigint vals[] =
+		{
+			bigint::parse("164953864532146553885641326541323564132"),
+			bigint::parse("68573958787958483948687979685743988795"),
+			bigint::parse("47785319425432789132452387667540040594"),
+			bigint::parse("62641345234867594511231243576678624112"),
+			bigint::parse("12642723264275675264211264237286172641"),
+			bigint::parse("41672765971459452836324591059442640942"),
+			bigint::parse("46176276219426832272141594256267216412"),
+			bigint::parse("16126745353512798654214787864567825452"),
+			bigint::parse("13786541237897643215487675429731824613"),
+			bigint::parse("45389783215348783514264316267678795642"),
+			bigint::parse("26461343345768768645949213234357678665"),
+			bigint::parse("45676597896543534326162612343537367866"),
+			bigint::parse("16435738689456523313264567898883765642"),
+			bigint::parse("46567383388656261334357573838366565421"),
+		};
+
+		bigint val2 = bigint::parse("165798541236525214");
+		decltype(f(vals[0], vals[0])) dd;
+
+		t_start;
+		for (std::size_t i = 0; i < count_1; ++i)
+		{
+			for (const auto &v : vals)
+			{
+				dd = f(v, val2);
+				dd = f(val2, v);
+				dd = f(v, v);
+				dd = f(val2, val2);
+			}
+		}
+		t_end("1) " << name << " bigint", count_1);
 	}
 
 	{
@@ -104,7 +140,7 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 				dd = f(val2, val2);
 			}
 		}
-		t_end(name << " unsigned 256", count_2);
+		t_end("2) " << name << " unsigned 256", count_2);
 	}
 
 	{
@@ -140,7 +176,43 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 				dd = f(val2, val2);
 			}
 		}
-		t_end(name << " unsigned 8192 (small)", count_3);
+		t_end("2) " << name << " unsigned 8192 (small)", count_3);
+	}
+
+	{
+		bigint vals[] =
+		{
+			bigint::parse("16495386453214655388564132657894532123546789897856532123548786534241323564132"),
+			bigint::parse("68573958787958483948687979685743456879789253125456795321234537897865149088795"),
+			bigint::parse("47785319425432789132452387662354568686531231234567898998686525252521750040594"),
+			bigint::parse("62641345234867595653789352121111040400456054511231243235464748687576678624112"),
+			bigint::parse("12642723264275606435798655323342606031302620024626783175264211264237286172641"),
+			bigint::parse("41672765971459452836324591059406343537667837237611632347685660909991442640942"),
+			bigint::parse("46176276219426832272141594256267006162343037603776858790046132642672704216412"),
+			bigint::parse("16126745353512706456790768664624426526567679254020425698654214787864567825452"),
+			bigint::parse("13786541237897643215480666435034357737389796460345034303430457675429731824613"),
+			bigint::parse("45389783215348783514060649676056783783378666546506443031332264316267678795642"),
+			bigint::parse("26461343345768768645949213246533037502642462567285494136406726534234357678665"),
+			bigint::parse("45676597896543534326162612343506645726780246243623123126452738607954037367866"),
+			bigint::parse("16435738689456523313264560646727382642602642564253728672940256457898883765642"),
+			bigint::parse("46567383388656261334357573830646507628607249504146296456425675972608366565421"),
+		};
+
+		bigint val2 = bigint::parse("16579862451765276262462456641541236525214");
+		decltype(f(vals[0], vals[0])) dd;
+
+		t_start;
+		for (std::size_t i = 0; i < count_4; ++i)
+		{
+			for (const auto &v : vals)
+			{
+				dd = f(v, val2);
+				dd = f(val2, v);
+				dd = f(v, v);
+				dd = f(val2, val2);
+			}
+		}
+		t_end("2) " << name << " bigint", count_4);
 	}
 
 	std::cerr << '\n';
@@ -394,12 +466,19 @@ int main(int argc, const char *argv[])
 
 	{
 		uint_t<256> temp;
+		bigint big_temp;
 
 		assert(!uint_t<256>::try_parse(temp, "0x764"));
 		assert(!uint_t<256>::try_parse(temp, "0x764", 10));
 		assert(!uint_t<256>::try_parse(temp, "0x764", 8));
 		assert(!uint_t<256>::try_parse(temp, "0x764", 16));
 		assert(uint_t<256>::try_parse(temp, "0x764", 0));
+
+		assert(!bigint::try_parse(big_temp, "0x764"));
+		assert(!bigint::try_parse(big_temp, "0x764", 10));
+		assert(!bigint::try_parse(big_temp, "0x764", 8));
+		assert(!bigint::try_parse(big_temp, "0x764", 16));
+		assert(bigint::try_parse(big_temp, "0x764", 0));
 	}
 
 	{
@@ -421,6 +500,9 @@ int main(int argc, const char *argv[])
 			"6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042000",
 			"6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048"
 		};
+		const char *bigstr = "-58375738281737588279837147284739847598236414275903469456726347213103494759684960785976894576983754826435876982739387450956487904879065879047659834598264827454587609"
+			"239859698657983479286431823749275039865490658759768596874957698345876438726347263598375469587698796587984769839827439028746598475684509845024376456890783984759834769846"
+			"2938490345903845901798179038356859708045892374298734836938403943756845982379824983745984576509863984759826429374938474985675467348652984597659856798346598275876984576893";
 
 		uint_t<512> u;
 		bigint b;
@@ -451,6 +533,9 @@ int main(int argc, const char *argv[])
 		assert(b.blocks[6] == 1475739525896764129);
 		assert(b.blocks[7] == 92233720368547758);
 		assert(tostr(b) == strs[0]);
+
+		b = bigint::parse(bigstr);
+		assert(tostr(b) == bigstr);
 	}
 
 	// overflow parsing tests
@@ -772,10 +857,44 @@ int main(int argc, const char *argv[])
 		}
 	}
 	
+	{
+		assert(tostr(bigint::parse("12") * bigint::parse("12")) == "144");
+		assert(tostr(bigint::parse("-12") * bigint::parse("12")) == "-144");
+		assert(tostr(bigint::parse("12") * bigint::parse("-12")) == "-144");
+		assert(tostr(bigint::parse("-12") * bigint::parse("-12")) == "144");
+
+		bigint v = 12;
+		v *= v;
+		assert(v == 144);
+
+		v = -12;
+		v *= v;
+		assert(v == 144);
+	}
+
+	{
+		assert(tostr(bigint::pow(12, -1)) == "0");
+		assert(tostr(bigint::pow(12, 0)) == "1");
+		assert(tostr(bigint::pow(12, 1)) == "12");
+		assert(tostr(bigint::pow(12, 2)) == "144");
+		assert(tostr(bigint::pow(12, 3)) == "1728");
+		assert(tostr(bigint::pow(12, 4)) == "20736");
+
+		assert(tostr(bigint::pow(-12, -1)) == "0");
+		assert(tostr(bigint::pow(-12, 0)) == "1");
+		assert(tostr(bigint::pow(-12, 1)) == "-12");
+		assert(tostr(bigint::pow(-12, 2)) == "144");
+		assert(tostr(bigint::pow(-12, 3)) == "-1728");
+		assert(tostr(bigint::pow(-12, 4)) == "20736");
+
+		assert(tostr(bigint::pow(122, 32)) == "5801156497853265440881973185035019503869198362251315125887713673216");
+		assert(tostr(bigint::pow(56, 73)) == "41469229998734605907229666533990439080884762393847798172038084645287681671512979662987869210144861737361911662097025032274313216");
+	}
+
 	// -- benchmarks -- //
 
-	benchmark_binary("divmod  ", 40000, 20000, 1000, [](const auto &a, const auto &b) { return detail::divmod(a, b); });
-	benchmark_binary("multiply", 100000, 20000, 1000, [](const auto &a, const auto &b) { return a * b; });
+	benchmark_binary("divmod  ", 40000, 20000, 1000, 5000, [](const auto &a, const auto &b) { return detail::divmod(a, b); });
+	benchmark_binary("multiply", 100000, 20000, 1000, 5000, [](const auto &a, const auto &b) { return a * b; });
 
 	// -- all tests completed -- //
 
