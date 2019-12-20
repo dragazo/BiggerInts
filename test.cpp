@@ -987,6 +987,7 @@ int main(int argc, const char *argv[])
 		bigint v = bigint::parse("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16);
 		bigint r = v * v;
 		assert(tostr(r) == "1026301351570233739499293428424157827113862320509474868877723027253195088579758740627615722253086934881590063514230345951830442386318246187269187562628311952630251852968692235997360173760639550065418089580517919902935726984364421732731351192069777176001110091235222448929542559681760328631249946802584338006151524151805763498018141131455523556616803713025");
+		uint_t<1024> v1024;
 
 		const char *strs[] = 
 		{
@@ -1021,6 +1022,14 @@ int main(int argc, const char *argv[])
 			assert(tostr(std::hex, v) == strs[i]);
 			v *= v;
 			assert(tostr(v) == ans[i]);
+		}
+
+		for (std::size_t i = 0; i < count; ++i)
+		{
+			uint_t<1024>::parse(v1024, strs[i], 16);
+			assert(tostr(std::hex, v1024) == strs[i]);
+			v1024 *= v1024;
+			assert(tostr(v1024) == ans[i]);
 		}
 	}
 

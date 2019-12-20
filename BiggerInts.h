@@ -1199,8 +1199,13 @@ namespace BiggerInts
 						for (std::size_t k = j + 1; k < bits / 64 && !++temp_1.blocks[k]; ++k);
 					}
 				}
-				res += temp_1;           // add up all the partial word-based multiplication (think the adding step at the end of long multiplication)
-				temp_1.blocks[i] = 0ull; // clear this position in temp_1 so it doesn't affect the next pass (will be ignored from here on out) (the understood zeroes in long multiplication partial results)
+				// add up all the partial word-based multiplication (think the adding step at the end of long multiplication)
+				std::uint64_t carry = 0;
+				for (std::size_t j = i; j < bits / 64; ++j)
+				{
+					std::uint64_t v = temp_1.blocks[j] + carry;
+					carry = (res.blocks[j] += v) < v || v < carry;
+				}
 			}
 			return res;
 		}
