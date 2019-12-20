@@ -338,13 +338,13 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 	std::cerr << '\n';
 }
 
-int main(int argc, const char *argv[])
+int main()
 {
-	assert(detail::_mul_u64(0, 0) == std::make_pair(0ull, 0ull));
-	assert(detail::_mul_u64(34346, 0) == std::make_pair(0ull, 0ull));
-	assert(detail::_mul_u64(0, 4564657) == std::make_pair(0ull, 0ull));
-	assert(detail::_mul_u64(3546482324346, 45654513154657) == std::make_pair(3576792889872885050ull, 8777317ull));
-	assert(detail::_mul_u64(18446744073709551615, 18446744073709551615) == std::make_pair(1ull, 18446744073709551614ull));
+	assert(detail::_mul_u64(0 COMMA 0) == std::make_pair<std::uint64_t COMMA std::uint64_t>(0ull COMMA 0ull));
+	assert(detail::_mul_u64(34346 COMMA 0) == std::make_pair<std::uint64_t COMMA std::uint64_t>(0ull COMMA 0ull));
+	assert(detail::_mul_u64(0 COMMA 4564657) == std::make_pair<std::uint64_t COMMA std::uint64_t>(0ull COMMA 0ull));
+	assert(detail::_mul_u64(3546482324346ull COMMA 45654513154657ull) == std::make_pair<std::uint64_t COMMA std::uint64_t>(3576792889872885050ull COMMA 8777317ull));
+	assert(detail::_mul_u64(18446744073709551615ull COMMA 18446744073709551615ull) == std::make_pair<std::uint64_t COMMA std::uint64_t>(1ull COMMA 18446744073709551614ull));
 
 	assert(detail::highest_set_bit(0) == 0);
 	for (std::size_t i = 0; i < 64; ++i)
@@ -634,14 +634,14 @@ int main(int argc, const char *argv[])
 		bigint b;
 
 		u = uint_t<512>::parse(strs[0]);
-		assert(u.blocks[0] == 5165088340638674452);
-		assert(u.blocks[1] == 1475739525896764129);
-		assert(u.blocks[2] == 16233134784864405422);
-		assert(u.blocks[3] == 12543785970122495098);
-		assert(u.blocks[4] == 8854437155380584775);
-		assert(u.blocks[5] == 5165088340638674452);
-		assert(u.blocks[6] == 1475739525896764129);
-		assert(u.blocks[7] == 92233720368547758);
+		assert(u.blocks[0] == 5165088340638674452ull);
+		assert(u.blocks[1] == 1475739525896764129ull);
+		assert(u.blocks[2] == 16233134784864405422ull);
+		assert(u.blocks[3] == 12543785970122495098ull);
+		assert(u.blocks[4] == 8854437155380584775ull);
+		assert(u.blocks[5] == 5165088340638674452ull);
+		assert(u.blocks[6] == 1475739525896764129ull);
+		assert(u.blocks[7] == 92233720368547758ull);
 		assert(tostr(u) == strs[0]);
 		u *= 100ull;
 		assert(tostr(u) == strs[1]);
@@ -650,14 +650,14 @@ int main(int argc, const char *argv[])
 
 		b = bigint::parse(strs[0]);
 		assert(b.blocks.size() == 8);
-		assert(b.blocks[0] == 5165088340638674452);
-		assert(b.blocks[1] == 1475739525896764129);
-		assert(b.blocks[2] == 16233134784864405422);
-		assert(b.blocks[3] == 12543785970122495098);
-		assert(b.blocks[4] == 8854437155380584775);
-		assert(b.blocks[5] == 5165088340638674452);
-		assert(b.blocks[6] == 1475739525896764129);
-		assert(b.blocks[7] == 92233720368547758);
+		assert(b.blocks[0] == 5165088340638674452ull);
+		assert(b.blocks[1] == 1475739525896764129ull);
+		assert(b.blocks[2] == 16233134784864405422ull);
+		assert(b.blocks[3] == 12543785970122495098ull);
+		assert(b.blocks[4] == 8854437155380584775ull);
+		assert(b.blocks[5] == 5165088340638674452ull);
+		assert(b.blocks[6] == 1475739525896764129ull);
+		assert(b.blocks[7] == 92233720368547758ull);
 		assert(tostr(b) == strs[0]);
 
 		b = bigint::parse(bigstr);

@@ -321,7 +321,7 @@ namespace BiggerInts
 
 		public: // -- core -- //
 
-			constexpr double_int() noexcept = default;
+			constexpr double_int() noexcept : blocks{} {};
 
 			constexpr double_int(const double_int&) noexcept = default;
 			constexpr double_int &operator=(const double_int&) noexcept = default;
@@ -1607,7 +1607,7 @@ namespace BiggerInts
 
 		inline bool operator==(const bigint &a, long long val) noexcept
 		{
-			return val == 0 && a.blocks.empty() || a.blocks.size() == 1 && a.blocks[0] == val;
+			return (val == 0 && a.blocks.empty()) || (a.blocks.size() == 1 && a.blocks[0] == (unsigned long long)val);
 		}
 		inline bool operator==(const bigint &a, long val) noexcept { return a == (long long)val; }
 		inline bool operator==(const bigint &a, int val) noexcept { return a == (long long)val; }
@@ -1620,7 +1620,7 @@ namespace BiggerInts
 
 		inline bool operator==(const bigint &a, unsigned long long val) noexcept
 		{
-			return val == 0 && a.blocks.empty() || a.blocks[0] == val && (a.blocks.size() == 1 || a.blocks.size() == 2 && a.blocks[1] == 0);
+			return (val == 0 && a.blocks.empty()) || (a.blocks.size() == 1 && a.blocks[0] == val) || (a.blocks.size() == 2 && a.blocks[0] == val && a.blocks[1] == 0);
 		}
 		inline bool operator==(const bigint &a, unsigned long val) noexcept { return a == (unsigned long long)val; }
 		inline bool operator==(const bigint &a, unsigned int val) noexcept { return a == (unsigned long long)val; }
@@ -1957,7 +1957,7 @@ namespace BiggerInts
 					if (num_digits < 19) break;
 				}
 
-				if constexpr (!std::is_same_v<std::decay_t<T>, bigint>) val = (decltype(val))bigval; // copy low half of bigval to result
+				if constexpr (!std::is_same_v<std::decay_t<T>, bigint>) val = (T)bigval; // copy low half of bigval to result
 				else val = std::move(bigval);
 			}
 			else // if no base specified, determine it from the suffix
