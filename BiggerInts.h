@@ -448,10 +448,15 @@ namespace BiggerInts
 				return ss.eof(); // we need to have parsed the entire string
 			}
 			// as try_parse() but throws std::invalid_argument on failure
+			static void parse(double_int &res, std::string_view str, int base = 10)
+			{
+				if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string");
+			}
+			// as parse() but allocates a new object to hold the result (less efficient if you're just going to assign it to a variable)
 			static double_int parse(std::string_view str, int base = 10)
 			{
 				double_int res;
-				if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string");
+				parse(res, str, base);
 				return res;
 			}
 		};
@@ -585,10 +590,15 @@ namespace BiggerInts
 				return ss.eof(); // we need to have parsed the entire string
 			}
 			// as try_parse() but throws std::invalid_argument on failure
+			static void parse(bigint &res, std::string_view str, int base = 10)
+			{
+				if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string");
+			}
+			// as parse() but allocates a new object to hold the result (less efficient if you're just going to assign it to a variable)
 			static bigint parse(std::string_view str, int base = 10)
 			{
 				bigint res;
-				if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string");
+				parse(res, str, base);
 				return res;
 			}
 
@@ -1196,28 +1206,37 @@ namespace BiggerInts
 		}
 		inline bigint _multiply_positive(const bigint *a, const bigint *b)
 		{
-			if (a->blocks.empty() || b->blocks.empty()) return {}; // if either value is zero just return zero immediately (so  we don't have to deal with empty array cases)
+			const std::size_t a_size = a->blocks.size();
+			const std::size_t b_size = b->blocks.size();
 
-			std::uint64_t b_high_bit = highest_set_bit(*b);
+			bigint res, temp_1, temp_2; // temp_1 will hold low halves of each 64-bit product, temp_2 holds the corresponding high overflows
 
-			if (std::uint64_t a_high_bit = highest_set_bit(*a); a_high_bit < b_high_bit)
+			res.blocks.reserve(a_size + b_size);
+			temp_1.blocks.resize(a_size + b_size + 1, 0ull);
+			temp_2.blocks.resize(a_size + b_size + 1, 0ull);
+
+			for (std::size_t i = 0; i < a_size; ++i) // loop through each word in a
 			{
-				std::swap(a, b);
-				b_high_bit = a_high_bit;
+				// here we construct temp_1, which is the value of a->blocks[i] * b, scaled by i words (think long multiplication from grade school)
+				for (std::size_t j = 0; j < b_size; ++j)
+				{
+					auto p = detail::_mul_u64(a->blocks[i], b->blocks[j]);
+					temp_1.blocks[j + i] = p.first;
+					temp_2.blocks[j + i] = p.second;
+				}
+				// add each overflow to the next-higher word (think carry from long multiplication)
+				for (std::size_t j = 1; j <= b_size; ++j)
+				{
+					if ((temp_1.blocks[j + i] += temp_2.blocks[j + i - 1]) < temp_2.blocks[j + i - 1]) // if the addition overflows we propagate a 1 until it fits somewhere
+					{
+						for (std::size_t k = j + i + 1; !++temp_1.blocks[k]; ++k);
+					}
+				}
+
+				res += temp_1;           // add up all the partial word-based multiplication (think the adding step at the end of long multiplication)
+				temp_1.blocks[i] = 0ull; // clear this position in temp_1 so it doesn't affect the next pass (will be ignored from here on out) (the understood zeroes in long multiplication partial results)
 			}
 
-			bigint res, _a;
-			res.blocks.reserve(a->blocks.size() + a->blocks.size());
-			_a.blocks.reserve(a->blocks.size() + a->blocks.size());
-			_a = *a;
-			std::size_t shift_count = 0;
-			for (std::uint64_t bit = 0; bit <= b_high_bit; ++bit, ++shift_count)
-				if (detail::bit_test_in_bounds_nonzero(*b, bit))
-				{
-					_a <<= shift_count;
-					shift_count = 0;
-					res += _a;
-				}
 			return res;
 		}
 		template<typename U, typename V, std::enable_if_t<std::is_same_v<std::decay_t<U>, bigint> && std::is_same_v<std::decay_t<V>, bigint>, int> = 0>
