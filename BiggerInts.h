@@ -1209,49 +1209,32 @@ namespace BiggerInts
 			}
 			return res;
 		}
-		inline bigint _multiply_positive(const bigint *a, const bigint *b)
+		inline bigint _multiply_positive(const bigint &a, const bigint &b)
 		{
-			if (a->blocks.size() < b->blocks.size()) std::swap(a, b); // wolog let b be smaller than a (physical size) (this reduces memory usage in the next step)
-
-			const std::size_t a_size = a->blocks.size();
-			const std::size_t b_size = b->blocks.size();
+			const std::size_t a_size = a.blocks.size();
+			const std::size_t b_size = b.blocks.size();
 
 			bigint res; // the final result object - bastardized for efficiency right now
-			res.blocks.resize((a_size + b_size) + (b_size + 1) + b_size, 0ull); // make a buffer large enough to hold the computed product and some working space for calculating it
+			res.blocks.resize(a_size + b_size, 0ull); // allocate all the space we'll need, zero initialized for the add logic later
 
-			// extract addresses to the starts of our working space areas
-			std::uint64_t *const temp_1 = &res.blocks[a_size + b_size];                  // array of size b_size + 1
-			std::uint64_t *const temp_2 = &res.blocks[(a_size + b_size) + (b_size + 1)]; // array of size b_size
-
-			for (std::size_t i = 0; i < a_size; ++i) // loop through each word in a
+			for (std::size_t i = 0; i < a_size; ++i) // loop through each block in a
 			{
 				// here we construct temp_1, which is the value of a->blocks[i] * b, scaled by i words (think long multiplication from grade school)
 				for (std::size_t j = 0; j < b_size; ++j)
 				{
-					auto p = detail::_mul_u64(a->blocks[i], b->blocks[j]);
-					temp_1[j] = p.first;
-					temp_2[j] = p.second;
-				}
-				temp_1[b_size] = 0;
-				// add each overflow to the next-higher word (think carry from long multiplication)
-				for (std::size_t j = 1; j <= b_size; ++j)
-				{
-					if ((temp_1[j] += temp_2[j - 1]) < temp_2[j - 1]) // if the addition overflows we propagate a 1 until it fits somewhere
+					auto p = detail::_mul_u64(a.blocks[i], b.blocks[j]); // compute the product with this block from b
+					if ((res.blocks[j + i] += p.first) < p.first) // add the low half to the corresponding block in res - overflow propagates a carry up to higher blocks
 					{
-						for (std::size_t k = j + 1; !++temp_1[k]; ++k);
+						for (std::size_t k = j + i + 1; !++res.blocks[k]; ++k);
 					}
-				}
-				// add up all the partial word-based multiplications (think the adding step at the end of long multiplication)
-				std::uint64_t carry = 0;
-				for (std::size_t j = 0; j <= b_size; ++j)
-				{
-					std::uint64_t v = temp_1[j] + carry;
-					carry = (res.blocks[j + i] += v) < v || v < carry;
+					if ((res.blocks[j + i + 1] += p.second) < p.second) // add the high half to the next block in res - overflow propagates a carry up to higher blocks
+					{
+						for (std::size_t k = j + i + 2; !++res.blocks[k]; ++k);
+					}
 				}
 			}
 
-			res.blocks.resize(a_size + b_size); // chop off all the working space gibberish we left behind (truncate to just the calculated result)
-			detail::_collapse(res);             // we need to perform one collapse operation on the finished result to put it into a valid state
+			detail::_collapse(res); // we need to perform one collapse operation on the finished result to put it into a valid state
 			return res;
 		}
 		template<typename U, typename V, std::enable_if_t<std::is_same_v<std::decay_t<U>, bigint> && std::is_same_v<std::decay_t<V>, bigint>, int> = 0>
@@ -1267,14 +1250,14 @@ namespace BiggerInts
 				detail::make_neg(a_cpy);
 				detail::make_neg(b_cpy);
 
-				return detail::_multiply_positive(&a_cpy, &b_cpy);
+				return detail::_multiply_positive(a_cpy, b_cpy);
 			}
 			else if (a_neg)
 			{
 				bigint a_cpy = std::forward<U>(a);
 				detail::make_neg(a_cpy);
 
-				bigint res = detail::_multiply_positive(&a_cpy, &b);
+				bigint res = detail::_multiply_positive(a_cpy, b);
 				detail::make_neg(res);
 				return res;
 			}
@@ -1283,11 +1266,11 @@ namespace BiggerInts
 				bigint b_cpy = std::forward<V>(b);
 				detail::make_neg(b_cpy);
 
-				bigint res = detail::_multiply_positive(&a, &b_cpy);
+				bigint res = detail::_multiply_positive(a, b_cpy);
 				detail::make_neg(res);
 				return res;
 			}
-			else return detail::_multiply_positive(&a, &b);
+			else return detail::_multiply_positive(a, b);
 		}
 
 		inline bigint operator*(const bigint &a, const bigint &b) { return detail::_multiply_unknown(a, b); }
