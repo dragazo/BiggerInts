@@ -1199,7 +1199,7 @@ namespace BiggerInts
 						for (std::size_t k = j + 1; k < bits / 64 && !++temp_1.blocks[k]; ++k);
 					}
 				}
-				// add up all the partial word-based multiplication (think the adding step at the end of long multiplication)
+				// add up all the partial word-based multiplications (think the adding step at the end of long multiplication)
 				std::uint64_t carry = 0;
 				for (std::size_t j = i; j < bits / 64; ++j)
 				{
@@ -1211,14 +1211,17 @@ namespace BiggerInts
 		}
 		inline bigint _multiply_positive(const bigint *a, const bigint *b)
 		{
+			if (a->blocks.size() < b->blocks.size()) std::swap(a, b); // wolog let b be smaller than a (physical size) (this reduces memory usage in the next step)
+
 			const std::size_t a_size = a->blocks.size();
 			const std::size_t b_size = b->blocks.size();
 
-			bigint res, temp_1, temp_2; // temp_1 will hold low halves of each 64-bit product, temp_2 holds the corresponding high overflows
+			bigint res; // the final result object - bastardized for efficiency right now
+			res.blocks.resize((a_size + b_size) + (b_size + 1) + b_size, 0ull); // make a buffer large enough to hold the computed product and some working space for calculating it
 
-			res.blocks.reserve(a_size + b_size);
-			temp_1.blocks.resize(a_size + b_size + 1, 0ull);
-			temp_2.blocks.resize(a_size + b_size + 1, 0ull);
+			// extract addresses to the starts of our working space areas
+			std::uint64_t *const temp_1 = &res.blocks[a_size + b_size];                  // array of size b_size + 1
+			std::uint64_t *const temp_2 = &res.blocks[(a_size + b_size) + (b_size + 1)]; // array of size b_size
 
 			for (std::size_t i = 0; i < a_size; ++i) // loop through each word in a
 			{
@@ -1226,22 +1229,29 @@ namespace BiggerInts
 				for (std::size_t j = 0; j < b_size; ++j)
 				{
 					auto p = detail::_mul_u64(a->blocks[i], b->blocks[j]);
-					temp_1.blocks[j + i] = p.first;
-					temp_2.blocks[j + i] = p.second;
+					temp_1[j] = p.first;
+					temp_2[j] = p.second;
 				}
+				temp_1[b_size] = 0;
 				// add each overflow to the next-higher word (think carry from long multiplication)
 				for (std::size_t j = 1; j <= b_size; ++j)
 				{
-					if ((temp_1.blocks[j + i] += temp_2.blocks[j + i - 1]) < temp_2.blocks[j + i - 1]) // if the addition overflows we propagate a 1 until it fits somewhere
+					if ((temp_1[j] += temp_2[j - 1]) < temp_2[j - 1]) // if the addition overflows we propagate a 1 until it fits somewhere
 					{
-						for (std::size_t k = j + i + 1; !++temp_1.blocks[k]; ++k);
+						for (std::size_t k = j + 1; !++temp_1[k]; ++k);
 					}
 				}
-
-				res += temp_1;           // add up all the partial word-based multiplication (think the adding step at the end of long multiplication)
-				temp_1.blocks[i] = 0ull; // clear this position in temp_1 so it doesn't affect the next pass (will be ignored from here on out) (the understood zeroes in long multiplication partial results)
+				// add up all the partial word-based multiplications (think the adding step at the end of long multiplication)
+				std::uint64_t carry = 0;
+				for (std::size_t j = 0; j <= b_size; ++j)
+				{
+					std::uint64_t v = temp_1[j] + carry;
+					carry = (res.blocks[j + i] += v) < v || v < carry;
+				}
 			}
 
+			res.blocks.resize(a_size + b_size); // chop off all the working space gibberish we left behind (truncate to just the calculated result)
+			detail::_collapse(res);             // we need to perform one collapse operation on the finished result to put it into a valid state
 			return res;
 		}
 		template<typename U, typename V, std::enable_if_t<std::is_same_v<std::decay_t<U>, bigint> && std::is_same_v<std::decay_t<V>, bigint>, int> = 0>
