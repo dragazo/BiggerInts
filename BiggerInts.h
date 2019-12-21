@@ -1179,33 +1179,26 @@ namespace BiggerInts
 		// -- mul -- //
 
 		template<std::uint64_t bits, bool sign>
-		constexpr double_int<bits, sign> _multiply(const double_int<bits, sign> *a, const double_int<bits, sign> *b) noexcept
+		constexpr double_int<bits, sign> _multiply(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept
 		{
-			double_int<bits, sign> res = 0ull, temp_1, temp_2; // temp_1 will hold low halves of each 64-bit product, temp_2 holds the corresponding high overflows
-			for (std::size_t i = 0; i < bits / 64; ++i) // loop through each word in a
+			double_int<bits, sign> res = 0ull; // the final result object - zero initialized for the add logic later
+
+			for (std::size_t i = 0; i < bits / 64; ++i) // loop through each block in a
 			{
 				// here we construct temp_1, which is the value of a->blocks[i] * b, scaled by i words (think long multiplication from grade school)
-				for (std::size_t j = i; j < bits / 64; ++j)
+				for (std::size_t j = i; j < bits / 64 - 1; ++j)
 				{
-					auto p = detail::_mul_u64(a->blocks[i], b->blocks[j - i]);
-					temp_1.blocks[j] = p.first;
-					temp_2.blocks[j] = p.second;
-				}
-				// add each overflow to the next-higher word (think carry from long multiplication)
-				for (std::size_t j = i + 1; j < bits / 64; ++j)
-				{
-					if ((temp_1.blocks[j] += temp_2.blocks[j - 1]) < temp_2.blocks[j - 1]) // if the addition overflows we propagate a 1 until it fits somewhere
+					auto p = detail::_mul_u64(a.blocks[i], b.blocks[j - i]); // compute the product with this block from b
+					if ((res.blocks[j] += p.first) < p.first)
 					{
-						for (std::size_t k = j + 1; k < bits / 64 && !++temp_1.blocks[k]; ++k);
+						for (std::size_t k = j + 1; k < bits / 64 && !++res.blocks[k]; ++k);
+					}
+					if ((res.blocks[j + 1] += p.second) < p.second)
+					{
+						for (std::size_t k = j + 2; k < bits / 64 && !++res.blocks[k]; ++k);
 					}
 				}
-				// add up all the partial word-based multiplications (think the adding step at the end of long multiplication)
-				std::uint64_t carry = 0;
-				for (std::size_t j = i; j < bits / 64; ++j)
-				{
-					std::uint64_t v = temp_1.blocks[j] + carry;
-					carry = (res.blocks[j] += v) < v || v < carry;
-				}
+				res.blocks[bits / 64 - 1] += a.blocks[i] * b.blocks[bits / 64 - 1 - i]; // last iteration of the loop is special since it overflows the (finite) array
 			}
 			return res;
 		}
@@ -1279,7 +1272,7 @@ namespace BiggerInts
 		inline bigint operator*(bigint &&a, bigint &&b) { return detail::_multiply_unknown(std::move(a), std::move(b)); }
 
 		template<std::uint64_t bits, bool sign>
-		constexpr double_int<bits, sign> operator*(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { return detail::_multiply(&a, &b); }
+		constexpr double_int<bits, sign> operator*(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept { return detail::_multiply(a, b); }
 
 		SHORTERHAND_BINARY_FORMATTER(*)
 

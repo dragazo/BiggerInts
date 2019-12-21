@@ -36,6 +36,14 @@ constexpr bool benchmark_do_uint = true;
 constexpr bool benchmark_do_int = true;
 constexpr bool benchmark_do_bigint = true;
 
+volatile std::uint64_t dont_optimize_this_away = 0; // Kelek's breath, optimizers can really make benchmarking annoying
+
+void do_something(const BiggerInts::bigint &v) { dont_optimize_this_away += v.blocks.empty() ? 0ull : v.blocks[0]; }
+template<std::uint64_t bits, bool sign>
+void do_something(const BiggerInts::detail::double_int<bits, sign> &v) { dont_optimize_this_away += v.blocks[0]; }
+template<typename T>
+void do_something(const std::pair<T, T> &v) { do_something(v.first); do_something(v.second); }
+
 template<typename BinaryFunction>
 void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2, std::size_t count_3, std::size_t count_4, BinaryFunction f)
 {
@@ -67,10 +75,10 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 		{
 			for (const auto &v : vals)
 			{
-				dd = f(v, val2);
-				dd = f(val2, v);
-				dd = f(v, v);
-				dd = f(val2, val2);
+				dd = f(v, val2); do_something(dd);
+				dd = f(val2, v); do_something(dd);
+				dd = f(v, v); do_something(dd);
+				dd = f(val2, val2); do_something(dd);
 			}
 		}
 		t_end("1) " << name << " unsigned 128", 4 * count_1);
@@ -104,10 +112,10 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 		{
 			for (const auto &v : vals)
 			{
-				dd = f(v, val2);
-				dd = f(val2, v);
-				dd = f(v, v);
-				dd = f(val2, val2);
+				dd = f(v, val2); do_something(dd);
+				dd = f(val2, v); do_something(dd);
+				dd = f(v, v); do_something(dd);
+				dd = f(val2, val2); do_something(dd);
 			}
 		}
 		t_end("1) " << name << " signed 128", 4 * count_1);
@@ -141,10 +149,10 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 		{
 			for (const auto &v : vals)
 			{
-				dd = f(v, val2);
-				dd = f(val2, v);
-				dd = f(v, v);
-				dd = f(val2, val2);
+				dd = f(v, val2); do_something(dd);
+				dd = f(val2, v); do_something(dd);
+				dd = f(v, v); do_something(dd);
+				dd = f(val2, val2); do_something(dd);
 			}
 		}
 		t_end("1) " << name << " bigint", 4 * count_1);
@@ -178,10 +186,10 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 		{
 			for (const auto &v : vals)
 			{
-				dd = f(v, val2);
-				dd = f(val2, v);
-				dd = f(v, v);
-				dd = f(val2, val2);
+				dd = f(v, val2); do_something(dd);
+				dd = f(val2, v); do_something(dd);
+				dd = f(v, v); do_something(dd);
+				dd = f(val2, val2); do_something(dd);
 			}
 		}
 		t_end("2) " << name << " unsigned 256", 4 * count_2);
@@ -215,10 +223,10 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 		{
 			for (const auto &v : vals)
 			{
-				dd = f(v, val2);
-				dd = f(val2, v);
-				dd = f(v, v);
-				dd = f(val2, val2);
+				dd = f(v, val2); do_something(dd);
+				dd = f(val2, v); do_something(dd);
+				dd = f(v, v); do_something(dd);
+				dd = f(val2, val2); do_something(dd);
 			}
 		}
 		t_end("2) " << name << " signed 256", 4 * count_2);
@@ -252,10 +260,10 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 		{
 			for (const auto &v : vals)
 			{
-				dd = f(v, val2);
-				dd = f(val2, v);
-				dd = f(v, v);
-				dd = f(val2, val2);
+				dd = f(v, val2); do_something(dd);
+				dd = f(val2, v); do_something(dd);
+				dd = f(v, v); do_something(dd);
+				dd = f(val2, val2); do_something(dd);
 			}
 		}
 		t_end("2) " << name << " unsigned 8192 (small)", 4 * count_3);
@@ -289,10 +297,10 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 		{
 			for (const auto &v : vals)
 			{
-				dd = f(v, val2);
-				dd = f(val2, v);
-				dd = f(v, v);
-				dd = f(val2, val2);
+				dd = f(v, val2); do_something(dd);
+				dd = f(val2, v); do_something(dd);
+				dd = f(v, v); do_something(dd);
+				dd = f(val2, val2); do_something(dd);
 			}
 		}
 		t_end("2) " << name << " signed 8192 (small)", 4 * count_3);
@@ -326,10 +334,10 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 		{
 			for (const auto &v : vals)
 			{
-				dd = f(v, val2);
-				dd = f(val2, v);
-				dd = f(v, v);
-				dd = f(val2, val2);
+				dd = f(v, val2); do_something(dd);
+				dd = f(val2, v); do_something(dd);
+				dd = f(v, v); do_something(dd);
+				dd = f(val2, val2); do_something(dd);
 			}
 		}
 		t_end("2) " << name << " bigint (small)", 4 * count_4);
