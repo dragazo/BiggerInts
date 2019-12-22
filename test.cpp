@@ -1077,8 +1077,8 @@ int main()
 
 	// -- benchmarks -- //
 
-	benchmark_binary("divmod  ", 40000, 20000, 1000, 5000, [](const auto &a, const auto &b) { return detail::divmod(a, b); });
 	benchmark_binary("multiply", 100000, 20000, 1000, 5000, [](const auto &a, const auto &b) { return a * b; });
+	benchmark_binary("divmod  ", 40000, 20000, 1000, 5000, [](const auto &a, const auto &b) { return detail::divmod(a, b); });
 
 	// -- all tests completed -- //
 

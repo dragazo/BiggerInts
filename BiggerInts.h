@@ -119,9 +119,12 @@ namespace BiggerInts
 		// as _mul_u64() except is allowed to use faster, platform-specific intrinsics that might not be constexpr
 		inline std::pair<std::uint64_t, std::uint64_t> _mul_u64_fast(std::uint64_t a, std::uint64_t b) noexcept
 		{
-			#ifdef _MSC_VER
+			#if defined(_MSC_VER)
 			a = _umul128(a, b, &b);
 			return { a, b };
+			#elif defined(__GNUC__)
+			auto r = (__uint128_t)a * b;
+			return { (std::uint64_t)r, r >> 64 };
 			#else
 			return _mul_u64(a, b);
 			#endif
