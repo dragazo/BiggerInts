@@ -18,6 +18,11 @@
 #include <cctype>
 #include <vector>
 
+// msvc
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
 /*
 
 adds larger integer types:
@@ -92,6 +97,7 @@ namespace BiggerInts
 			return 0;
 		}
 
+		// computes the full (unsigned) product of a * b (first = low, second = high)
 		constexpr std::pair<std::uint64_t, std::uint64_t> _mul_u64(std::uint64_t a, std::uint64_t b) noexcept
 		{
 			std::uint64_t a_lo = (std::uint32_t)a;
@@ -109,6 +115,16 @@ namespace BiggerInts
 			if (std::uint64_t temp = mid << 32; (lo += temp) < temp) ++hi;
 
 			return { lo, hi };
+		}
+		// as _mul_u64() except is allowed to use faster, platform-specific intrinsics that might not be constexpr
+		inline std::pair<std::uint64_t, std::uint64_t> _mul_u64_fast(std::uint64_t a, std::uint64_t b) noexcept
+		{
+			#ifdef _MSC_VER
+			a = _umul128(a, b, &b);
+			return { a, b };
+			#else
+			return _mul_u64(a, b);
+			#endif
 		}
 
 		// -- helpers -- //
@@ -1188,7 +1204,7 @@ namespace BiggerInts
 				// here we construct temp_1, which is the value of a->blocks[i] * b, scaled by i words (think long multiplication from grade school)
 				for (std::size_t j = i; j < bits / 64 - 1; ++j)
 				{
-					auto p = detail::_mul_u64(a.blocks[i], b.blocks[j - i]); // compute the product with this block from b
+					auto p = detail::_mul_u64_fast(a.blocks[i], b.blocks[j - i]); // compute the product with this block from b
 					if ((res.blocks[j] += p.first) < p.first)
 					{
 						for (std::size_t k = j + 1; k < bits / 64 && !++res.blocks[k]; ++k);
@@ -1215,7 +1231,7 @@ namespace BiggerInts
 				// here we construct temp_1, which is the value of a->blocks[i] * b, scaled by i words (think long multiplication from grade school)
 				for (std::size_t j = 0; j < b_size; ++j)
 				{
-					auto p = detail::_mul_u64(a.blocks[i], b.blocks[j]); // compute the product with this block from b
+					auto p = detail::_mul_u64_fast(a.blocks[i], b.blocks[j]); // compute the product with this block from b
 					if ((res.blocks[j + i] += p.first) < p.first) // add the low half to the corresponding block in res - overflow propagates a carry up to higher blocks
 					{
 						for (std::size_t k = j + i + 1; !++res.blocks[k]; ++k);
