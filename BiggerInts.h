@@ -18,10 +18,34 @@
 #include <cctype>
 #include <vector>
 
-// msvc
+// detect compiler - msvc
 #ifdef _MSC_VER
 #include <intrin.h>
 #endif
+
+// detect arch bits
+#if _WIN32 || _WIN64
+
+#if _WIN64
+#define DRAGAZO_BIGGER_INTS_ARCHBIT 64
+#else
+#define DRAGAZO_BIGGER_INTS_ARCHBIT 32
+#endif
+
+#elif __GNUC__
+
+#if __x86_64__ || __ppc64__
+#define DRAGAZO_BIGGER_INTS_ARCHBIT 64
+#else
+#define DRAGAZO_BIGGER_INTS_ARCHBIT 32
+#endif
+
+#else
+
+#define DRAGAZO_BIGGER_INTS_ARCHBIT 64
+
+#endif
+
 
 /*
 
@@ -48,8 +72,6 @@ namespace BiggerInts
 		// however this _may_ have some overhead that would actually make it slower for smaller integer types.
 		// bit counts at or above this value will use the algorithm that minimizes the total number of shifts during divmod().
 		static inline constexpr std::uint64_t divmod_shift_count_thresh = 256;
-		// same as above but for multiplication.
-		static inline constexpr std::uint64_t multiply_shift_count_thresh = 512;
 
 		// --------------------------------
 		
@@ -119,12 +141,16 @@ namespace BiggerInts
 		// as _mul_u64() except is allowed to use faster, platform-specific intrinsics that might not be constexpr
 		inline std::pair<std::uint64_t, std::uint64_t> _mul_u64_fast(std::uint64_t a, std::uint64_t b) noexcept
 		{
-			#if defined(_MSC_VER)
-			a = _umul128(a, b, &b);
-			return { a, b };
-			#elif defined(__GNUC__)
-			auto r = (__uint128_t)a * b;
-			return { (std::uint64_t)r, r >> 64 };
+			#if DRAGAZO_BIGGER_INTS_ARCHBIT == 64
+				#if defined(_MSC_VER)
+				a = _umul128(a, b, &b);
+				return { a, b };
+				#elif defined(__GNUC__)
+				auto r = (__uint128_t)a * b;
+				return { (std::uint64_t)r, r >> 64 };
+				#else
+				return _mul_u64(a, b);
+				#endif
 			#else
 			return _mul_u64(a, b);
 			#endif
@@ -181,25 +207,27 @@ namespace BiggerInts
 				while (true)
 				{
 					++shift_count;
-					if (bit_test_unchecked(num, bit))
+					if (res_second_highest_bit + shift_count >= den_highest_bit)
+					{
+						res.second <<= shift_count;
+						res_second_highest_bit += shift_count;
+						shift_count = 0;
+
+						if (bit_test_unchecked(num, bit)) ++res.second.blocks[0];
+
+						if (!cmp_less_non_negative(res.second, den))
+						{
+							res.second -= den;
+							res_second_highest_bit = highest_set_bit(res.second);
+							bit_set_unchecked(res.first, bit);
+						}
+					}
+					else if (bit_test_unchecked(num, bit))
 					{
 						res.second <<= shift_count;
 						res_second_highest_bit += shift_count;
 						shift_count = 0;
 						++res.second.blocks[0];
-					}
-					else if (res_second_highest_bit + shift_count >= den_highest_bit)
-					{
-						res.second <<= shift_count;
-						res_second_highest_bit += shift_count;
-						shift_count = 0;
-					}
-
-					if (res.second >= den)
-					{
-						res.second -= den;
-						res_second_highest_bit = highest_set_bit(res.second);
-						bit_set_unchecked(res.first, bit);
 					}
 
 					if (bit-- == 0) break;
@@ -480,6 +508,9 @@ namespace BiggerInts
 			}
 		};
 
+		bigint _pow(bigint, const bigint&);
+		bigint _factorial(std::uint64_t);
+
 		// represents an arbitrarily large (signed) integer type in 2's complement
 		class bigint
 		{
@@ -589,7 +620,6 @@ namespace BiggerInts
 		public: // -- static utilities -- //
 
 			friend std::istream &operator>>(std::istream&, bigint&);
-			friend bigint _pow(bigint, const bigint&);
 
 			// attempts to parse the string into an integer value - returns true on successful parse.
 			// base must be 10 (dec), 16 (hex), 8 (oct), or 0 to automatically determine base from C-style prefix in str.
@@ -622,8 +652,11 @@ namespace BiggerInts
 			}
 
 			// computes the result of raising a to the power of b
-			static bigint pow(const bigint &a, const bigint &b) { return _pow(a, b); }
-			static bigint pow(bigint &&a, const bigint &b) { return _pow(std::move(a), b); }
+			static bigint pow(const bigint &a, const bigint &b) { return detail::_pow(a, b); }
+			static bigint pow(bigint &&a, const bigint &b) { return detail::_pow(std::move(a), b); }
+
+			// computes factorials
+			static bigint factorial(std::uint64_t v) { return detail::_factorial(v); }
 		};
 
 		// -- bigint utility definitions -- //
@@ -660,7 +693,7 @@ namespace BiggerInts
 				_collapse(a);
 			}
 		}
-
+		
 		inline bool bit_test(const bigint &val, std::uint64_t bit) noexcept
 		{
 			std::uint64_t block = bit / 64;
@@ -686,6 +719,27 @@ namespace BiggerInts
 			if (!neg && detail::is_neg(val)) val.blocks.push_back(0ull); // make sure positive things remain positive
 
 			_collapse(val);
+		}
+
+		inline int cmp(const bigint &a, const bigint &b) noexcept
+		{
+			const bool a_neg = detail::is_neg(a);
+			const bool b_neg = detail::is_neg(b);
+			if (a_neg ^ b_neg) return a_neg ? -1 : 1; // if they have different signs we know right away
+
+			if (a.blocks.size() > b.blocks.size()) return a_neg ? -1 : 1; // if a has higher magnitude than b we can tell from the sign
+			if (a.blocks.size() < b.blocks.size()) return a_neg ? 1 : -1; // similarly
+
+			for (std::size_t i = a.blocks.size(); i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i] ? -1 : 1; // otherwise base decision on first different block
+
+			return 0; // otherwise they're equal
+		}
+		inline bool cmp_less_non_negative(const bigint &a, const bigint &b) noexcept // same as cmp() but requires they both be non-negative
+		{
+			if (a.blocks.size() > b.blocks.size()) return false;
+			if (a.blocks.size() < b.blocks.size()) return true;
+			for (std::size_t i = a.blocks.size(); i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i];
+			return false;
 		}
 
 		// -- operators -- //
@@ -1309,20 +1363,6 @@ namespace BiggerInts
 		template<std::uint64_t bits, bool sign, typename T>
 		constexpr double_int<bits, sign> &operator*=(double_int<bits, sign> &a, const T &b) noexcept { a *= (double_int<bits, sign>)b; return a; }
 
-		inline int cmp(const bigint &a, const bigint &b) noexcept
-		{
-			const bool a_neg = detail::is_neg(a);
-			const bool b_neg = detail::is_neg(b);
-			if (a_neg ^ b_neg) return a_neg ? -1 : 1; // if they have different signs we know right away
-
-			if (a.blocks.size() > b.blocks.size()) return a_neg ? -1 : 1; // if a has higher magnitude than b we can tell from the sign
-			if (a.blocks.size() < b.blocks.size()) return a_neg ? 1 : -1; // similarly
-
-			for (std::size_t i = a.blocks.size(); i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i] ? -1 : 1; // otherwise base decision on first different block
-
-			return 0; // otherwise they're equal
-		}
-
 		inline bool operator<(const bigint &a, const bigint &b) noexcept { return cmp(a, b) < 0; }
 		inline bool operator<=(const bigint &a, const bigint &b) noexcept { return cmp(a, b) <= 0; }
 		inline bool operator>(const bigint &a, const bigint &b) noexcept { return cmp(a, b) > 0; }
@@ -1330,7 +1370,13 @@ namespace BiggerInts
 
 		inline std::pair<bigint, bigint> divmod_unchecked_positive(const bigint &num, const bigint &den)
 		{
+			if (num.blocks.size() < den.blocks.size()) return { {}, num }; // both positive, so if num < den then we know result immediately (this also handles num == 0 case, as we already know den != 0)
+
 			std::pair<bigint, bigint> res; // default constructed to (0, 0)
+
+			// pre-allocate space for the results
+			res.first.blocks.reserve(num.blocks.size() - den.blocks.size() + 1);
+			res.second.blocks.reserve(den.blocks.size());
 
 			std::uint64_t bit = highest_set_bit(num);
 
@@ -1341,25 +1387,27 @@ namespace BiggerInts
 			while (true)
 			{
 				++shift_count;
-				if (bit_test(num, bit)) // no unchecked equivalent because arbitrary precision
+				if (res_second_highest_bit + shift_count >= den_highest_bit)
+				{
+					res.second <<= shift_count;
+					res_second_highest_bit += shift_count;
+					shift_count = 0;
+
+					if (bit_test_in_bounds_nonzero(num, bit)) ++res.second;
+
+					if (!cmp_less_non_negative(res.second, den))
+					{
+						res.second -= den;
+						res_second_highest_bit = highest_set_bit(res.second);
+						bit_set(res.first, bit); // no unchecked equivalent because arbitrary precision
+					}
+				}
+				else if (bit_test_in_bounds_nonzero(num, bit))
 				{
 					res.second <<= shift_count;
 					res_second_highest_bit += shift_count;
 					shift_count = 0;
 					++res.second;
-				}
-				else if (res_second_highest_bit + shift_count >= den_highest_bit)
-				{
-					res.second <<= shift_count;
-					res_second_highest_bit += shift_count;
-					shift_count = 0;
-				}
-
-				if (res.second >= den)
-				{
-					res.second -= den;
-					res_second_highest_bit = highest_set_bit(res.second);
-					bit_set(res.first, bit); // no unchecked equivalent because arbitrary precision
 				}
 
 				if (bit-- == 0) break;
@@ -1493,6 +1541,13 @@ namespace BiggerInts
 		// -- cmp -- //
 
 		// cmp() will be equivalent to <=> but works for any version of C++
+
+		template<std::uint64_t bits, bool sign>
+		constexpr bool cmp_less_non_negative(const double_int<bits, sign> &a, const double_int<bits, sign> &b) noexcept // as cmp() but requires they both be non-negative
+		{
+			for (std::size_t i = bits / 64; i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i];
+			return false;
+		}
 
 		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>
 		constexpr int cmp(const double_int<bits_1, sign> &a, const double_int<bits_2, sign> &b) noexcept
@@ -1669,18 +1724,50 @@ namespace BiggerInts
 
 		template<typename T> static inline const T stringify_decimal_base = 10000000000000000000ull; // base to use for decimal stringification
 
+		// prints the value - interpreted as non-negative - sign_ch (if not null) is appended to the front of the printed value
 		template<typename T, std::enable_if_t<detail::is_biggerints_type<std::decay_t<T>>::value, int> = 0>
-		std::ostream &print_positive(std::ostream &ostr, T &&val)
+		std::ostream &print_positive(std::ostream &ostr, T &&val, char sign_ch)
 		{
+			std::ostream::sentry sentry(ostr);
+			if (!sentry) return ostr;
+
 			std::string str;
 			int digit, dcount;
 			std::uint64_t block;
 
-			std::ostream::sentry sentry(ostr);
-			if (!sentry) return ostr;
-
 			// build the string
-			if (ostr.flags() & std::ios::oct)
+			if (ostr.flags() & std::ios::hex)
+			{
+				auto cpy = std::forward<T>(val); // double_int potentially has many zero blocks
+				const char hex_alpha = ostr.flags() & std::ios::uppercase ? 'A' : 'a';
+
+				while (true)
+				{
+					// get a block
+					if constexpr (std::is_same_v<std::decay_t<T>, bigint>) block = cpy.blocks.empty() ? 0ull : cpy.blocks[0];
+					else block = cpy.blocks[0];
+					cpy >>= 64;
+					dcount = 0;
+
+					do // write the block - do-while to ensure 0 gets printed
+					{
+						digit = block & 15;
+						str.push_back(digit < 10 ? '0' + digit : hex_alpha + digit - 10);
+						block >>= 4;
+						++dcount;
+					} while (block);
+
+					if (cpy) { for (; dcount < 16; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
+					else break; // otherwise we're done
+				}
+
+				if (ostr.flags() & std::ios::showbase)
+				{
+					str.push_back('x'); // uses put() to make sure we don't clobber ostr.width()
+					str.push_back('0');
+				}
+			}
+			else if (ostr.flags() & std::ios::oct)
 			{
 				auto cpy = std::forward<T>(val);
 
@@ -1706,46 +1793,13 @@ namespace BiggerInts
 					// otherwise we're done
 					else break;
 				}
-				if (ostr.flags() & std::ios::showbase) ostr.put('0');
-			}
-			else if (ostr.flags() & std::ios::hex)
-			{
-				auto cpy = std::forward<T>(val);
-				const char hex_alpha = ostr.flags() & std::ios::uppercase ? 'A' : 'a';
-
-				while (true)
-				{
-					// get a block
-					if constexpr (std::is_same_v<std::decay_t<T>, bigint>) block = cpy.blocks.empty() ? 0ull : cpy.blocks[0];
-					else block = cpy.blocks[0];
-					cpy >>= 64;
-					dcount = 0;
-
-					// write the block - do-while to ensure 0 gets printed
-					do
-					{
-						digit = block & 15;
-						str.push_back(digit < 10 ? '0' + digit : hex_alpha + digit - 10);
-						block >>= 4;
-						++dcount;
-					} while (block);
-
-					// if there's still stuff, pad with zeroes and continue
-					if (cpy) { for (; dcount < 16; ++dcount) str.push_back('0'); }
-					// otherwise we're done
-					else break;
-				}
-				if (ostr.flags() & std::ios::showbase)
-				{
-					ostr.put('0'); // uses put() to make sure we don't clobber ostr.width()
-					ostr.put('x');
-				}
+				if (ostr.flags() & std::ios::showbase) str.push_back('0');
 			}
 			else // default to dec mode
 			{
 				std::pair<std::decay_t<T>, std::decay_t<T>> temp;
 				temp.first = std::forward<T>(val); // temp.first takes the role of cpy in the other radicies
-
+				
 				while (true)
 				{
 					// get a block
@@ -1769,67 +1823,53 @@ namespace BiggerInts
 				}
 			}
 
-			// write the string
-			if (ostr.flags() & std::ios::left)
-			{
-				for (std::size_t i = str.size(); i > 0;) ostr.put(str[--i]);
-				for (int i = (int)ostr.width() - (int)str.size(); i > 0; --i) ostr.put(ostr.fill());
-			}
-			else // default to right
-			{
-				for (int i = (int)ostr.width() - (int)str.size(); i > 0; --i) ostr.put(ostr.fill());
-				for (std::size_t i = str.size(); i > 0;) ostr.put(str[--i]);
-			}
+			if (sign_ch) str.push_back(sign_ch); // append the sign character if specified
 
-			// clobber width - makes sure the next write isn't weird
-			ostr.width(0);
+			std::reverse(str.begin(), str.end()); // reverse the string for printing
+			ostr << str;                          // print the string (this applies the width/precision)
+			
 			return ostr;
 		}
 		
 		template<std::uint64_t bits>
-		std::ostream &operator<<(std::ostream &ostr, const double_int<bits, false> &val) { print_positive(ostr, val); return ostr; }
+		std::ostream &operator<<(std::ostream &ostr, const double_int<bits, false> &val) { print_positive(ostr, val, 0); return ostr; }
 		template<std::uint64_t bits>
 		std::ostream &operator<<(std::ostream &ostr, const double_int<bits, true> &val)
 		{
-			double_int<bits, false> cpy = val; // we'll do signed io in terms of unsigned
+			double_int<bits, false> cpy = val;
+			char sign_ch = 0;
 
-			if (detail::is_neg(cpy)) // if it's negative make it positive and print the - sign
+			if ((ostr.flags() & std::ios::basefield) == std::ios::dec) // decimal is the only base where signs come into play
 			{
-				detail::make_neg(cpy);
-				ostr.put('-');
-				if (ostr.width() > 0) ostr.width(ostr.width() - 1); // dec width if was specified
-			}
-			else if (ostr.flags() & std::ios::showpos) // otherwise, is positive. print the + sign if showpos is set
-			{
-				ostr.put('+');
-				if (ostr.width() > 0) ostr.width(ostr.width() - 1); // dec width if was specified
+				if (detail::is_neg(cpy))
+				{
+					detail::make_neg(cpy);
+					sign_ch = '-';
+				}
+				else if (ostr.flags() & std::ios::showpos) sign_ch = '+';
 			}
 
-			ostr << cpy; // then just refer to cpy as positive
+			print_positive(ostr, cpy, sign_ch);
 			return ostr;
 		}
 
 		template<typename T, std::enable_if_t<std::is_same_v<std::decay_t<T>, bigint>, int> = 0>
 		std::ostream &operator<<(std::ostream &ostr, T &&val)
 		{
-			if (detail::is_neg(val))
+			bigint cpy = std::forward<T>(val);
+			char sign_ch = 0;
+
+			if ((ostr.flags() & std::ios::basefield) == std::ios::dec) // decimal is the only base where signs come into play
 			{
-				bigint cpy = std::forward<T>(val); // if it's negative, we need to make it positive to print it with the helper function
-				detail::make_neg(cpy);
-				ostr.put('-'); // put the minus sign to denote that it was negative
-				if (ostr.width() > 0) ostr.width(ostr.width() - 1); // dec width if was specified
-				print_positive(ostr, std::move(cpy)); // then print the positive value
-			}
-			else
-			{
-				if (ostr.flags() & std::ios::showpos) // if showpos is set, we print the implicit '+' sign
+				if (detail::is_neg(cpy))
 				{
-					ostr.put('+');
-					if (ostr.width() > 0) ostr.width(ostr.width() - 1); // dec width if was specified
+					detail::make_neg(cpy);
+					sign_ch = '-';
 				}
-				print_positive(ostr, std::forward<T>(val)); // then print the positive value
+				else if (ostr.flags() & std::ios::showpos) sign_ch = '+';
 			}
 
+			print_positive(ostr, cpy, sign_ch);
 			return ostr;
 		}
 
@@ -2049,6 +2089,19 @@ namespace BiggerInts
 				a *= a;
 			}
 
+			return res;
+		}
+
+		static constexpr std::uint64_t _factorial_lookups[] = {
+			1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600, 6227020800, 87178291200,
+			1307674368000, 20922789888000, 355687428096000, 6402373705728000, 121645100408832000, 2432902008176640000
+		};
+		static constexpr std::uint64_t _factorial_lookups_count = sizeof(_factorial_lookups) / sizeof(*_factorial_lookups);
+		inline bigint _factorial(std::uint64_t v)
+		{
+			if (v < _factorial_lookups_count) return _factorial_lookups[v];
+			bigint res = _factorial_lookups[_factorial_lookups_count - 1];
+			for (std::uint64_t i = _factorial_lookups_count; i <= v; ++i) res *= i;
 			return res;
 		}
 	}
