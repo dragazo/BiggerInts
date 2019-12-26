@@ -1739,7 +1739,13 @@ namespace BiggerInts
 			if (ostr.flags() & std::ios::hex)
 			{
 				auto cpy = std::forward<T>(val); // double_int potentially has many zero blocks
+				const bool sign = detail::is_neg(cpy);
 				const char hex_alpha = ostr.flags() & std::ios::uppercase ? 'A' : 'a';
+
+				if constexpr (std::is_same_v<std::decay_t<T>, bigint>)
+				{
+					if (detail::is_neg(cpy)) cpy.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
+				}
 
 				while (true)
 				{
@@ -1760,7 +1766,19 @@ namespace BiggerInts
 					if (cpy) { for (; dcount < 16; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
 					else break; // otherwise we're done
 				}
+				if constexpr (std::is_same_v<std::decay_t<T>, bigint>)
+				{
+					if (sign)
+					{
+						const char f = ostr.flags() & std::ios::uppercase ? 'F' : 'f';
 
+						std::size_t s; // now we truncate all leading f's
+						for (s = str.size(); s > 0; --s) if (str[s - 1] != f) break;
+						str.resize(s); // chop off everything we don't want
+						if (str.empty() || str.back() <= '7') str.push_back(f); // if the string is now empty or no longer sign extends to negative, add a (single) f back on
+					}
+					else if (str.back() >= '8') str.push_back('0'); // if val was positive but ends in an 8 or higher, add a 0 to prevent sign extending to negative on parsing
+				}
 				if (ostr.flags() & std::ios::showbase)
 				{
 					str.push_back('x'); // uses put() to make sure we don't clobber ostr.width()
@@ -1770,6 +1788,12 @@ namespace BiggerInts
 			else if (ostr.flags() & std::ios::oct)
 			{
 				auto cpy = std::forward<T>(val);
+				const bool sign = detail::is_neg(cpy);
+
+				if constexpr (std::is_same_v<std::decay_t<T>, bigint>)
+				{
+					if (sign) cpy.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
+				}
 
 				while (true)
 				{
@@ -1788,10 +1812,24 @@ namespace BiggerInts
 						++dcount;
 					} while (block);
 
-					// if there's still stuff, pad with zeroes and continue
-					if (cpy) { for (; dcount < 21; ++dcount) str.push_back('0'); }
-					// otherwise we're done
-					else break;
+					if (cpy) { for (; dcount < 21; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
+					else break; // otherwise we're done
+				}
+				if constexpr (std::is_same_v<std::decay_t<T>, bigint>)
+				{
+					if (sign) 
+					{
+						// if it was negative we need to ensure that the high char will sign extend to negative
+						if (str.back() == '1') str.back() = '7'; // 001 -> 111
+						else if (str.back() <= '3') str.back() += 4; // 010, 011 -> 110, 111
+						// otherwise is at least 4 and therefore already good to go
+
+						std::size_t s; // now we truncate all leading 7's
+						for (s = str.size(); s > 0; --s) if (str[s - 1] != '7') break;
+						str.resize(s); // chop off everything we don't want
+						if (str.empty() || str.back() <= '3') str.push_back('7'); // if the string is now empty or no longer sign extends to negative, add a (single) 7 back on
+					}
+					else if (str.back() >= '4') str.push_back('0'); // if val was positive but ends in a 4 or higher, add a 0 to prevent sign extending to negative on parsing
 				}
 				if (ostr.flags() & std::ios::showbase) str.push_back('0');
 			}
@@ -1816,17 +1854,15 @@ namespace BiggerInts
 						++dcount;
 					} while (block);
 
-					// if there's still stuff, pad with zeroes and continue
-					if (temp.first) { for (; dcount < 19; ++dcount) str.push_back('0'); }
-					// otherwise we're done
-					else break;
+					if (temp.first) { for (; dcount < 19; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
+					else break; // otherwise we're done
 				}
 			}
 
 			if (sign_ch) str.push_back(sign_ch); // append the sign character if specified
 
 			std::reverse(str.begin(), str.end()); // reverse the string for printing
-			ostr << str;                          // print the string (this applies the width/precision)
+			ostr << str;                          // print the string (this applies the width/fill)
 			
 			return ostr;
 		}
