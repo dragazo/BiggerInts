@@ -440,8 +440,8 @@ namespace BiggerInts
 					constexpr double_int &operator=(const double_int<_bits, _sign> &other) noexcept
 					{
 						for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
-						std::uint64_t fill;
-						if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0; else fill = 0;
+						std::uint64_t fill = 0;
+						if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0;
 						for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
 						return *this;
 					}
@@ -1742,6 +1742,7 @@ namespace BiggerInts
 				const bool sign = detail::is_neg(cpy);
 				const char hex_alpha = ostr.flags() & std::ios::uppercase ? 'A' : 'a';
 
+				(void)sign; // to ignore unused warning for double_int
 				if constexpr (std::is_same_v<std::decay_t<T>, bigint>)
 				{
 					if (sign) cpy.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
@@ -1790,6 +1791,7 @@ namespace BiggerInts
 				auto cpy = std::forward<T>(val);
 				const bool sign = detail::is_neg(cpy);
 
+				(void)sign; // to ignore unused warning for double_int
 				if constexpr (std::is_same_v<std::decay_t<T>, bigint>)
 				{
 					if (sign) cpy.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
@@ -1912,6 +1914,9 @@ namespace BiggerInts
 		template<typename T, std::enable_if_t<detail::is_biggerints_type<T>::value, int> = 0>
 		std::istream &parse_positive_hex(std::istream &istr, T &val, bool noskipws = false)
 		{
+			std::istream::sentry sentry(istr, noskipws);
+			if (!sentry) return istr;
+
 			constexpr std::uint64_t bits = detail::bit_count<std::decay_t<T>>::value;
 
 			val = 0u; // start by zeroing value
@@ -1971,6 +1976,9 @@ namespace BiggerInts
 		template<typename T, std::enable_if_t<detail::is_biggerints_type<T>::value, int> = 0>
 		std::istream &parse_positive_oct(std::istream &istr, T &val, bool noskipws = false)
 		{
+			std::istream::sentry sentry(istr, noskipws);
+			if (!sentry) return istr;
+
 			constexpr std::uint64_t bits = detail::bit_count<std::decay_t<T>>::value;
 
 			val = 0u; // start by zeroing value
@@ -2031,6 +2039,9 @@ namespace BiggerInts
 		template<typename T, std::enable_if_t<detail::is_biggerints_type<T>::value, int> = 0>
 		std::istream &parse_positive_dec(std::istream &istr, T &val, bool noskipws = false)
 		{
+			std::istream::sentry sentry(istr, noskipws);
+			if (!sentry) return istr;
+
 			constexpr std::uint64_t bits = detail::bit_count<std::decay_t<T>>::value;
 
 			val = 0u; // start by zeroing value
@@ -2083,12 +2094,13 @@ namespace BiggerInts
 		template<typename T, std::enable_if_t<detail::is_biggerints_type<T>::value, int> = 0>
 		std::istream &parse_positive(std::istream &istr, T &val, bool noskipws = false)
 		{
-			switch (istr.flags() & std::ios::basefield)
+			typedef std::underlying_type_t<std::ios::fmtflags> enum_t;
+			switch ((enum_t)(istr.flags() & std::ios::basefield))
 			{
-			case std::ios::hex: return parse_positive_hex(istr, val, noskipws);
-			case std::ios::oct: return parse_positive_oct(istr, val, noskipws);
-			case std::ios::dec: return parse_positive_dec(istr, val, noskipws);
-			case 0:
+			case (enum_t)std::ios::hex: return parse_positive_hex(istr, val, noskipws);
+			case (enum_t)std::ios::oct: return parse_positive_oct(istr, val, noskipws);
+			case (enum_t)std::ios::dec: return parse_positive_dec(istr, val, noskipws);
+			case (enum_t)0: // this is why we're doing the cast to underlying int type
 			{
 				std::istream::sentry sentry(istr, noskipws);
 				if (!sentry) return istr;
