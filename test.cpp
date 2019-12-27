@@ -588,16 +588,11 @@ int main()
 	assert(tostr(uint_t<256>::parse("167345562314657356422211643535261643535621", 16)) == "32811116214936888653588305588611479218962394469921");
 
 	assert(tostr(int_t<256>::parse("167345562314657356422211643535261643535621", 10)) == "167345562314657356422211643535261643535621");
+	assert(tostr(int_t<256>::parse("+167345562314657356422211643535261643535621", 10)) == "167345562314657356422211643535261643535621");
+	assert(tostr(int_t<256>::parse("-167345562314657356422211643535261643535621", 10)) == "-167345562314657356422211643535261643535621");
+
 	assert(tostr(int_t<256>::parse("167345562314657356422211643535261643535621", 8)) == "19846815955032434075951735996930767761");
 	assert(tostr(int_t<256>::parse("167345562314657356422211643535261643535621", 16)) == "32811116214936888653588305588611479218962394469921");
-
-	assert(tostr(int_t<256>::parse("+167345562314657356422211643535261643535621", 10)) == "167345562314657356422211643535261643535621");
-	assert(tostr(int_t<256>::parse("+167345562314657356422211643535261643535621", 8)) == "19846815955032434075951735996930767761");
-	assert(tostr(int_t<256>::parse("+167345562314657356422211643535261643535621", 16)) == "32811116214936888653588305588611479218962394469921");
-
-	assert(tostr(int_t<256>::parse("-167345562314657356422211643535261643535621", 10)) == "-167345562314657356422211643535261643535621");
-	assert(tostr(int_t<256>::parse("-167345562314657356422211643535261643535621", 8)) == "-19846815955032434075951735996930767761");
-	assert(tostr(int_t<256>::parse("-167345562314657356422211643535261643535621", 16)) == "-32811116214936888653588305588611479218962394469921");
 
 	{
 		uint_t<256> temp;
@@ -621,11 +616,11 @@ int main()
 		assert(int_t<256>::try_parse(temp, "-167345562314657356422211643535261643535621", 10));
 		assert(tostr(temp) == "-167345562314657356422211643535261643535621");
 
-		assert(int_t<256>::try_parse(temp, "-167345562314657356422211643535261643535621", 8));
-		assert(tostr(temp) == "-19846815955032434075951735996930767761");
+		assert(int_t<256>::try_parse(temp, "167345562314657356422211643535261643535621", 8));
+		assert(tostr(temp) == "19846815955032434075951735996930767761");
 
-		assert(int_t<256>::try_parse(temp, "-167345562314657356422211643535261643535621", 16));
-		assert(tostr(temp) == "-32811116214936888653588305588611479218962394469921");
+		assert(int_t<256>::try_parse(temp, "167345562314657356422211643535261643535621", 16));
+		assert(tostr(temp) == "32811116214936888653588305588611479218962394469921");
 	}
 
 	{
@@ -649,6 +644,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "      +453");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "     00705");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "     0x1c5");
+
+		assert(bigint::parse("453") == 453);
+		assert(bigint::parse("       453") == 453);
+		assert(bigint::parse("+453") == 453);
+		assert(bigint::parse("      +453") == 453);
+		assert(bigint::parse("453", 10) == 453);
+		assert(bigint::parse("0705", 8) == 453);
+		assert(bigint::parse("1c5", 16) == 453);
+		assert(bigint::parse("+453", 10) == 453);
+		assert(bigint::parse("0705", 8) == 453);
+		assert(bigint::parse("1c5", 16) == 453);
+		assert(bigint::parse("453", 0) = 453);
+		assert(bigint::parse("00705", 0) == 453);
+		assert(bigint::parse("0x1c5", 0) == 453);
+		assert(bigint::parse("+453", 0) == 453);
+		assert(bigint::parse("00705", 0) == 453);
+		assert(bigint::parse("0x1c5", 0) == 453);
+		assert(bigint::parse("      +453", 0) == 453);
+		assert(bigint::parse("     00705", 0) == 453);
+		assert(bigint::parse("     0x1c5", 0) == 453);
 	}
 	{
 		bigint v = 1;
@@ -671,6 +686,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        +1");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        01");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0x1");
+
+		assert(bigint::parse("1") == 1);
+		assert(bigint::parse("         1") == 1);
+		assert(bigint::parse("+1") == 1);
+		assert(bigint::parse("        +1") == 1);
+		assert(bigint::parse("1", 10) == 1);
+		assert(bigint::parse("1", 8) == 1);
+		assert(bigint::parse("1", 16) == 1);
+		assert(bigint::parse("+1", 10) == 1);
+		assert(bigint::parse("1", 8) == 1);
+		assert(bigint::parse("1", 16) == 1);
+		assert(bigint::parse("1", 0) == 1);
+		assert(bigint::parse("01", 0) == 1);
+		assert(bigint::parse("0x1", 0) == 1);
+		assert(bigint::parse("+1", 0) == 1);
+		assert(bigint::parse("01", 0) == 1);
+		assert(bigint::parse("0x1", 0) == 1);
+		assert(bigint::parse("        +1", 0) == 1);
+		assert(bigint::parse("        01", 0) == 1);
+		assert(bigint::parse("       0x1", 0) == 1);
 	}
 	{
 		bigint v = 4;
@@ -693,6 +728,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        +4");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       004");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0x4");
+
+		assert(bigint::parse("4") == 4);
+		assert(bigint::parse("         4") == 4);
+		assert(bigint::parse("+4") = 4);
+		assert(bigint::parse("        +4") == 4);
+		assert(bigint::parse("4", 10) == 4);
+		assert(bigint::parse("04", 8) == 4);
+		assert(bigint::parse("4", 16) == 4);
+		assert(bigint::parse("+4", 10) == 4);
+		assert(bigint::parse("04", 8) == 4);
+		assert(bigint::parse("4", 16) == 4);
+		assert(bigint::parse("4", 0) == 4);
+		assert(bigint::parse("004", 0) == 4);
+		assert(bigint::parse("0x4", 0) == 4);
+		assert(bigint::parse("+4", 0) == 4);
+		assert(bigint::parse("004", 0) == 4);
+		assert(bigint::parse("0x4", 0) == 4);
+		assert(bigint::parse("        +4", 0) == 4);
+		assert(bigint::parse("       004", 0) == 4);
+		assert(bigint::parse("       0x4", 0) == 4);
 	}
 	{
 		bigint v = 8;
@@ -715,6 +770,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        +8");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       010");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "      0x08");
+
+		assert(bigint::parse("8") == 8);
+		assert(bigint::parse("         8") == 8);
+		assert(bigint::parse("+8") == 8);
+		assert(bigint::parse("        +8") == 8);
+		assert(bigint::parse("8", 10) == 8);
+		assert(bigint::parse("10", 8) == 8);
+		assert(bigint::parse("08", 16) == 8);
+		assert(bigint::parse("+8", 10) == 8);
+		assert(bigint::parse("10", 8) == 8);
+		assert(bigint::parse("08", 16) == 8);
+		assert(bigint::parse("8", 0) == 8);
+		assert(bigint::parse("010", 0) == 8);
+		assert(bigint::parse("0x08", 0) == 8);
+		assert(bigint::parse("+8", 0) == 8);
+		assert(bigint::parse("010", 0) == 8);
+		assert(bigint::parse("0x08", 0) == 8);
+		assert(bigint::parse("        +8", 0) == 8);
+		assert(bigint::parse("       010", 0) == 8);
+		assert(bigint::parse("      0x08", 0) == 8);
 	}
 	{
 		bigint v = 0x966;
@@ -737,6 +812,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "     +2406");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "    004546");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "    0x0966");
+
+		assert(bigint::parse("2406") == 0x966);
+		assert(bigint::parse("      2406") == 0x966);
+		assert(bigint::parse("+2406") == 0x966);
+		assert(bigint::parse("     +2406") == 0x966);
+		assert(bigint::parse("2406", 10) == 0x966);
+		assert(bigint::parse("04546", 8) == 0x966);
+		assert(bigint::parse("0966", 16) == 0x966);
+		assert(bigint::parse("+2406", 10) == 0x966);
+		assert(bigint::parse("04546", 8) == 0x966);
+		assert(bigint::parse("0966", 16) == 0x966);
+		assert(bigint::parse("2406", 0) == 0x966);
+		assert(bigint::parse("004546", 0) == 0x966);
+		assert(bigint::parse("0x0966", 0) == 0x966);
+		assert(bigint::parse("+2406", 0) == 0x966);
+		assert(bigint::parse("004546", 0) == 0x966);
+		assert(bigint::parse("0x0966", 0) == 0x966);
+		assert(bigint::parse("     +2406", 0) == 0x966);
+		assert(bigint::parse("    004546", 0) == 0x966);
+		assert(bigint::parse("    0x0966", 0) == 0x966);
 	}
 	{
 		bigint v = -1;
@@ -759,6 +854,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -1");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        07");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xf");
+
+		assert(bigint::parse("-1") == -1);
+		assert(bigint::parse("        -1") == -1);
+		assert(bigint::parse("-1") == -1);
+		assert(bigint::parse("        -1") == -1);
+		assert(bigint::parse("-1", 10) == -1);
+		assert(bigint::parse("7", 8) == -1);
+		assert(bigint::parse("f", 16) == -1);
+		assert(bigint::parse("-1", 10) == -1);
+		assert(bigint::parse("7", 8) == -1);
+		assert(bigint::parse("f", 16) == -1);
+		assert(bigint::parse("-1", 0) == -1);
+		assert(bigint::parse("07", 0) == -1);
+		assert(bigint::parse("0xf", 0) == -1);
+		assert(bigint::parse("-1", 0) == -1);
+		assert(bigint::parse("07", 0) == -1);
+		assert(bigint::parse("0xf", 0) == -1);
+		assert(bigint::parse("        -1", 0) == -1);
+		assert(bigint::parse("        07", 0) == -1);
+		assert(bigint::parse("       0xf", 0) == -1);
 	}
 	{
 		bigint v = -2;
@@ -781,6 +896,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -2");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        06");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xe");
+
+		assert(bigint::parse("-2") == -2);
+		assert(bigint::parse("        -2") == -2);
+		assert(bigint::parse("-2") == -2);
+		assert(bigint::parse("        -2") == -2);
+		assert(bigint::parse("-2", 10) = -2);
+		assert(bigint::parse("6", 8) == -2);
+		assert(bigint::parse("e", 16) == -2);
+		assert(bigint::parse("-2", 10) == -2);
+		assert(bigint::parse("6", 8) == -2);
+		assert(bigint::parse("e", 16) == -2);
+		assert(bigint::parse("-2", 0) == -2);
+		assert(bigint::parse("06", 0) == -2);
+		assert(bigint::parse("0xe", 0) == -2);
+		assert(bigint::parse("-2", 0) == -2);
+		assert(bigint::parse("06", 0) == -2);
+		assert(bigint::parse("0xe", 0) == -2);
+		assert(bigint::parse("        -2", 0) == -2);
+		assert(bigint::parse("        06", 0) == -2);
+		assert(bigint::parse("       0xe", 0) == -2);
 	}
 	{
 		bigint v = -4;
@@ -803,6 +938,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -4");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        04");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xc");
+
+		assert(bigint::parse("-4") == -4);
+		assert(bigint::parse("        -4") == -4);
+		assert(bigint::parse("-4") == -4);
+		assert(bigint::parse("        -4") == -4);
+		assert(bigint::parse("-4", 10) == -4);
+		assert(bigint::parse("4", 8) == -4);
+		assert(bigint::parse("c", 16) == -4);
+		assert(bigint::parse("-4", 10) == -4);
+		assert(bigint::parse("4", 8) == -4);
+		assert(bigint::parse("c", 16) == -4);
+		assert(bigint::parse("-4", 0) == -4);
+		assert(bigint::parse("04", 0) == -4);
+		assert(bigint::parse("0xc", 0) == -4);
+		assert(bigint::parse("-4", 0) == -4);
+		assert(bigint::parse("04", 0) == -4);
+		assert(bigint::parse("0xc", 0) == -4);
+		assert(bigint::parse("        -4", 0) == -4);
+		assert(bigint::parse("        04", 0) == -4);
+		assert(bigint::parse("       0xc", 0) == -4);
 	}
 	{
 		bigint v = -5;
@@ -825,6 +980,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -5");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       073");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xb");
+
+		assert(bigint::parse("-5") == -5);
+		assert(bigint::parse("        -5") == -5);
+		assert(bigint::parse("-5") == -5);
+		assert(bigint::parse("        -5") == -5);
+		assert(bigint::parse("-5", 10) == -5);
+		assert(bigint::parse("73", 8) == -5);
+		assert(bigint::parse("b", 16) == -5);
+		assert(bigint::parse("-5", 10) == -5);
+		assert(bigint::parse("73", 8) == -5);
+		assert(bigint::parse("b", 16) == -5);
+		assert(bigint::parse("-5", 0) == -5);
+		assert(bigint::parse("073", 0) == -5);
+		assert(bigint::parse("0xb", 0) == -5);
+		assert(bigint::parse("-5", 0) == -5);
+		assert(bigint::parse("073", 0) == -5);
+		assert(bigint::parse("0xb", 0) == -5);
+		assert(bigint::parse("        -5", 0) == -5);
+		assert(bigint::parse("       073", 0) == -5);
+		assert(bigint::parse("       0xb", 0) == -5);
 	}
 	{
 		bigint v = -16;
@@ -847,6 +1022,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "       -16");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       060");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "      0xf0");
+
+		assert(bigint::parse("-16") == -16);
+		assert(bigint::parse("       -16") == -16);
+		assert(bigint::parse("-16") == -16);
+		assert(bigint::parse("       -16") == -16);
+		assert(bigint::parse("-16", 10) == -16);
+		assert(bigint::parse("60", 8) == -16);
+		assert(bigint::parse("f0", 16) == -16);
+		assert(bigint::parse("-16", 10) == -16);
+		assert(bigint::parse("60", 8) == -16);
+		assert(bigint::parse("f0", 16) == -16);
+		assert(bigint::parse("-16", 0) == -16);
+		assert(bigint::parse("060", 0) == -16);
+		assert(bigint::parse("0xf0", 0) == -16);
+		assert(bigint::parse("-16", 0) == -16);
+		assert(bigint::parse("060", 0) == -16);
+		assert(bigint::parse("0xf0", 0) == -16);
+		assert(bigint::parse("       -16", 0) == -16);
+		assert(bigint::parse("       060", 0) == -16);
+		assert(bigint::parse("      0xf0", 0) == -16);
 	}
 	{
 		bigint v = 0xffffffffffffffffull;
@@ -869,6 +1064,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "+18446744073709551615");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "01777777777777777777777");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "0x0ffffffffffffffff");
+
+		assert(bigint::parse("18446744073709551615") == 0xffffffffffffffffull);
+		assert(bigint::parse("18446744073709551615") == 0xffffffffffffffffull);
+		assert(bigint::parse("+18446744073709551615") == 0xffffffffffffffffull);
+		assert(bigint::parse("+18446744073709551615") == 0xffffffffffffffffull);
+		assert(bigint::parse("18446744073709551615", 10) == 0xffffffffffffffffull);
+		assert(bigint::parse("1777777777777777777777", 8) == 0xffffffffffffffffull);
+		assert(bigint::parse("0ffffffffffffffff", 16) == 0xffffffffffffffffull);
+		assert(bigint::parse("+18446744073709551615", 10) == 0xffffffffffffffffull);
+		assert(bigint::parse("1777777777777777777777", 8) == 0xffffffffffffffffull);
+		assert(bigint::parse("0ffffffffffffffff", 16) == 0xffffffffffffffffull);
+		assert(bigint::parse("18446744073709551615", 0) == 0xffffffffffffffffull);
+		assert(bigint::parse("01777777777777777777777", 0) == 0xffffffffffffffffull);
+		assert(bigint::parse("0x0ffffffffffffffff", 0) == 0xffffffffffffffffull);
+		assert(bigint::parse("+18446744073709551615", 0) == 0xffffffffffffffffull);
+		assert(bigint::parse("01777777777777777777777", 0) == 0xffffffffffffffffull);
+		assert(bigint::parse("0x0ffffffffffffffff", 0) == 0xffffffffffffffffull);
+		assert(bigint::parse("+18446744073709551615", 0) == 0xffffffffffffffffull);
+		assert(bigint::parse("01777777777777777777777", 0) == 0xffffffffffffffffull);
+		assert(bigint::parse("0x0ffffffffffffffff", 0) == 0xffffffffffffffffull);
 	}
 	{
 		bigint v = 0777777777777777777777ull;
@@ -891,6 +1106,26 @@ int main()
 		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "+9223372036854775807");
 		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "00777777777777777777777");
 		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "0x7fffffffffffffff");
+
+		assert(bigint::parse("9223372036854775807") == 0777777777777777777777ull);
+		assert(bigint::parse("9223372036854775807") == 0777777777777777777777ull);
+		assert(bigint::parse("+9223372036854775807") == 0777777777777777777777ull);
+		assert(bigint::parse("+9223372036854775807") == 0777777777777777777777ull);
+		assert(bigint::parse("9223372036854775807", 10) == 0777777777777777777777ull);
+		assert(bigint::parse("0777777777777777777777", 8) == 0777777777777777777777ull);
+		assert(bigint::parse("7fffffffffffffff", 16) == 0777777777777777777777ull);
+		assert(bigint::parse("+9223372036854775807", 10) == 0777777777777777777777ull);
+		assert(bigint::parse("0777777777777777777777", 8) == 0777777777777777777777ull);
+		assert(bigint::parse("7fffffffffffffff", 16) == 0777777777777777777777ull);
+		assert(bigint::parse("9223372036854775807", 0) == 0777777777777777777777ull);
+		assert(bigint::parse("00777777777777777777777", 0) == 0777777777777777777777ull);
+		assert(bigint::parse("0x7fffffffffffffff", 0) == 0777777777777777777777ull);
+		assert(bigint::parse("+9223372036854775807", 0) == 0777777777777777777777ull);
+		assert(bigint::parse("00777777777777777777777", 0) == 0777777777777777777777ull);
+		assert(bigint::parse("0x7fffffffffffffff", 0) == 0777777777777777777777ull);
+		assert(bigint::parse("+9223372036854775807", 0) == 0777777777777777777777ull);
+		assert(bigint::parse("00777777777777777777777", 0) == 0777777777777777777777ull);
+		assert(bigint::parse("0x7fffffffffffffff", 0) == 0777777777777777777777ull);
 	}
 
 	{
@@ -1258,7 +1493,7 @@ int main()
 	}
 	
 	{
-		bigint v = bigint::parse("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16);
+		bigint v = bigint::parse("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16);
 		bigint r = v * v;
 		assert(tostr(r) == "1026301351570233739499293428424157827113862320509474868877723027253195088579758740627615722253086934881590063514230345951830442386318246187269187562628311952630251852968692235997360173760639550065418089580517919902935726984364421732731351192069777176001110091235222448929542559681760328631249946802584338006151524151805763498018141131455523556616803713025");
 		uint_t<1024> v1024;

@@ -1744,7 +1744,7 @@ namespace BiggerInts
 
 				if constexpr (std::is_same_v<std::decay_t<T>, bigint>)
 				{
-					if (detail::is_neg(cpy)) cpy.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
+					if (sign) cpy.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
 				}
 
 				while (true)
@@ -1910,7 +1910,126 @@ namespace BiggerInts
 		}
 
 		template<typename T, std::enable_if_t<detail::is_biggerints_type<T>::value, int> = 0>
-		std::istream &parse_positive(std::istream &istr, T &val, bool noskipws = false)
+		std::istream &parse_positive_hex(std::istream &istr, T &val, bool noskipws = false)
+		{
+			constexpr std::uint64_t bits = detail::bit_count<std::decay_t<T>>::value;
+
+			val = 0u; // start by zeroing value
+			int first_digit, digit, num_digits;
+			std::uint64_t block;
+
+			// first char must be a hex digit - don't extract
+			if ((first_digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+			if (!ext_hex(first_digit)) { istr.setstate(std::ios::failbit); return istr; }
+
+			while (true)
+			{
+				block = 0; // read a block of 16 hex digits
+				for (num_digits = 0; num_digits < 16; ++num_digits)
+				{
+					// get the digit and make sure it's in range - only extract it if it's good
+					if ((digit = istr.peek()) == EOF) break;
+					if (!ext_hex(digit)) break;
+					istr.get();
+
+					block <<= 4;
+					block |= digit;
+				}
+				if (num_digits != 0)
+				{
+					if constexpr (!std::is_same_v<std::decay_t<T>, bigint>)
+					{
+						// detect overflow
+						if (val.blocks[bits / 64 - 1] >> (std::uint64_t)(64 - 4 * num_digits)) { istr.setstate(std::ios::failbit); return istr; }
+					}
+
+					// incorporate it into value
+					val <<= (std::uint64_t)(4 * num_digits);
+					val |= block;
+				}
+
+				if (num_digits < 16) break;
+			}
+
+			if constexpr (std::is_same_v<std::decay_t<T>, bigint>)
+			{
+				static_assert(highest_set_bit(0) == 0); // sanity check for the behavior below
+
+				if (first_digit >= 8) // if the value should sign extend to negative
+				{
+					val.blocks.back() |= ~((1ull << highest_set_bit(val.blocks.back())) - 1); // set all bits after the high bit to one
+					_collapse(val);
+				}
+				else // otherwise should sign extend to positive
+				{
+					if (detail::is_neg(val)) val.blocks.push_back(0ull); // if currently negative, toss on a 0 block to make it positive
+				}
+			}
+
+			return istr;
+		}
+		template<typename T, std::enable_if_t<detail::is_biggerints_type<T>::value, int> = 0>
+		std::istream &parse_positive_oct(std::istream &istr, T &val, bool noskipws = false)
+		{
+			constexpr std::uint64_t bits = detail::bit_count<std::decay_t<T>>::value;
+
+			val = 0u; // start by zeroing value
+			int first_digit, digit, num_digits;
+			std::uint64_t block;
+
+			// first char must be an oct digit - don't extract
+			if ((first_digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+			if (first_digit < '0' || first_digit > '7') { istr.setstate(std::ios::failbit); return istr; }
+			first_digit -= '0';
+
+			while (true)
+			{
+				block = 0; // read a block of 21 oct digits
+				for (num_digits = 0; num_digits < 21; ++num_digits)
+				{
+					// get the digit and make sure it's in range - only extract it if it's good
+					if ((digit = istr.peek()) == EOF) break;
+					if (digit < '0' || digit > '7') break;
+					istr.get();
+
+					block <<= 3;
+					block |= digit - '0';
+				}
+				if (num_digits != 0)
+				{
+					if constexpr (!std::is_same_v<std::decay_t<T>, bigint>)
+					{
+						// detect overflow
+						if (val.blocks[bits / 64 - 1] >> (std::uint64_t)(64 - 3 * num_digits)) { istr.setstate(std::ios::failbit); return istr; }
+					}
+
+					// incorporate it into value
+					val <<= (std::uint64_t)(3 * num_digits);
+					val |= block;
+				}
+
+				if (num_digits < 21) break;
+			}
+
+			if constexpr (std::is_same_v<std::decay_t<T>, bigint>)
+			{
+				static_assert(highest_set_bit(0) == 0); // sanity check for the behavior below
+
+				if (first_digit >= 4) // if the value should sign extend to negative
+				{
+					val.blocks.back() |= ~((1ull << highest_set_bit(val.blocks.back())) - 1); // set all bits after the high bit to one
+					_collapse(val);
+				}
+				else // otherwise should sign extend to positive
+				{
+					if (detail::is_neg(val)) val.blocks.push_back(0ull); // if currently negative, toss on a 0 block to make it positive
+				}
+			}
+
+			return istr;
+		}
+		template<typename T, std::enable_if_t<detail::is_biggerints_type<T>::value, int> = 0>
+		std::istream &parse_positive_dec(std::istream &istr, T &val, bool noskipws = false)
 		{
 			constexpr std::uint64_t bits = detail::bit_count<std::decay_t<T>>::value;
 
@@ -1918,150 +2037,76 @@ namespace BiggerInts
 			int digit, num_digits;
 			std::uint64_t block;
 
-			std::istream::sentry sentry(istr, noskipws);
-			if (!sentry) return istr;
+			// perform multiply/add in terms of a larger int type to easily tell if we overflow (only for finite integral types)
+			std::conditional_t<std::is_same_v<std::decay_t<T>, bigint>, bigint, double_int<bits * 2, false>> bigval = std::move(val);
 
-			// parse the string
-			if (istr.flags() & std::ios::oct)
+			// first char must be a dec digit - don't extract
+			if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+			if (digit < '0' || digit > '9') { istr.setstate(std::ios::failbit); return istr; }
+
+			while (true)
 			{
-			parse_oct:
-
-				// first char must be an oct digit - don't extract
-				if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
-				if (digit < '0' || digit > '7') { istr.setstate(std::ios::failbit); return istr; }
-
-				while (true)
+				block = 0;               // read a block of 19 dec digits
+				std::uint64_t scale = 1; // scale factor to apply to val for block incorporation (see below)
+				for (num_digits = 0; num_digits < 19; ++num_digits)
 				{
-					block = 0; // read a block of 21 oct digits
-					for (num_digits = 0; num_digits < 21; ++num_digits)
-					{
-						// get the digit and make sure it's in range - only extract it if it's good
-						if ((digit = istr.peek()) == EOF) break;
-						if (digit < '0' || digit > '7') break;
-						istr.get();
-
-						block <<= 3;
-						block |= digit - '0';
-					}
-					if (num_digits != 0)
-					{
-						if constexpr (!std::is_same_v<std::decay_t<T>, bigint>)
-						{
-							// detect overflow
-							if (val.blocks[bits / 64 - 1] >> (std::uint64_t)(64 - 3 * num_digits)) { istr.setstate(std::ios::failbit); return istr; }
-						}
-
-						// incorporate it into value
-						val <<= (std::uint64_t)(3 * num_digits);
-						val |= block;
-					}
-
-					if (num_digits < 21) break;
-				}
-			}
-			else if (istr.flags() & std::ios::hex)
-			{
-			parse_hex:
-
-				// first char must be an hex digit - don't extract
-				if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
-				if (!ext_hex(digit)) { istr.setstate(std::ios::failbit); return istr; }
-
-				while (true)
-				{
-					block = 0; // read a block of 16 hex digits
-					for (num_digits = 0; num_digits < 16; ++num_digits)
-					{
-						// get the digit and make sure it's in range - only extract it if it's good
-						if ((digit = istr.peek()) == EOF) break;
-						if (!ext_hex(digit)) break;
-						istr.get();
-
-						block <<= 4;
-						block |= digit;
-					}
-					if (num_digits != 0)
-					{
-						if constexpr (!std::is_same_v<std::decay_t<T>, bigint>)
-						{
-							// detect overflow
-							if (val.blocks[bits / 64 - 1] >> (std::uint64_t)(64 - 4 * num_digits)) { istr.setstate(std::ios::failbit); return istr; }
-						}
-
-						// incorporate it into value
-						val <<= (std::uint64_t)(4 * num_digits);
-						val |= block;
-					}
-
-					if (num_digits < 16) break;
-				}
-			}
-			else if (istr.flags() & std::ios::dec)
-			{
-			parse_dec:
-
-				// perform multiply/add in terms of a larger int type to easily tell if we overflow (only for finite integral types)
-				std::conditional_t<std::is_same_v<std::decay_t<T>, bigint>, bigint, double_int<detail::bit_count<std::decay_t<T>>::value * 2, false>> bigval = std::move(val);
-
-				// first char must be a dec digit - don't extract
-				if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
-				if (digit < '0' || digit > '9') { istr.setstate(std::ios::failbit); return istr; }
-
-				while (true)
-				{
-					block = 0;               // read a block of 19 dec digits
-					std::uint64_t scale = 1; // scale factor to apply to val for block incorporation (see below)
-					for (num_digits = 0; num_digits < 19; ++num_digits)
-					{
-						// get the digit and make sure it's in range - only extract it if it's good
-						if ((digit = istr.peek()) == EOF) break;
-						if (digit < '0' || digit > '9') break;
-						istr.get();
-
-						scale *= 10;
-						block *= 10;
-						block += digit - '0';
-					}
-					if (num_digits != 0)
-					{
-						// incorporate it into big value
-						bigval *= scale;
-						bigval += block;
-
-						if constexpr (!std::is_same_v<std::decay_t<T>, bigint>)
-						{
-							// detect overflow
-							if (bigval.blocks[bits / 64]) { istr.setstate(std::ios::failbit); return istr; }
-						}
-					}
-
-					if (num_digits < 19) break;
-				}
-
-				if constexpr (!std::is_same_v<std::decay_t<T>, bigint>) val = (T)bigval; // copy low half of bigval to result
-				else val = std::move(bigval);
-			}
-			else // if no base specified, determine it from the suffix
-			{
-				// look at the top character - fail if none
-				if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
-				// if it's a zero we have a prefix
-				if (digit == '0')
-				{
-					// get the next character - if there is none, it's a valid dec zero
+					// get the digit and make sure it's in range - only extract it if it's good
+					if ((digit = istr.peek()) == EOF) break;
+					if (digit < '0' || digit > '9') break;
 					istr.get();
-					if ((digit = istr.peek()) == EOF) return istr;
 
-					// if second char is 'x', extract it and parse a hex value
-					if (digit == 'x') { istr.get(); goto parse_hex; }
-					// otherwise parse as oct
-					else goto parse_oct;
+					scale *= 10;
+					block *= 10;
+					block += digit - '0';
 				}
-				// no prefix is dec
-				else goto parse_dec;
+				if (num_digits != 0)
+				{
+					// incorporate it into big value
+					bigval *= scale;
+					bigval += block;
+
+					if constexpr (!std::is_same_v<std::decay_t<T>, bigint>)
+					{
+						// detect overflow
+						if (bigval.blocks[bits / 64]) { istr.setstate(std::ios::failbit); return istr; }
+					}
+				}
+
+				if (num_digits < 19) break;
 			}
+
+			if constexpr (!std::is_same_v<std::decay_t<T>, bigint>) val = (T)bigval; // copy low half of bigval to result
+			else val = std::move(bigval);
 
 			return istr;
+		}
+		template<typename T, std::enable_if_t<detail::is_biggerints_type<T>::value, int> = 0>
+		std::istream &parse_positive(std::istream &istr, T &val, bool noskipws = false)
+		{
+			switch (istr.flags() & std::ios::basefield)
+			{
+			case std::ios::hex: return parse_positive_hex(istr, val, noskipws);
+			case std::ios::oct: return parse_positive_oct(istr, val, noskipws);
+			case std::ios::dec: return parse_positive_dec(istr, val, noskipws);
+			case 0:
+			{
+				std::istream::sentry sentry(istr, noskipws);
+				if (!sentry) return istr;
+
+				int digit;
+				if ((digit = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+				if (digit == '0') // if first digit is a zero we have a prefix
+				{
+					istr.get();
+					if ((digit = istr.peek()) == EOF) return istr; // get the next character - if there is none, it's a valid dec zero
+
+					if (digit == 'x') { istr.get(); return parse_positive_hex(istr, val, true); } // if second char is 'x', extract it and parse a hex value
+					else return parse_positive_oct(istr, val, true);                              // otherwise parse as oct
+				}
+				else return parse_positive_dec(istr, val, true); // no prefix is decimal
+			}
+			default: istr.setstate(std::ios::failbit); return istr; // if there are multiple base flags set, just fail (ambiguous)
+			}
 		}
 
 		template<std::uint64_t bits> inline std::istream &operator>>(std::istream &istr, double_int<bits, false> &val) { parse_positive(istr, val); return istr; }
@@ -2069,38 +2114,51 @@ namespace BiggerInts
 		template<typename T, std::enable_if_t<detail::is_signed_double_int<T>::value || std::is_same_v<T, bigint>, int> = 0>
 		std::istream &parse_signed(std::istream &istr, T &val)
 		{
-			int ch;
-			bool neg = false; // we'll do signed io in terms of unsigned
+			constexpr std::uint64_t bits = detail::bit_count<std::decay_t<T>>::value;
 
 			std::istream::sentry sentry(istr);
 			if (!sentry) return istr;
 
-			// look at the first char - fail if we can't get one
-			if ((ch = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+			int ch;
+			bool neg = false;
+			typedef std::conditional_t<std::is_same_v<T, bigint>, bigint, double_int<bits, false>> _T;
+			std::istream &(*parser)(std::istream&, _T&, bool) = parse_positive; // the parser function to use (default to universal version)
 
-			// account for optional sign - extract it if present
-			if (ch == '-') { istr.get(); neg = true; }
-			else if (ch == '+') istr.get();
-
-			if constexpr (!std::is_same_v<std::decay_t<T>, bigint>)
+			if ((istr.flags() & std::ios::basefield) == std::ios::dec) // decimal is the only base where signs come into play
 			{
-				// parse the value (and don't skip ws since we already did that)
-				double_int<detail::bit_count<std::decay_t<T>>::value, false> tmp;
-				if (!parse_positive(istr, tmp, true)) return istr;
-				val = tmp; // store the tmp parse location back to val
+				if ((ch = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+				if (ch == '-' || ch == '+')
+				{
+					istr.get();      // extract the sign char
+					neg = ch == '-'; // update sign flag
+				}
+			}
+			else if ((istr.flags() & std::ios::basefield) == 0) // otherwise if we're supposed to figure out the format and we see a sign char then it's decimal
+			{
+				if ((ch = istr.peek()) == EOF) { istr.setstate(std::ios::failbit | std::ios::eofbit); return istr; }
+				if (ch == '-' || ch == '+')
+				{
+					istr.get();                  // extract the sign char
+					neg = ch == '-';             // update sign flag
+					parser = parse_positive_dec; // set to dec parser (rather than universal parser)
+				}
+			}
+
+			if constexpr (!std::is_same_v<T, bigint>)
+			{
+				double_int<detail::bit_count<std::decay_t<T>>::value, false> tmp; // signed double_int parse handled by unsigned
+				if (!parser(istr, tmp, true)) return istr;                        // don't skip white space (we already did that above)
+				val = tmp;
 			}
 			else
 			{
-				if (!parse_positive(istr, val, true)) return istr;
+				if (!parser(istr, val, true)) return istr; // don't skip white space (we already did that above)
 			}
 
-			// account for sign in result
-			if (neg) detail::make_neg(val);
-
+			if (neg) detail::make_neg(val); // account for sign in result
 			if constexpr (!std::is_same_v<std::decay_t<T>, bigint>)
 			{
-				// check for signed overflow
-				if (detail::is_neg(val) != neg) { istr.setstate(std::ios::failbit); return istr; }
+				if (detail::is_neg(val) != neg) { istr.setstate(std::ios::failbit); return istr; } // check for signed overflow
 			}
 
 			return istr;
