@@ -40,7 +40,7 @@ volatile std::uint64_t dont_optimize_this_away = 0; // Kelek's breath, optimizer
 
 void do_something(const BiggerInts::bigint &v) { dont_optimize_this_away += v.blocks.empty() ? 0ull : v.blocks[0]; }
 template<std::uint64_t bits, bool sign>
-void do_something(const BiggerInts::detail::double_int<bits, sign> &v) { dont_optimize_this_away += v.blocks[0]; }
+void do_something(const BiggerInts::detail::fixed_int<bits, sign> &v) { dont_optimize_this_away += v.blocks[0]; }
 template<typename T>
 void do_something(const std::pair<T, T> &v) { do_something(v.first); do_something(v.second); }
 void do_something(const std::string &a) { dont_optimize_this_away += (std::uint64_t)a.size(); }
@@ -347,7 +347,7 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 	std::cerr << '\n';
 }
 
-int main()
+void detail_tests()
 {
 	assert(detail::_mul_u64(0 COMMA 0) == std::make_pair<std::uint64_t COMMA std::uint64_t>(0ull COMMA 0ull));
 	assert(detail::_mul_u64(34346 COMMA 0) == std::make_pair<std::uint64_t COMMA std::uint64_t>(0ull COMMA 0ull));
@@ -361,7 +361,9 @@ int main()
 		assert(detail::highest_set_bit((std::uint64_t)1 << i) == i);
 	}
 	assert(detail::highest_set_bit(uint_t<512>(0)) == 0);
-
+}
+void smol_tests()
+{
 	assert(tostr(uint_t<128>(2) * uint_t<128>(13)) == "26");
 	assert(tostr(uint_t<128>(2) + uint_t<128>(13)) == "15");
 	assert(tostr(uint_t<128>(20) - uint_t<128>(13)) == "7");
@@ -393,10 +395,12 @@ int main()
 
 	assert(tostr(int_t<128>(-13) >> 1) == "-7");
 	assert(tostr(int_t<128>(-13) >> 2) == "-4");
-
+}
+void bigboi_tests()
+{
 	uint_t<8192> big_mul = 947563412;
 	assert(tostr(big_mul) == "947563412");
-	
+
 	big_mul *= big_mul;
 	assert(tostr(big_mul) == "897876419761081744");
 
@@ -407,6 +411,38 @@ int main()
 	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119296");
 
 	big_mul += 17;
+	big_mul += (decltype(big_mul))0;
+	big_mul = big_mul + (decltype(big_mul))0;
+	big_mul = (decltype(big_mul))0 + big_mul;
+	big_mul = big_mul + 0;
+	big_mul = 0 + big_mul;
+	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	big_mul -= 0;
+	big_mul = big_mul - (decltype(big_mul))0;
+	big_mul = (decltype(big_mul))0 - big_mul;
+	big_mul = big_mul - 0;
+	big_mul = 0 - big_mul;
+	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	big_mul &= (decltype(big_mul))-1;
+	big_mul &= -1;
+	big_mul = big_mul & (decltype(big_mul))-1;
+	big_mul = big_mul & -1;
+	big_mul = (decltype(big_mul))-1 & big_mul;
+	big_mul = -1 & big_mul;
+	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	big_mul |= (decltype(big_mul))0;
+	big_mul |= 0;
+	big_mul = big_mul | (decltype(big_mul))0;
+	big_mul = big_mul | 0;
+	big_mul = (decltype(big_mul))0 | big_mul;
+	big_mul = 0 | big_mul;
+	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	big_mul ^= (decltype(big_mul))0;
+	big_mul ^= 0;
+	big_mul = big_mul ^ (decltype(big_mul))0;
+	big_mul = big_mul ^ 0;
+	big_mul = (decltype(big_mul))0 ^ big_mul;
+	big_mul = 0 ^ big_mul;
 	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
 
 	big_mul <<= 621;
@@ -482,21 +518,9 @@ int main()
 
 	assert(tostr(big_mul + 75u) == "540");
 	assert(tostr(big_mul ^ big_mul) == "0");
-
-	// -- type equivalence tests -- //
-
-	static_assert(std::is_same<uint_t<8>, std::uint8_t>::value, "type equivalence violation");
-	static_assert(std::is_same<uint_t<16>, std::uint16_t>::value, "type equivalence violation");
-	static_assert(std::is_same<uint_t<32>, std::uint32_t>::value, "type equivalence violation");
-	static_assert(std::is_same<uint_t<64>, std::uint64_t>::value, "type equivalence violation");
-
-	static_assert(std::is_same<int_t<8>, std::int8_t>::value, "type equivalence violation");
-	static_assert(std::is_same<int_t<16>, std::int16_t>::value, "type equivalence violation");
-	static_assert(std::is_same<int_t<32>, std::int32_t>::value, "type equivalence violation");
-	static_assert(std::is_same<int_t<64>, std::int64_t>::value, "type equivalence violation");
-
-	// -- numeric limits tests -- //
-
+}
+void numeric_limits_tests()
+{
 	assert(tostr(std::numeric_limits<uint_t<512>>::min()) == "0");
 	assert(tostr(std::numeric_limits<uint_t<512>>::max()) == "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095");
 	assert(tostr(std::numeric_limits<uint_t<512>>::lowest()) == "0");
@@ -520,9 +544,9 @@ int main()
 	assert(tostr(std::numeric_limits<int_t<64>>::min()) == "-9223372036854775808");
 	assert(tostr(std::numeric_limits<int_t<64>>::max()) == "9223372036854775807");
 	assert(tostr(std::numeric_limits<int_t<64>>::lowest()) == "-9223372036854775808");
-
-	// -- test string parsing -- //
-
+}
+void simple_parse_tests()
+{
 	assert(tostr(uint_t<256>::parse("184738578493786576848368767654873647697975746763857664")) == "184738578493786576848368767654873647697975746763857664");
 	assert(tostr(uint_t<256>::parse("18")) == "18");
 	assert(uint_t<256>::parse("18") == 18u);
@@ -593,7 +617,9 @@ int main()
 
 	assert(tostr(int_t<256>::parse("167345562314657356422211643535261643535621", 8)) == "19846815955032434075951735996930767761");
 	assert(tostr(int_t<256>::parse("167345562314657356422211643535261643535621", 16)) == "32811116214936888653588305588611479218962394469921");
-
+}
+void big_parse_tests()
+{
 	{
 		uint_t<256> temp;
 		bigint big_temp;
@@ -1127,9 +1153,11 @@ int main()
 		assert(bigint::parse("00777777777777777777777", 0) == 0777777777777777777777ull);
 		assert(bigint::parse("0x7fffffffffffffff", 0) == 0777777777777777777777ull);
 	}
-
+}
+void block_parse_tests()
+{
 	{
-		const char *strs[] = 
+		const char *strs[] =
 		{
 			"67039039649712985497870124991029230637396829102961966888617807218608820150367734884009371490834517138450159290932430254268769414059732849732168245030420",
 			"6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042000",
@@ -1172,9 +1200,9 @@ int main()
 		b = bigint::parse(bigstr);
 		assert(tostr(b) == bigstr);
 	}
-
-	// overflow parsing tests
-
+}
+void overflow_parse_tests()
+{
 	{
 		uint_t<512> u;
 		int_t<512> s;
@@ -1195,9 +1223,9 @@ int main()
 		assert(!int_t<512>::try_parse(s, "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042049"));
 		assert(!int_t<512>::try_parse(s, "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048"));
 	}
-
-	// -- promotion tests -- //
-
+}
+void promotion_demotion_tests()
+{
 	{
 		auto f128 = [](auto v) {
 			using namespace BiggerInts;
@@ -1227,7 +1255,7 @@ int main()
 	}
 
 	// -- demotion tests -- //
-	
+
 	{
 		uint_t<256> u6 = 64;
 		uint_t<128> u5 = (uint_t<128>)u6;
@@ -1359,7 +1387,9 @@ int main()
 			assert(vp1 >= vm1);
 		}
 	}
-
+}
+void more_ops_tests()
+{
 	{
 		long long vals[] = { 0, 2, -4, 1, 233, -1646, -233, 453567, -447453, 35, 2, -2, -1 };
 		constexpr int count = sizeof(vals) / sizeof(*vals);
@@ -1491,14 +1521,16 @@ int main()
 			assert(bigneg.blocks.size() == 0);
 		}
 	}
-	
+}
+void big_promotion_tests()
+{
 	{
 		bigint v = bigint::parse("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16);
 		bigint r = v * v;
 		assert(tostr(r) == "1026301351570233739499293428424157827113862320509474868877723027253195088579758740627615722253086934881590063514230345951830442386318246187269187562628311952630251852968692235997360173760639550065418089580517919902935726984364421732731351192069777176001110091235222448929542559681760328631249946802584338006151524151805763498018141131455523556616803713025");
 		uint_t<1024> v1024;
 
-		const char *bigint_strs[] = 
+		const char *bigint_strs[] =
 		{
 			"0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			"1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -1537,7 +1569,7 @@ int main()
 		static_assert(sizeof(bigint_strs) == sizeof(ans));
 		static_assert(sizeof(other_strs) == sizeof(ans));
 		constexpr std::size_t count = sizeof(bigint_strs) / sizeof(*bigint_strs);
-		
+
 		for (std::size_t i = 0; i < count; ++i)
 		{
 			bigint::parse(v, bigint_strs[i], 16);
@@ -1560,7 +1592,9 @@ int main()
 			assert(tostr(v1024) == ans[i]);
 		}
 	}
-
+}
+void misc_tests()
+{
 	{
 		assert(tostr(bigint::parse("12") * bigint::parse("12")) == "144");
 		assert(tostr(bigint::parse("-12") * bigint::parse("12")) == "-144");
@@ -1575,7 +1609,9 @@ int main()
 		v *= v;
 		assert(v == 144);
 	}
-
+}
+void pow_tests()
+{
 	{
 		assert(tostr(bigint::pow(12, -1)) == "0");
 		assert(tostr(bigint::pow(12, 0)) == "1");
@@ -1594,7 +1630,9 @@ int main()
 		assert(tostr(bigint::pow(122, 32)) == "5801156497853265440881973185035019503869198362251315125887713673216");
 		assert(tostr(bigint::pow(56, 73)) == "41469229998734605907229666533990439080884762393847798172038084645287681671512979662987869210144861737361911662097025032274313216");
 	}
-
+}
+void factorial_tests()
+{
 	{
 		const char *factorial_tests[] = {
 			"1",
@@ -1707,10 +1745,40 @@ int main()
 			assert(tostr(v) == factorial_tests[i]);
 		}
 	}
+}
+
+static_assert(std::is_same<uint_t<8>, std::uint8_t>::value, "type equivalence violation");
+static_assert(std::is_same<uint_t<16>, std::uint16_t>::value, "type equivalence violation");
+static_assert(std::is_same<uint_t<32>, std::uint32_t>::value, "type equivalence violation");
+static_assert(std::is_same<uint_t<64>, std::uint64_t>::value, "type equivalence violation");
+
+static_assert(std::is_same<int_t<8>, std::int8_t>::value, "type equivalence violation");
+static_assert(std::is_same<int_t<16>, std::int16_t>::value, "type equivalence violation");
+static_assert(std::is_same<int_t<32>, std::int32_t>::value, "type equivalence violation");
+static_assert(std::is_same<int_t<64>, std::int64_t>::value, "type equivalence violation");
+
+int main()
+{
+	// -- core tests -- //
+
+	detail_tests();
+	smol_tests();
+	bigboi_tests();
+	numeric_limits_tests();
+	simple_parse_tests();
+	big_parse_tests();
+	block_parse_tests();
+	overflow_parse_tests();
+	promotion_demotion_tests();
+	more_ops_tests();
+	big_promotion_tests();
+	misc_tests();
+	pow_tests();
+	factorial_tests();
 
 	// -- benchmarks -- //
 
-	benchmark_binary("multiply ", 100000, 20000, 1000, 5000, [](const auto &a, const auto &b) { return a * b; });
+	benchmark_binary("multiply ", 200000, 20000, 1000, 5000, [](const auto &a, const auto &b) { return a * b; });
 	benchmark_binary("divmod   ", 4000, 2000, 100, 500, [](const auto &a, const auto &b) { return detail::divmod(a, b); });
 	benchmark_binary("tostr dec", 1000, 1000, 100, 100, [](const auto &a, const auto &b) { return tostr(a) + tostr(b); });
 	benchmark_binary("tostr hex", 1000, 1000, 1000, 1000, [](const auto &a, const auto &b) { return tostr(std::hex, a) + tostr(std::hex, b); });
