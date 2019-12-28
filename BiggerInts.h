@@ -138,9 +138,6 @@ namespace BiggerInts
 		}
 
 		template<std::uint64_t bits, bool sign>
-		constexpr void bit_set_unchecked(fixed_int<bits, sign> &val, std::uint64_t bit) noexcept {  }
-
-		template<std::uint64_t bits, bool sign>
 		constexpr bool is_neg(const fixed_int<bits, sign> &val) noexcept { return val.blocks[bits / 64 - 1] & 0x8000000000000000; }
 
 		
@@ -321,7 +318,7 @@ namespace BiggerInts
 		}
 
 		// res must already be initialized to zero before calling this
-		constexpr void multiply_same_size_already_zero(fixed_int_wrapper res, const_fixed_int_wrapper a, const_fixed_int_wrapper b) noexcept
+		inline void multiply_same_size_already_zero(fixed_int_wrapper res, const_fixed_int_wrapper a, const_fixed_int_wrapper b) noexcept
 		{
 			for (std::size_t i = 0; i < res.blocks_n; ++i) // loop through each block in a
 			{
@@ -565,8 +562,8 @@ namespace BiggerInts
 					constexpr fixed_int &operator=(const fixed_int<_bits, _sign> &other) noexcept
 					{
 						for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
-						std::uint64_t fill;
-						if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0; else fill = 0;
+						std::uint64_t fill = 0;
+						if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0;
 						for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
 						return *this;
 					}

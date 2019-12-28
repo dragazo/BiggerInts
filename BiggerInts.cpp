@@ -587,6 +587,7 @@ std::ostream &print_positive(std::ostream &ostr, T val, char sign_ch)
 		const bool sign = detail::is_neg(val);
 		const char hex_alpha = ostr.flags() & std::ios::uppercase ? 'A' : 'a';
 
+		(void)sign; // suppress unused warnings
 		if constexpr (std::is_same_v<T, bigint>)
 		{
 			if (sign) val.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
@@ -641,6 +642,7 @@ std::ostream &print_positive(std::ostream &ostr, T val, char sign_ch)
 	{
 		const bool sign = detail::is_neg(val);
 
+		(void)sign; // suppress unused warnings
 		if constexpr (std::is_same_v<T, bigint>)
 		{
 			if (sign) val.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
@@ -790,6 +792,9 @@ std::ostream &detail::operator<<(std::ostream &ostr, bigint &&val) { return prin
 template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
 std::istream &parse_positive_hex(std::istream &istr, T &val, bool noskipws = false)
 {
+	std::istream::sentry sentry(istr, noskipws);
+	if (!sentry) return istr;
+
 	// start by zeroing value
 	if constexpr (std::is_same_v<T, bigint>) val.blocks.clear();
 	else for (std::size_t i = 0; i < val.blocks_n; ++i) val.blocks[i] = 0;
@@ -856,6 +861,9 @@ std::istream &parse_positive_hex(std::istream &istr, T &val, bool noskipws = fal
 template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
 std::istream &parse_positive_oct(std::istream &istr, T &val, bool noskipws = false)
 {
+	std::istream::sentry sentry(istr, noskipws);
+	if (!sentry) return istr;
+
 	// start by zeroing value
 	if constexpr (std::is_same_v<T, bigint>) val.blocks.clear();
 	else for (std::size_t i = 0; i < val.blocks_n; ++i) val.blocks[i] = 0;
@@ -923,6 +931,9 @@ std::istream &parse_positive_oct(std::istream &istr, T &val, bool noskipws = fal
 template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
 std::istream &parse_positive_dec(std::istream &istr, T &val, bool noskipws = false)
 {
+	std::istream::sentry sentry(istr, noskipws);
+	if (!sentry) return istr;
+
 	// start by zeroing value
 	if constexpr (std::is_same_v<T, bigint>) val.blocks.clear();
 	else for (std::size_t i = 0; i < val.blocks_n; ++i) val.blocks[i] = 0;
@@ -987,12 +998,13 @@ std::istream &parse_positive_dec(std::istream &istr, T &val, bool noskipws = fal
 template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
 std::istream &parse_positive(std::istream &istr, T &val, bool noskipws = false)
 {
-	switch (istr.flags() & std::ios::basefield)
+	typedef std::underlying_type_t<std::ios::fmtflags> enum_t;
+	switch ((enum_t)(istr.flags() & std::ios::basefield))
 	{
-	case std::ios::hex: return parse_positive_hex(istr, val, noskipws);
-	case std::ios::oct: return parse_positive_oct(istr, val, noskipws);
-	case std::ios::dec: return parse_positive_dec(istr, val, noskipws);
-	case 0:
+	case (enum_t)std::ios::hex: return parse_positive_hex(istr, val, noskipws);
+	case (enum_t)std::ios::oct: return parse_positive_oct(istr, val, noskipws);
+	case (enum_t)std::ios::dec: return parse_positive_dec(istr, val, noskipws);
+	case (enum_t)0:
 	{
 		std::istream::sentry sentry(istr, noskipws);
 		if (!sentry) return istr;

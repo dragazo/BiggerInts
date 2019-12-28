@@ -1,6 +1,6 @@
 # BiggerInts
 
-BiggerInts is a header-only C++17 library that generates signed and unsigned integer types of increasingly larger sizes.
+BiggerInts is a C++17 library that generates signed and unsigned integer types of increasingly larger sizes.
 All features are held in [BiggerInts.h](BiggerInts.h) in a namespace by the same name.
 
 The following type aliases are provided:
