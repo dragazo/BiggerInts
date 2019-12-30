@@ -617,6 +617,54 @@ void simple_parse_tests()
 
 	assert(tostr(int_t<256>::parse("167345562314657356422211643535261643535621", 8)) == "19846815955032434075951735996930767761");
 	assert(tostr(int_t<256>::parse("167345562314657356422211643535261643535621", 16)) == "32811116214936888653588305588611479218962394469921");
+
+	// zero parsing edge cases
+
+	auto zero_tester = [](auto v) {
+		assert(decltype(v)::parse("0") == 0);
+		assert(decltype(v)::parse(" 0") == 0);
+		assert(decltype(v)::parse("0 ") == 0);
+		assert(decltype(v)::parse(" 0 ") == 0);
+
+		assert(decltype(v)::parse("0", 10) == 0);
+		assert(decltype(v)::parse(" 0", 10) == 0);
+		assert(decltype(v)::parse("0 ", 10) == 0);
+		assert(decltype(v)::parse(" 0 ", 10) == 0);
+
+		assert(decltype(v)::parse("0", 8) == 0);
+		assert(decltype(v)::parse(" 0", 8) == 0);
+		assert(decltype(v)::parse("0 ", 8) == 0);
+		assert(decltype(v)::parse(" 0 ", 8) == 0);
+
+		assert(decltype(v)::parse("0", 16) == 0);
+		assert(decltype(v)::parse(" 0", 16) == 0);
+		assert(decltype(v)::parse("0 ", 16) == 0);
+		assert(decltype(v)::parse(" 0 ", 16) == 0);
+
+		assert(decltype(v)::parse("0", 0) == 0);
+		assert(decltype(v)::parse(" 0", 0) == 0);
+		assert(decltype(v)::parse("0 ", 0) == 0);
+		assert(decltype(v)::parse(" 0 ", 0) == 0);
+
+		assert(!decltype(v)::try_parse(v, "0x", 0));
+		assert(!decltype(v)::try_parse(v, " 0x", 0));
+		assert(!decltype(v)::try_parse(v, "0x ", 0));
+		assert(!decltype(v)::try_parse(v, " 0x ", 0));
+
+		assert(!decltype(v)::try_parse(v, "0 x", 0));
+		assert(!decltype(v)::try_parse(v, " 0 x", 0));
+		assert(!decltype(v)::try_parse(v, "0 x ", 0));
+		assert(!decltype(v)::try_parse(v, " 0 x ", 0));
+
+		assert(!decltype(v)::try_parse(v, "0 1", 0));
+		assert(!decltype(v)::try_parse(v, " 0 1", 0));
+		assert(!decltype(v)::try_parse(v, "0 1 ", 0));
+		assert(!decltype(v)::try_parse(v, " 0 1 ", 0));
+	};
+
+	zero_tester(uint_t<256>{});
+	zero_tester(int_t<256>{});
+	zero_tester(bigint{});
 }
 void big_parse_tests()
 {

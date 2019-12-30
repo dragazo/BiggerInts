@@ -1065,10 +1065,11 @@ std::istream &parse_positive(std::istream &istr, T &val, bool noskipws = false)
 		if (digit == '0') // if first digit is a zero we have a prefix
 		{
 			istr.get();
-			if ((digit = istr.peek()) == EOF) return istr; // get the next character - if there is none, it's a valid dec zero
+			if ((digit = istr.peek()) == EOF) return istr; // get the next character - if there is none, it's a valid decimal zero
 
-			if (digit == 'x') { istr.get(); return parse_positive_hex(istr, val, true); } // if second char is 'x', extract it and parse a hex value
-			else return parse_positive_oct(istr, val, true);                              // otherwise parse as oct
+			if (digit == 'x') { istr.get(); return parse_positive_hex(istr, val, true); }            // if second char is 'x', extract it and parse a hex value
+			else if (std::isdigit((unsigned char)digit)) return parse_positive_oct(istr, val, true); // otherwise if it's a digit parse as oct
+			else return istr;                                                                        // otherwise is a valid decimal zero
 		}
 		else return parse_positive_dec(istr, val, true); // no prefix is decimal
 	}
