@@ -1604,10 +1604,20 @@ void misc_tests()
 		bigint v = 12;
 		v *= v;
 		assert(v == 144);
-
 		v = -12;
 		v *= v;
 		assert(v == 144);
+	}
+	{
+		std::pair<bigint, bigint> v = detail::divmod((bigint)5, (bigint)3);
+		assert(v.first == 1);
+		assert(v.second == 2);
+		v = detail::divmod((bigint)5, 3);
+		assert(v.first == 1);
+		assert(v.second == 2);
+		v = detail::divmod(5, (bigint)3);
+		assert(v.first == 1);
+		assert(v.second == 2);
 	}
 }
 void pow_tests()

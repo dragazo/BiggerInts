@@ -1,3 +1,7 @@
+#include <cctype>
+#include <sstream>
+#include <algorithm>
+
 #include "BiggerInts.h"
 
 using namespace BiggerInts;
@@ -504,31 +508,81 @@ std::pair<bigint, bigint> detail::divmod_unchecked_positive(const bigint &num, c
 	return res;
 }
 
-bool bigint::try_parse(bigint &res, std::string_view str, int base)
+template<typename U, typename V, std::enable_if_t<std::is_same_v<std::decay_t<U>, bigint> && std::is_same_v<std::decay_t<V>, bigint>, int> = 0>
+std::pair<bigint, bigint> _divmod_unchecked(U &&a, V &&b)
 {
-	std::istringstream ss(std::string(str.begin(), str.end())); // unfortunately istringstream requires a copy because stdlib is dumb
+	const bool a_neg = detail::is_neg(a);
+	const bool b_neg = detail::is_neg(b);
 
-	if (base == 10) {}
-	else if (base == 16) ss.setf(std::ios::hex, std::ios::basefield);
-	else if (base == 8) ss.setf(std::ios::oct, std::ios::basefield);
-	else if (base == 0) ss.unsetf(std::ios::basefield);
-	else throw std::invalid_argument("unrecognized base specified");
+	if (a_neg && b_neg)
+	{
+		bigint a_cpy = std::forward<U>(a);
+		bigint b_cpy = std::forward<V>(b);
+		detail::make_neg(a_cpy);
+		detail::make_neg(b_cpy);
 
-	ss >> res;
-	if (!ss) return false; // parse needs to succeed
-	while (std::isspace((unsigned char)ss.peek())) ss.get();
-	return ss.eof(); // we need to have parsed the entire string
+		return detail::divmod_unchecked_positive(a_cpy, b_cpy);
+	}
+	else if (a_neg)
+	{
+		bigint a_cpy = std::forward<U>(a);
+		detail::make_neg(a_cpy);
+
+		auto res = detail::divmod_unchecked_positive(a_cpy, b);
+		detail::make_neg(res.first);
+		detail::make_neg(res.second);
+		return res;
+	}
+	else if (b_neg)
+	{
+		bigint b_cpy = std::forward<V>(b);
+		detail::make_neg(b_cpy);
+
+		auto res = detail::divmod_unchecked_positive(a, b_cpy);
+		detail::make_neg(res.first);
+		detail::make_neg(res.second);
+		return res;
+	}
+	else return detail::divmod_unchecked_positive(a, b);
 }
-void bigint::parse(bigint &res, std::string_view str, int base)
+
+template<typename U, typename V, std::enable_if_t<std::is_same_v<std::decay_t<U>, bigint> && std::is_same_v<std::decay_t<V>, bigint>, int> = 0>
+std::pair<bigint, bigint> _divmod(U &&a, V &&b)
 {
-	if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string");
+	if (!b) throw std::domain_error("divide by zero");
+	return _divmod_unchecked(std::forward<U>(a), std::forward<V>(b));
 }
-bigint bigint::parse(std::string_view str, int base)
+
+std::pair<bigint, bigint> detail::divmod(const bigint &a, const bigint &b) { return _divmod(a, b); }
+std::pair<bigint, bigint> detail::divmod(bigint &&a, const bigint &b) { return _divmod(std::move(a), b); }
+std::pair<bigint, bigint> detail::divmod(const bigint &a, bigint &&b) { return _divmod(a, std::move(b)); }
+std::pair<bigint, bigint> detail::divmod(bigint &&a, bigint &&b) { return _divmod(std::move(a), std::move(b)); }
+
+bigint detail::operator/(const bigint &num, const bigint &den) { return detail::divmod(num, den).first; }
+bigint detail::operator/(bigint &&num, const bigint &den) { return detail::divmod(std::move(num), den).first; }
+bigint detail::operator/(const bigint &num, bigint &&den) { return detail::divmod(num, std::move(den)).first; }
+bigint detail::operator/(bigint &&num, bigint &&den) { return detail::divmod(std::move(num), std::move(den)).first; }
+
+bigint detail::operator%(const bigint &num, const bigint &den) { return detail::divmod(num, den).second; }
+bigint detail::operator%(bigint &&num, const bigint &den) { return detail::divmod(std::move(num), den).second; }
+bigint detail::operator%(const bigint &num, bigint &&den) { return detail::divmod(num, std::move(den)).second; }
+bigint detail::operator%(bigint &&num, bigint &&den) { return detail::divmod(std::move(num), std::move(den)).second; }
+
+bigint &detail::operator/=(bigint &num, const bigint &den)
 {
-	bigint res;
-	parse(res, str, base);
-	return res;
+	if (&num != &den) num = std::move(num) / den;
+	else num = num / den;
+	return num;
 }
+bigint &detail::operator/=(bigint &num, bigint &&den) { num = std::move(num) / std::move(den); return num; }
+
+bigint &detail::operator%=(bigint &num, const bigint &den)
+{
+	if (&num != &den) num = std::move(num) % den;
+	else num = num % den;
+	return num;
+}
+bigint &detail::operator%=(bigint &num, bigint &&den) { num = std::move(num) % std::move(den); return num; }
 
 bigint bigint::pow(bigint a, const bigint &b) // pass by value is intentional
 {
@@ -567,8 +621,6 @@ constexpr bool ext_hex(int &ch) noexcept
 	if (ch >= 'a' && ch <= 'f') { ch = ch - 'a' + 10; return true; }
 	return false;
 }
-
-//template<typename T> static inline const T stringify_decimal_base = 10000000000000000000ull; // base to use for decimal stringification
 
 // prints the value - interpreted as non-negative - sign_ch (if not null) is appended to the front of the printed value
 template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
@@ -976,8 +1028,8 @@ std::istream &parse_positive_dec(std::istream &istr, T &val, bool noskipws = fal
 				for (std::size_t i = 0; i < val.blocks_n; ++i) val.blocks[i] = 0;
 
 				// incorporate it into val
-				std::uint64_t overflow = multiply_word_already_zero(val, { &buffer[0], buffer.size() }, scale);
-				overflow += add_block(val, block);
+				std::uint64_t overflow = multiply_u64_already_zero(val, { &buffer[0], buffer.size() }, scale);
+				overflow += add_u64(val, block);
 
 				// detect overflow
 				if (overflow) { istr.setstate(std::ios::failbit); return istr; }
@@ -998,13 +1050,12 @@ std::istream &parse_positive_dec(std::istream &istr, T &val, bool noskipws = fal
 template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
 std::istream &parse_positive(std::istream &istr, T &val, bool noskipws = false)
 {
-	typedef std::underlying_type_t<std::ios::fmtflags> enum_t;
-	switch ((enum_t)(istr.flags() & std::ios::basefield))
+	switch ((int)(istr.flags() & std::ios::basefield))
 	{
-	case (enum_t)std::ios::hex: return parse_positive_hex(istr, val, noskipws);
-	case (enum_t)std::ios::oct: return parse_positive_oct(istr, val, noskipws);
-	case (enum_t)std::ios::dec: return parse_positive_dec(istr, val, noskipws);
-	case (enum_t)0:
+	case (int)std::ios::hex: return parse_positive_hex(istr, val, noskipws);
+	case (int)std::ios::oct: return parse_positive_oct(istr, val, noskipws);
+	case (int)std::ios::dec: return parse_positive_dec(istr, val, noskipws);
+	case 0:
 	{
 		std::istream::sentry sentry(istr, noskipws);
 		if (!sentry) return istr;
@@ -1070,3 +1121,30 @@ void detail::parse_positive_core(std::istream &istr, detail::fixed_int_wrapper v
 void detail::parse_signed_core(std::istream &istr, detail::fixed_int_wrapper val) { parse_signed(istr, val); }
 
 std::istream &detail::operator>>(std::istream &istr, bigint &val) { parse_signed(istr, val); return istr; }
+
+template<bool sign, typename T>
+bool _try_parse(T &res, std::string_view str, int base)
+{
+	std::istringstream ss(std::string(str.begin(), str.end())); // unfortunately istringstream requires a copy because stdlib is dumb
+
+	switch (base)
+	{
+	case 10: break;
+	case 16: ss.setf(std::ios::hex, std::ios::basefield); break;
+	case 8: ss.setf(std::ios::oct, std::ios::basefield); break;
+	case 0: ss.unsetf(std::ios::basefield); break;
+	default: throw std::invalid_argument("unrecognized base specified");
+	}
+
+	if constexpr (sign) parse_signed(ss, res); else parse_positive(ss, res); // run the parser
+	if (!ss) return false;                                                   // parse needs to succeed
+	while (std::isspace((unsigned char)ss.peek())) ss.get();                 // consume trailing white space
+	return ss.eof();                                                         // we need to have parsed the entire string
+}
+
+bool detail::try_parse_unsigned(fixed_int_wrapper res, std::string_view str, int base) { return _try_parse<false>(res, str, base); }
+bool detail::try_parse_signed(fixed_int_wrapper res, std::string_view str, int base) { return _try_parse<true>(res, str, base); }
+
+bool bigint::try_parse(bigint &res, std::string_view str, int base) { return _try_parse<true>(res, str, base); }
+void bigint::parse(bigint &res, std::string_view str, int base) { if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string"); }
+bigint bigint::parse(std::string_view str, int base) { bigint res;  parse(res, str, base); return res; }
