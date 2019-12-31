@@ -105,7 +105,7 @@ int detail::cmp_bigint_builtin(const bigint &a, unsigned long long val) noexcept
 
 	if (a.blocks.size() > 2) return 1; // if a has higher magnitude, it's greater
 	else if (a.blocks.size() == 2 && a.blocks[1]) return 1; // if second block is significant, a is greater
-	else if (a.blocks.size() == 0) return val < 0 ? 1 : val > 0 ? -1 : 0; // if a == 0
+	else if (a.blocks.size() == 0) return val ? -1 : 0; // if a == 0
 	else return a.blocks[0] < val ? -1 : a.blocks[0] > val ? 1 : 0; // otherwise same magnitude
 }
 
