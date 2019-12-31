@@ -1644,6 +1644,17 @@ void big_promotion_tests()
 void misc_tests()
 {
 	{
+		assert(uint_t<256>(5) == 5);
+		assert(int_t<256>(5) == 5);
+		assert(bigint(5) == 5);
+
+		assert(uint_t<256>(5) < uint_t<256>(6));
+		assert(uint_t<256>(-5) > uint_t<256>(6));
+
+		assert(int_t<256>(5) < int_t<256>(6));
+		assert(int_t<256>(-5) < int_t<256>(6));
+	}
+	{
 		assert(tostr(bigint::parse("12") * bigint::parse("12")) == "144");
 		assert(tostr(bigint::parse("-12") * bigint::parse("12")) == "-144");
 		assert(tostr(bigint::parse("12") * bigint::parse("-12")) == "-144");
@@ -1804,6 +1815,23 @@ void factorial_tests()
 		}
 	}
 }
+void divmod_sign_tests()
+{
+	static_assert(6 / 5 == 1); static_assert(6 % 5 == 1); // assert ISO2011 modulus requirements
+	static_assert(6 / -5 == -1); static_assert(6 % -5 == 1);
+	static_assert(-6 / 5 == -1); static_assert(-6 % 5 == -1);
+	static_assert(-6 / -5 == 1); static_assert(-6 % -5 == -1);
+
+	assert(detail::divmod(int_t<256>(6) COMMA int_t<256>(5)) == std::make_pair<int_t<256> COMMA int_t<256>>(1 COMMA 1));
+	assert(detail::divmod(int_t<256>(6) COMMA int_t<256>(-5)) == std::make_pair<int_t<256> COMMA int_t<256>>(-1 COMMA 1));
+	assert(detail::divmod(int_t<256>(-6) COMMA int_t<256>(5)) == std::make_pair<int_t<256> COMMA int_t<256>>(-1 COMMA -1));
+	assert(detail::divmod(int_t<256>(-6) COMMA int_t<256>(-5)) == std::make_pair<int_t<256> COMMA int_t<256>>(1 COMMA -1));
+
+	assert(detail::divmod(bigint(6) COMMA bigint(5)) == std::make_pair<bigint COMMA bigint>(1 COMMA 1));
+	assert(detail::divmod(bigint(6) COMMA bigint(-5)) == std::make_pair<bigint COMMA bigint>(-1 COMMA 1));
+	assert(detail::divmod(bigint(-6) COMMA bigint(5)) == std::make_pair<bigint COMMA bigint>(-1 COMMA - 1));
+	assert(detail::divmod(bigint(-6) COMMA bigint(-5)) == std::make_pair<bigint COMMA bigint>(1 COMMA - 1));
+}
 
 static_assert(std::is_same<uint_t<8>, std::uint8_t>::value, "type equivalence violation");
 static_assert(std::is_same<uint_t<16>, std::uint16_t>::value, "type equivalence violation");
@@ -1833,6 +1861,7 @@ int main()
 	misc_tests();
 	pow_tests();
 	factorial_tests();
+	divmod_sign_tests();
 
 	// -- benchmarks -- //
 

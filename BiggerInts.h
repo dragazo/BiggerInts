@@ -2,7 +2,6 @@
 #define DRAGAZO_BIGGER_INTS_H
 
 #include <cstdint>
-#include <climits>
 #include <type_traits>
 #include <utility>
 #include <iostream>
@@ -124,7 +123,7 @@ namespace BiggerInts
 				#if _MSC_VER
 				a = _umul128(a, b, &b);
 				return { a, b };
-				#elif defined(__GNUC__)
+				#elif __GNUC__
 				auto r = (__uint128_t)a * b;
 				return { (std::uint64_t)r, r >> 64 };
 				#else
@@ -289,7 +288,7 @@ namespace BiggerInts
 			return overflow + p.second;
 		}
 		
-		constexpr bool cmp_less_non_negative(const_fixed_int_wrapper a, const_fixed_int_wrapper b) noexcept
+		constexpr bool cmp_less_non_negative_same_size(const_fixed_int_wrapper a, const_fixed_int_wrapper b) noexcept
 		{
 			for (std::size_t i = a.blocks_n; i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i];
 			return false;
@@ -301,31 +300,31 @@ namespace BiggerInts
 			std::uint64_t bit = highest_set_bit(num);
 
 			const std::size_t den_highest_bit = highest_set_bit(den);
-			std::size_t res_second_highest_bit = 0;
+			std::size_t rem_highest_bit = 0;
 			std::size_t shift_count = 0;
 
 			while (true)
 			{
 				++shift_count;
-				if (res_second_highest_bit + shift_count >= den_highest_bit)
+				if (rem_highest_bit + shift_count >= den_highest_bit)
 				{
 					shl(rem, shift_count);
-					res_second_highest_bit += shift_count;
+					rem_highest_bit += shift_count;
 					shift_count = 0;
 
 					if (bit_test_unchecked(num, bit)) ++rem.blocks[0];
 
-					if (!cmp_less_non_negative(rem, den))
+					if (!cmp_less_non_negative_same_size(rem, den))
 					{
 						sub_same_size(rem, den);
-						res_second_highest_bit = highest_set_bit(rem);
+						rem_highest_bit = highest_set_bit(rem);
 						bit_set_unchecked(quo, bit);
 					}
 				}
 				else if (bit_test_unchecked(num, bit))
 				{
 					shl(rem, shift_count);
-					res_second_highest_bit += shift_count;
+					rem_highest_bit += shift_count;
 					shift_count = 0;
 					++rem.blocks[0];
 				}
@@ -337,17 +336,48 @@ namespace BiggerInts
 		}
 		constexpr void divmod_unchecked_already_zero(fixed_int_wrapper quo, fixed_int_wrapper rem, fixed_int_wrapper num, fixed_int_wrapper den)
 		{
-			bool neg = false;
-			if (detail::is_neg(num)) { detail::make_neg(num); neg = !neg; }
-			if (detail::is_neg(den)) { detail::make_neg(den); neg = !neg; }
+			bool num_neg = detail::is_neg(num);
+			bool den_neg = detail::is_neg(den);
+
+			if (num_neg) detail::make_neg(num);
+			if (den_neg) detail::make_neg(den);
 
 			divmod_unchecked_positive_already_zero(quo, rem, num, den);
 
-			if (neg)
-			{
-				detail::make_neg(quo);
-				detail::make_neg(rem);
-			}
+			if (num_neg ^ den_neg) detail::make_neg(quo);
+			if (num_neg) detail::make_neg(rem);
+		}
+
+		constexpr void zero_extend(fixed_int_wrapper a, unsigned long long val)
+		{
+			a.blocks[0] = val;
+			for (std::size_t i = 1; i < a.blocks_n; ++i) a.blocks[i] = 0;
+		}
+		// a must be at least as large as val
+		constexpr void zero_extend(fixed_int_wrapper a, const_fixed_int_wrapper val)
+		{
+			for (std::size_t i = 0; i < val.blocks_n; ++i) a.blocks[i] = val.blocks[i];
+			for (std::size_t i = val.blocks_n; i < a.blocks_n; ++i) a.blocks[i] = 0;
+		}
+
+		constexpr void sign_extend(fixed_int_wrapper a, signed long long val)
+		{
+			a.blocks[0] = val;
+			std::uint64_t fill = val < 0 ? -1 : 0;
+			for (std::size_t i = 1; i < a.blocks_n; ++i) a.blocks[i] = fill;
+		}
+		// a must be at least as large as val
+		constexpr void sign_extend(fixed_int_wrapper a, const_fixed_int_wrapper val)
+		{
+			for (std::size_t i = 0; i < val.blocks_n; ++i) a.blocks[i] = val.blocks[i];
+			std::uint64_t fill = detail::is_neg(val) ? -1 : 0;
+			for (std::size_t i = val.blocks_n; i < a.blocks_n; ++i) a.blocks[i] = fill;
+		}
+
+		// a must be no larger than val
+		constexpr void demote(fixed_int_wrapper a, const_fixed_int_wrapper val)
+		{
+			for (std::size_t i = 0; i < a.blocks_n; ++i) a.blocks[i] = val.blocks[i];
 		}
 
 		// -- custom intrinsics -- //
@@ -363,14 +393,10 @@ namespace BiggerInts
 		template<> struct is_builtin_int<long> : std::true_type {};
 		template<> struct is_builtin_int<long long> : std::true_type {};
 
-		// checks if T is a biggerints type (signed or unsigned)
+		// checks if T is a biggerings type (signed or unsigned)
 		template<typename T> struct is_biggerints_type : std::false_type {};
 		template<std::uint64_t bits, bool sign> struct is_biggerints_type<fixed_int<bits, sign>> : std::true_type {};
-		template<> struct is_biggerints_type<bigint> : std::true_type {};
-
-		// checks if T is a signed fixed_int
-		template<typename T> struct is_signed_fixed_int : std::false_type {};
-		template<std::uint64_t bits> struct is_signed_fixed_int<fixed_int<bits, true>> : std::true_type {};
+		template<> struct is_biggerints_type<bigint> : std::true_type{};
 	}
 
 	template<std::uint64_t bits> using uint_t = typename detail::fixed_int_selector<bits, false>::type;
@@ -379,24 +405,6 @@ namespace BiggerInts
 
 	namespace detail
 	{
-		// contains an integral constant that represents the number of bits in a given (supported) (integral) type
-		template<typename T> struct bit_count {};
-
-		template<> struct bit_count<unsigned char> : std::integral_constant<std::uint64_t, sizeof(unsigned char) * CHAR_BIT> {};
-		template<> struct bit_count<unsigned short> : std::integral_constant<std::uint64_t, sizeof(unsigned short) * CHAR_BIT> {};
-		template<> struct bit_count<unsigned int> : std::integral_constant<std::uint64_t, sizeof(unsigned int) * CHAR_BIT> {};
-		template<> struct bit_count<unsigned long> : std::integral_constant<std::uint64_t, sizeof(unsigned long) * CHAR_BIT> {};
-		template<> struct bit_count<unsigned long long> : std::integral_constant<std::uint64_t, sizeof(unsigned long long) * CHAR_BIT> {};
-
-		template<> struct bit_count<signed char> : std::integral_constant<std::uint64_t, sizeof(signed char) * CHAR_BIT> {};
-		template<> struct bit_count<signed short> : std::integral_constant<std::uint64_t, sizeof(signed short) * CHAR_BIT> {};
-		template<> struct bit_count<signed int> : std::integral_constant<std::uint64_t, sizeof(signed int) * CHAR_BIT> {};
-		template<> struct bit_count<signed long> : std::integral_constant<std::uint64_t, sizeof(signed long) * CHAR_BIT> {};
-		template<> struct bit_count<signed long long> : std::integral_constant<std::uint64_t, sizeof(signed long long) * CHAR_BIT> {};
-
-		template<std::uint64_t bits, bool sign> struct bit_count<fixed_int<bits, sign>> : std::integral_constant<std::uint64_t, bits> {};
-		template<> struct bit_count<bigint> : std::integral_constant<std::uint64_t, 0ull> {}; // we'll just elect to define bigint as having zero bits - it really has infinite, but that's not representable
-
 		// -- container impl -- //
 
 		bool try_parse_unsigned(fixed_int_wrapper res, std::string_view str, int base = 10);
@@ -433,71 +441,39 @@ namespace BiggerInts
 			constexpr fixed_int(unsigned short val) noexcept : fixed_int((unsigned long long)val) {}
 			constexpr fixed_int(unsigned int val) noexcept : fixed_int((unsigned long long)val) {}
 			constexpr fixed_int(unsigned long val) noexcept : fixed_int((unsigned long long)val) {}
-			constexpr fixed_int(unsigned long long val) noexcept : blocks{}
-			{
-				blocks[0] = val;
-				for (std::size_t i = 1; i < bits / 64; ++i) blocks[i] = 0;
-			}
+			constexpr fixed_int(unsigned long long val) noexcept : blocks{} { *this = val; }
 
 			constexpr fixed_int(signed short val) noexcept : fixed_int((signed long long)val) {}
 			constexpr fixed_int(signed int val) noexcept : fixed_int((signed long long)val) {}
 			constexpr fixed_int(signed long val) noexcept : fixed_int((signed long long)val) {}
-			constexpr fixed_int(signed long long val) noexcept : blocks{}
-			{
-				blocks[0] = val;
-				std::uint64_t fill = val < 0 ? -1 : 0;
-				for (std::size_t i = 1; i < bits / 64; ++i) blocks[i] = fill;
-			}
+			constexpr fixed_int(signed long long val) noexcept : blocks{} { *this = val; }
 
-			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits > _bits), int> = 0>
-					constexpr fixed_int(const fixed_int<_bits, _sign> &other) noexcept : blocks{}
-					{
-						for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
-						std::uint64_t fill = 0;
-						if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0;
-						for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
-					}
+			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(_bits < bits), int> = 0>
+			constexpr fixed_int(const fixed_int<_bits, _sign> &other) noexcept : blocks{} { *this = other; }
 
 		public: // -- promotion assignment -- //
 
 			constexpr fixed_int &operator=(unsigned short val) noexcept { *this = (unsigned long long)val; return *this; }
 			constexpr fixed_int &operator=(unsigned int val) noexcept { *this = (unsigned long long)val; return *this; }
 			constexpr fixed_int &operator=(unsigned long val) noexcept { *this = (unsigned long long)val; return *this; }
-			constexpr fixed_int &operator=(unsigned long long val) noexcept
-			{
-				blocks[0] = val;
-				for (std::size_t i = 1; i < bits / 64; ++i) blocks[i] = 0;
-				return *this;
-			}
+			constexpr fixed_int &operator=(unsigned long long val) noexcept { detail::zero_extend(wrap(*this), val); return *this; }
 
 			constexpr fixed_int &operator=(signed short val) noexcept { *this = (signed long long)val; return *this; }
 			constexpr fixed_int &operator=(signed int val) noexcept { *this = (signed long long)val; return *this; }
 			constexpr fixed_int &operator=(signed long val) noexcept { *this = (signed long long)val; return *this; }
-			constexpr fixed_int &operator=(signed long long val) noexcept
-			{
-				blocks[0] = val;
-				std::uint64_t fill = val < 0 ? -1 : 0;
-				for (std::size_t i = 1; i < bits / 64; ++i) blocks[i] = fill;
-				return *this;
-			}
+			constexpr fixed_int &operator=(signed long long val) noexcept { detail::sign_extend(wrap(*this), val); return *this; }
 
-			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits > _bits), int> = 0>
-					constexpr fixed_int &operator=(const fixed_int<_bits, _sign> &other) noexcept
-					{
-						for (std::size_t i = 0; i < _bits / 64; ++i) blocks[i] = other.blocks[i];
-						std::uint64_t fill = 0;
-						if constexpr (_sign) fill = detail::is_neg(other) ? -1 : 0;
-						for (std::size_t i = _bits / 64; i < bits / 64; ++i) blocks[i] = fill;
-						return *this;
-					}
+			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(_bits < bits), int> = 0>
+				constexpr fixed_int &operator=(const fixed_int<_bits, _sign> &other) noexcept
+				{
+					if constexpr (_sign) sign_extend(wrap(*this), wrap(other)); else zero_extend(wrap(*this), wrap(other));
+					return *this;
+				}
 
 		public: // -- fixed_int demotions -- //
 
 			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits < _bits), int> = 0>
-				constexpr explicit fixed_int(const fixed_int<_bits, _sign> &other) noexcept : blocks{}
-				{
-					for (std::size_t i = 0; i < bits / 64; ++i) blocks[i] = other.blocks[i];
-				}
+			constexpr explicit fixed_int(const fixed_int<_bits, _sign> &other) noexcept : blocks{} { detail::demote(wrap(*this), wrap(other)); }
 
 		public: // -- demotion conversion -- //
 
@@ -513,11 +489,7 @@ namespace BiggerInts
 
 		public: // -- bool conversion -- //
 
-			constexpr explicit operator bool() const noexcept
-			{
-				for (std::size_t i = 0; i < bits / 64; ++i) if (blocks[i]) return true;
-				return false;
-			}
+			constexpr explicit operator bool() const noexcept { return detail::nonzero(wrap(*this)); }
 			constexpr friend bool operator!(const fixed_int &a) noexcept { return !(bool)a; }
 
 		public: // -- assigny things -- //
@@ -570,6 +542,11 @@ namespace BiggerInts
 			// users should probably not touch this directly, but is exposed because it's useful for writing extensions.
 			std::vector<std::uint64_t> blocks;
 
+		private:
+
+			void zero_extend(const_fixed_int_wrapper val);
+			void sign_extend(const_fixed_int_wrapper val);
+
 		public: // -- core -- //
 
 			// constructs a new bigint with a value of zero
@@ -606,13 +583,13 @@ namespace BiggerInts
 			}
 
 			template<std::uint64_t bits, bool sign>
-			bigint(const fixed_int<bits, sign> &other) { operator=(other); }
+			bigint(const fixed_int<bits, sign> &other) { *this = other; }
 
 		public: // -- promotion assignment -- //
 
-			bigint &operator=(unsigned short val) { return operator=((unsigned long long)val); }
-			bigint &operator=(unsigned int val) { return operator=((unsigned long long)val); }
-			bigint &operator=(unsigned long val) { return operator=((unsigned long long)val); }
+			bigint &operator=(unsigned short val) { return *this = (unsigned long long)val; }
+			bigint &operator=(unsigned int val) { return *this = (unsigned long long)val; }
+			bigint &operator=(unsigned long val) { return *this = (unsigned long long)val; }
 			bigint &operator=(unsigned long long val)
 			{
 				blocks.clear();
@@ -624,26 +601,20 @@ namespace BiggerInts
 				return *this;
 			}
 			
-			bigint &operator=(short val) { return operator=((long long)val); }
-			bigint &operator=(int val) { return operator=((long long)val); }
-			bigint &operator=(long val) { return operator=((long long)val); }
+			bigint &operator=(short val) { return *this = (long long)val; }
+			bigint &operator=(int val) { return *this = (long long)val; }
+			bigint &operator=(long val) { return *this = (long long)val; }
 			bigint &operator=(long long val)
 			{
 				blocks.clear();
-				if (val) blocks.push_back((unsigned long long)val);
+				if (val) blocks.push_back(val);
 				return *this;
 			}
 
 			template<std::uint64_t bits, bool sign>
 			bigint &operator=(const fixed_int<bits, sign> &other)
 			{
-				blocks.assign(std::begin(other.blocks), std::end(other.blocks));
-				if constexpr (!sign)
-				{
-					while (!blocks.empty() && blocks.back() == 0) blocks.pop_back();
-					if (!blocks.empty() && (blocks.back() & 0x8000000000000000ull)) blocks.push_back(0ull);
-				}
-				else _collapse(*this);
+				if constexpr (sign) sign_extend(wrap(other)); else zero_extend(wrap(other));
 				return *this;
 			}
 
@@ -685,6 +656,12 @@ namespace BiggerInts
 			bigint &operator*=(const bigint &b);
 			bigint &operator*=(bigint &&b);
 
+			bigint &operator/=(const bigint &den);
+			bigint &operator/=(bigint &&den);
+
+			bigint &operator%=(const bigint &den);
+			bigint &operator%=(bigint &&den);
+
 		public: // -- static utilities -- //
 
 			// attempts to parse the string into an integer value - returns true on successful parse.
@@ -721,7 +698,6 @@ namespace BiggerInts
 		bool bit_test_in_bounds_nonzero(const bigint &val, std::uint64_t bit) noexcept;
 		void bit_set(bigint &val, std::uint64_t bit) noexcept;
 
-		int cmp(const bigint &a, const bigint &b) noexcept;
 		bool cmp_less_non_negative(const bigint &a, const bigint &b) noexcept;
 
 		// -- add -- //
@@ -825,15 +801,6 @@ namespace BiggerInts
 		bigint operator*(const bigint &a, bigint &&b);
 		bigint operator*(bigint &&a, bigint &&b);
 
-		// -- comparison -- //
-
-		inline bool operator==(const bigint &a, const bigint &b) noexcept { return a.blocks == b.blocks; }
-		inline bool operator!=(const bigint &a, const bigint &b) noexcept { return a.blocks != b.blocks; }
-		inline bool operator<(const bigint &a, const bigint &b) noexcept { return cmp(a, b) < 0; }
-		inline bool operator<=(const bigint &a, const bigint &b) noexcept { return cmp(a, b) <= 0; }
-		inline bool operator>(const bigint &a, const bigint &b) noexcept { return cmp(a, b) > 0; }
-		inline bool operator>=(const bigint &a, const bigint &b) noexcept { return cmp(a, b) >= 0; }
-
 		// -- divmod -- //
 
 		void divmod_unchecked_positive_already_zero(bigint &quo, bigint &rem, const bigint &num, const bigint &den);
@@ -853,12 +820,6 @@ namespace BiggerInts
 		bigint operator%(bigint &&num, const bigint &den);
 		bigint operator%(const bigint &num, bigint &&den);
 		bigint operator%(bigint &&num, bigint &&den);
-
-		bigint &operator/=(bigint &num, const bigint &den);
-		bigint &operator/=(bigint &num, bigint &&den);
-
-		bigint &operator%=(bigint &num, const bigint &den);
-		bigint &operator%=(bigint &num, bigint &&den);
 
 		template<std::uint64_t bits>
 		constexpr std::pair<fixed_int<bits, false>, fixed_int<bits, false>> divmod(const fixed_int<bits, false> &num, const fixed_int<bits, false> &den)
@@ -886,20 +847,10 @@ namespace BiggerInts
 
 		// -- cmp -- //
 
-		// cmp() will be equivalent to <=> but works for any version of C++
-
-		constexpr bool cmp_less_non_negative_same_size(const_fixed_int_wrapper a, const_fixed_int_wrapper b) noexcept // as cmp() but requires they both be non-negative
-		{
-			for (std::size_t i = a.blocks_n; i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i];
-			return false;
-		}
-		template<std::uint64_t bits, bool sign>
-		constexpr bool cmp_less_non_negative(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) noexcept { return cmp_less_non_negative_same_size(wrap(a), wrap(b)); }
-
 		template<bool sign>
-		constexpr int cmp(const_fixed_int_wrapper a, const_fixed_int_wrapper b) noexcept
+		constexpr int cmp_wrapped_wrapped(const_fixed_int_wrapper a, const_fixed_int_wrapper b) noexcept
 		{
-			if (b.blocks_n > a.blocks_n) return -cmp<sign>(b, a); // wolog let a be at least as large as b (in physical size)
+			if (b.blocks_n > a.blocks_n) return -cmp_wrapped_wrapped<sign>(b, a); // wolog let a be at least as large as b (in physical size)
 			else
 			{
 				if constexpr (sign)
@@ -925,11 +876,8 @@ namespace BiggerInts
 				return 0; // otherwise they're equal
 			}
 		}
-		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>
-		constexpr int cmp(const fixed_int<bits_1, sign> &a, const fixed_int<bits_2, sign> &b) noexcept { return cmp<true>(wrap(a), wrap(b)); }
-
 		template<bool sign>
-		constexpr int cmp(const_fixed_int_wrapper a, std::conditional_t<sign, long long, unsigned long long> val) noexcept
+		constexpr int cmp_wrapped_builtin(const_fixed_int_wrapper a, std::conditional_t<sign, long long, unsigned long long> val) noexcept
 		{
 			std::uint64_t fill = 0;
 			if constexpr (sign) fill = val < 0 ? 0xffffffffffffffffull : 0ull;
@@ -945,75 +893,25 @@ namespace BiggerInts
 			}
 			return 0;
 		}
-		template<std::uint64_t bits, bool sign>
-		constexpr int cmp(const fixed_int<bits, sign> &a, std::conditional_t<sign, long long, unsigned long long> val) noexcept { return cmp<sign>(wrap(a), val); }
+		int cmp_bigint_builtin(const bigint &a, long long val) noexcept;
+		int cmp_bigint_builtin(const bigint &a, unsigned long long val) noexcept;
+
+		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>
+		constexpr int cmp(const fixed_int<bits_1, sign> &a, const fixed_int<bits_2, sign> &b) noexcept { return detail::cmp_wrapped_wrapped<sign>(wrap(a), wrap(b)); }
+
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T>, int> = 0>
+		constexpr int cmp(const fixed_int<bits, sign> &a, T val) noexcept { return detail::cmp_wrapped_builtin<sign>(wrap(a), val); }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T>, int> = 0>
+		constexpr int cmp(T val, const fixed_int<bits, sign> &a) noexcept { return -detail::cmp_wrapped_builtin<sign>(wrap(a), val); }
+
+		int cmp(const bigint &a, const bigint &b) noexcept;
 		
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator==(const fixed_int<bits1, sign> &a, const fixed_int<bits2, sign> &b) noexcept { return cmp(a, b) == 0; }
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator!=(const fixed_int<bits1, sign> &a, const fixed_int<bits2, sign> &b) noexcept { return cmp(a, b) != 0; }
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator<(const fixed_int<bits1, sign> &a, const fixed_int<bits2, sign> &b) noexcept { return cmp(a, b) < 0; }
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator<=(const fixed_int<bits1, sign> &a, const fixed_int<bits2, sign> &b) noexcept { return cmp(a, b) <= 0; }
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator>(const fixed_int<bits1, sign> &a, const fixed_int<bits2, sign> &b) noexcept { return cmp(a, b) > 0; }
-		template<std::uint64_t bits1, std::uint64_t bits2, bool sign> constexpr bool operator>=(const fixed_int<bits1, sign> &a, const fixed_int<bits2, sign> &b) noexcept { return cmp(a, b) >= 0; }
-
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator==(const fixed_int<bits, sign> &a, T b) noexcept { return cmp(a, b) == 0; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator!=(const fixed_int<bits, sign> &a, T b) noexcept { return cmp(a, b) != 0; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator<(const fixed_int<bits, sign> &a, T b) noexcept { return cmp(a, b) < 0; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator<=(const fixed_int<bits, sign> &a, T b) noexcept { return cmp(a, b) <= 0; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator>(const fixed_int<bits, sign> &a, T b) noexcept { return cmp(a, b) > 0; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator>=(const fixed_int<bits, sign> &a, T b) noexcept { return cmp(a, b) >= 0; }
-
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator==(T a, const fixed_int<bits, sign> &b) noexcept { return cmp(b, a) == 0; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator!=(T a, const fixed_int<bits, sign> &b) noexcept { return cmp(b, a) != 0; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator<(T a, const fixed_int<bits, sign> &b) noexcept { return cmp(b, a) > 0; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator<=(T a, const fixed_int<bits, sign> &b) noexcept { return cmp(b, a) >= 0; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator>(T a, const fixed_int<bits, sign> &b) noexcept { return cmp(b, a) < 0; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T> == sign, int> = 0> constexpr bool operator>=(T a, const fixed_int<bits, sign> &b) noexcept { return cmp(b, a) <= 0; }
-
-		inline bool operator==(const bigint &a, long long val) noexcept
-		{
-			return (val == 0 && a.blocks.empty()) || (a.blocks.size() == 1 && a.blocks[0] == (unsigned long long)val);
-		}
-		inline bool operator==(const bigint &a, long val) noexcept { return a == (long long)val; }
-		inline bool operator==(const bigint &a, int val) noexcept { return a == (long long)val; }
-		inline bool operator==(const bigint &a, short val) noexcept { return a == (long long)val; }
-
-		inline bool operator==(long long val, const bigint &a) noexcept { return a == val; }
-		inline bool operator==(long val, const bigint &a) noexcept { return a == (long long)val; }
-		inline bool operator==(int val, const bigint &a) noexcept { return a == (long long)val; }
-		inline bool operator==(short val, const bigint &a) noexcept { return a == (long long)val; }
-
-		inline bool operator==(const bigint &a, unsigned long long val) noexcept
-		{
-			return (val == 0 && a.blocks.empty()) || (a.blocks.size() == 1 && a.blocks[0] == val) || (a.blocks.size() == 2 && a.blocks[0] == val && a.blocks[1] == 0);
-		}
-		inline bool operator==(const bigint &a, unsigned long val) noexcept { return a == (unsigned long long)val; }
-		inline bool operator==(const bigint &a, unsigned int val) noexcept { return a == (unsigned long long)val; }
-		inline bool operator==(const bigint &a, unsigned short val) noexcept { return a == (unsigned long long)val; }
-
-		inline bool operator==(unsigned long long val, const bigint &a) noexcept { return a == val; }
-		inline bool operator==(unsigned long val, const bigint &a) noexcept { return a == (unsigned long long)val; }
-		inline bool operator==(unsigned int val, const bigint &a) noexcept { return a == (unsigned long long)val; }
-		inline bool operator==(unsigned short val, const bigint &a) noexcept { return a == (unsigned long long)val; }
-
-		inline bool operator!=(const bigint &a, long long val) noexcept { return !(a == val); }
-		inline bool operator!=(const bigint &a, long val) noexcept { return !(a == (long long)val); }
-		inline bool operator!=(const bigint &a, int val) noexcept { return !(a == (long long)val); }
-		inline bool operator!=(const bigint &a, short val) noexcept { return !(a == (long long)val); }
-
-		inline bool operator!=(long long val, const bigint &a) noexcept { return !(a == val); }
-		inline bool operator!=(long val, const bigint &a) noexcept { return !(a == (long long)val); }
-		inline bool operator!=(int val, const bigint &a) noexcept { return !(a == (long long)val); }
-		inline bool operator!=(short val, const bigint &a) noexcept { return !(a == (long long)val); }
-
-		inline bool operator!=(const bigint &a, unsigned long long val) noexcept { return !(a == val); }
-		inline bool operator!=(const bigint &a, unsigned long val) noexcept { return !(a == (unsigned long long)val); }
-		inline bool operator!=(const bigint &a, unsigned int val) noexcept { return !(a == (unsigned long long)val); }
-		inline bool operator!=(const bigint &a, unsigned short val) noexcept { return !(a == (unsigned long long)val); }
-
-		inline bool operator!=(unsigned long long val, const bigint &a) noexcept { return !(a == val); }
-		inline bool operator!=(unsigned long val, const bigint &a) noexcept { return !(a == (unsigned long long)val); }
-		inline bool operator!=(unsigned int val, const bigint &a) noexcept { return !(a == (unsigned long long)val); }
-		inline bool operator!=(unsigned short val, const bigint &a) noexcept { return !(a == (unsigned long long)val); }
+		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator==(const T &a, const U &b) noexcept { return cmp(a, b) == 0; }
+		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator!=(const T &a, const U &b) noexcept { return cmp(a, b) != 0; }
+		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator<(const T &a, const U &b) noexcept { return cmp(a, b) < 0; }
+		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator<=(const T &a, const U &b) noexcept { return cmp(a, b) <= 0; }
+		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator>(const T &a, const U &b) noexcept { return cmp(a, b) > 0; }
+		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator>=(const T &a, const U &b) noexcept { return cmp(a, b) >= 0; }
 
 		// -- io -- //
 

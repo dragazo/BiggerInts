@@ -66,6 +66,13 @@ void detail::bit_set(bigint &val, std::uint64_t bit) noexcept
 	_collapse(val);
 }
 
+bool detail::cmp_less_non_negative(const bigint &a, const bigint &b) noexcept // same as cmp() but requires they both be non-negative
+{
+	if (a.blocks.size() > b.blocks.size()) return false;
+	if (a.blocks.size() < b.blocks.size()) return true;
+	for (std::size_t i = a.blocks.size(); i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i];
+	return false;
+}
 int detail::cmp(const bigint &a, const bigint &b) noexcept
 {
 	const bool a_neg = detail::is_neg(a);
@@ -79,12 +86,41 @@ int detail::cmp(const bigint &a, const bigint &b) noexcept
 
 	return 0; // otherwise they're equal
 }
-bool detail::cmp_less_non_negative(const bigint &a, const bigint &b) noexcept // same as cmp() but requires they both be non-negative
+int detail::cmp_bigint_builtin(const bigint &a, long long val) noexcept
 {
-	if (a.blocks.size() > b.blocks.size()) return false;
-	if (a.blocks.size() < b.blocks.size()) return true;
-	for (std::size_t i = a.blocks.size(); i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i];
-	return false;
+	const bool a_neg = detail::is_neg(a);
+	if (a_neg != (val < 0)) return a_neg ? -1 : 1; // if they have different signs we know right away
+
+	if (a.blocks.size() > 1) return a_neg ? -1 : 1; // if a has higher magnitude than b we can tell from the sign
+	else if (a.blocks.size() == 1)
+	{
+		if (a.blocks[0] == (unsigned long long)val) return 0;
+		else return a.blocks[0] < (unsigned long long)val ? -1 : 1;
+	}
+	else return val < 0 ? 1 : val > 0 ? -1 : 0; // otherwise a == 0
+}
+int detail::cmp_bigint_builtin(const bigint &a, unsigned long long val) noexcept
+{
+	if (detail::is_neg(a)) return -1; // if a is negative we know it's < immediately
+
+	if (a.blocks.size() > 2) return 1; // if a has higher magnitude, it's greater
+	else if (a.blocks.size() == 2 && a.blocks[1]) return 1; // if second block is significant, a is greater
+	else if (a.blocks.size() == 0) return val < 0 ? 1 : val > 0 ? -1 : 0; // if a == 0
+	else return a.blocks[0] < val ? -1 : a.blocks[0] > val ? 1 : 0; // otherwise same magnitude
+}
+
+void bigint::zero_extend(detail::const_fixed_int_wrapper val)
+{
+	blocks.assign(val.blocks, val.blocks + val.blocks_n);
+	std::size_t s = blocks.size();
+	for (; s > 0; --s) if (blocks[s - 1]) break;
+	blocks.resize(s);
+	if (!blocks.empty() && (blocks.back() & 0x8000000000000000ull)) blocks.push_back(0ull);
+}
+void bigint::sign_extend(detail::const_fixed_int_wrapper val)
+{
+	blocks.assign(val.blocks, val.blocks + val.blocks_n);
+	_collapse(*this);
 }
 
 bigint &bigint::operator++()
@@ -521,7 +557,9 @@ std::pair<bigint, bigint> _divmod_unchecked(U &&a, V &&b)
 		detail::make_neg(a_cpy);
 		detail::make_neg(b_cpy);
 
-		return detail::divmod_unchecked_positive(a_cpy, b_cpy);
+		auto res = detail::divmod_unchecked_positive(a_cpy, b_cpy);
+		detail::make_neg(res.second);
+		return res;
 	}
 	else if (a_neg)
 	{
@@ -540,7 +578,6 @@ std::pair<bigint, bigint> _divmod_unchecked(U &&a, V &&b)
 
 		auto res = detail::divmod_unchecked_positive(a, b_cpy);
 		detail::make_neg(res.first);
-		detail::make_neg(res.second);
 		return res;
 	}
 	else return detail::divmod_unchecked_positive(a, b);
@@ -568,21 +605,21 @@ bigint detail::operator%(bigint &&num, const bigint &den) { return detail::divmo
 bigint detail::operator%(const bigint &num, bigint &&den) { return detail::divmod(num, std::move(den)).second; }
 bigint detail::operator%(bigint &&num, bigint &&den) { return detail::divmod(std::move(num), std::move(den)).second; }
 
-bigint &detail::operator/=(bigint &num, const bigint &den)
+bigint &bigint::operator/=(const bigint &den)
 {
-	if (&num != &den) num = std::move(num) / den;
-	else num = num / den;
-	return num;
+	if (this != &den) *this = std::move(*this) / den;
+	else *this = *this / den;
+	return *this;
 }
-bigint &detail::operator/=(bigint &num, bigint &&den) { num = std::move(num) / std::move(den); return num; }
+bigint &bigint::operator/=(bigint &&den) { *this = std::move(*this) / std::move(den); return *this; }
 
-bigint &detail::operator%=(bigint &num, const bigint &den)
+bigint &bigint::operator%=(const bigint &den)
 {
-	if (&num != &den) num = std::move(num) % den;
-	else num = num % den;
-	return num;
+	if (this != &den) *this = std::move(*this) % den;
+	else *this = *this % den;
+	return *this;
 }
-bigint &detail::operator%=(bigint &num, bigint &&den) { num = std::move(num) % std::move(den); return num; }
+bigint &bigint::operator%=(bigint &&den) { *this = std::move(*this) % std::move(den); return *this; }
 
 bigint bigint::pow(bigint a, const bigint &b) // pass by value is intentional
 {
