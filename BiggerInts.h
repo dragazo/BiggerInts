@@ -23,6 +23,8 @@
 #endif
 
 /*
+(SCROLL DOWN TO THE SECTION LABELED "PUBLIC STUFF")
+
 adds larger integer types:
 
 the template aliases uint_t<N> and int_t<N> represent fixed-size N-bit integer types of any number of bits which is a power of 2 (e.g. 32, 64, 128, etc.).
@@ -39,6 +41,8 @@ report any bugs to https://github.com/dragazo/BiggerInts/issues
 
 namespace BiggerInts
 {
+	struct tostr_fmt;
+
 	namespace detail
 	{
 		template<std::uint64_t bits, bool sign> struct fixed_int;
@@ -397,18 +401,11 @@ namespace BiggerInts
 		template<typename T> struct is_biggerints_type : std::false_type {};
 		template<std::uint64_t bits, bool sign> struct is_biggerints_type<fixed_int<bits, sign>> : std::true_type {};
 		template<> struct is_biggerints_type<bigint> : std::true_type{};
-	}
 
-	template<std::uint64_t bits> using uint_t = typename detail::fixed_int_selector<bits, false>::type;
-	template<std::uint64_t bits> using int_t = typename detail::fixed_int_selector<bits, true>::type;
-	using bigint = detail::bigint;
-
-	namespace detail
-	{
 		// -- container impl -- //
 
-		bool try_parse_unsigned(fixed_int_wrapper res, std::string_view str, int base = 10);
-		bool try_parse_signed(fixed_int_wrapper res, std::string_view str, int base = 10);
+		bool try_parse_unsigned(fixed_int_wrapper res, std::string_view str, int base);
+		bool try_parse_signed(fixed_int_wrapper res, std::string_view str, int base);
 
 		// given a desired number of bits (power of 2), simulates it with 2 ints of half that size - sign flag marks signed/unsigned
 		template<std::uint64_t bits, bool sign> struct fixed_int
@@ -529,8 +526,6 @@ namespace BiggerInts
 			// as parse() but allocates a new object to hold the result (less efficient if you're just going to assign it to a variable)
 			static fixed_int parse(std::string_view str, int base = 10) { fixed_int res; parse(res, str, base); return res; }
 		};
-
-		void _collapse(bigint&); // collapses the value in the given bigint to make it satisfy the requirements of the blocks array
 
 		// represents an arbitrarily large (signed) integer type in 2's complement
 		class bigint
@@ -913,18 +908,24 @@ namespace BiggerInts
 		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator>(const T &a, const U &b) noexcept { return cmp(a, b) > 0; }
 		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator>=(const T &a, const U &b) noexcept { return cmp(a, b) >= 0; }
 
+		// -- string conversions -- //
+
+		std::string tostr_unsigned(fixed_int_wrapper val, const tostr_fmt &fmt);
+		std::string tostr_signed(fixed_int_wrapper val, const tostr_fmt &fmt);
+
 		// -- io -- //
 
-		void print_positive_core(std::ostream &ostr, const_fixed_int_wrapper val);
-		void print_signed_core(std::ostream &ostr, const_fixed_int_wrapper val);
-		
+		std::ostream &print_unsigned(std::ostream &ostr, fixed_int_wrapper val);
+		std::ostream &print_signed(std::ostream &ostr, fixed_int_wrapper val);
+
+		template<std::uint64_t bits, bool sign>
+		std::ostream &operator<<(std::ostream &ostr, const fixed_int<bits, sign> &val)
+		{
+			fixed_int<bits, sign> cpy = val;
+			if constexpr (sign) return print_signed(ostr, wrap(cpy)); else return print_unsigned(ostr, wrap(cpy));
+		}
 		std::ostream &operator<<(std::ostream &ostr, const bigint &val);
 		std::ostream &operator<<(std::ostream &ostr, bigint &&val);
-
-		template<std::uint64_t bits>
-		std::ostream &operator<<(std::ostream &ostr, const fixed_int<bits, false> &val) { print_positive_core(ostr, wrap(val)); return ostr; }
-		template<std::uint64_t bits>
-		std::ostream &operator<<(std::ostream &ostr, const fixed_int<bits, true> &val) { print_signed_core(ostr, wrap(val)); return ostr; }
 
 		void parse_positive_core(std::istream &istr, fixed_int_wrapper val);
 		void parse_signed_core(std::istream &istr, fixed_int_wrapper val);
@@ -936,6 +937,48 @@ namespace BiggerInts
 
 		std::istream &operator>>(std::istream &istr, bigint &val);
 	}
+
+	// ------------------ //
+	// -- PUBLIC STUFF -- //
+	// ------------------ //
+
+	// these are the public type aliases that users of this library should use.
+	// they behave exactly like their builtin counterparts, just bigger.
+	template<std::uint64_t bits> using uint_t = typename detail::fixed_int_selector<bits, false>::type;
+	template<std::uint64_t bits> using int_t = typename detail::fixed_int_selector<bits, true>::type;
+	using bigint = detail::bigint;
+
+	// represents a collection of formatting settings for converting values to strings
+	struct tostr_fmt
+	{
+		int base = 10;          // the base to use for the conversion (must be 10, 
+		bool showpos = false;   // if set to true positive values printed in decimal will have a '+' sign on the front
+		bool showbase = false;  // if set to true a radix prefix will be appended to the front of the string
+		bool uppercase = false; // if set to true alphabetic characters in the result will be uppercase
+
+		// sets all format settings to the defaults
+		tostr_fmt() = default;
+		// creates a format settings object for the specified base
+		explicit tostr_fmt(int _base) : base(_base) {}
+		// extracts the format settings from the specified stream
+		explicit tostr_fmt(const std::ios_base &stream);
+
+		// converts the value into a string using these conversion settings
+		template<std::uint64_t bits, bool sign>
+		std::string operator()(const detail::fixed_int<bits, sign> &val) const
+		{
+			auto cpy = val;
+			if constexpr (sign) return detail::tostr_signed(detail::wrap(cpy), *this); else return detail::tostr_unsigned(detail::wrap(cpy), *this);
+		}
+		std::string operator()(const bigint &val) const;
+		std::string operator()(bigint &&val) const;
+	};
+
+	// converts the value into a string using the specified format
+	template<std::uint64_t bits, bool sign>
+	inline std::string tostr(const detail::fixed_int<bits, sign> &val, const tostr_fmt &fmt = {}) { return fmt(val); }
+	inline std::string tostr(const bigint &val, const tostr_fmt &fmt = {}) { return fmt(val); }
+	inline std::string tostr(bigint &&val, const tostr_fmt &fmt = {}) { return fmt(std::move(val)); }
 }
 
 // -- std info definitions -- //

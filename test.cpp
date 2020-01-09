@@ -25,7 +25,7 @@ using namespace BiggerInts;
 #define t_test(init, expr, count) { init; t_start; for(int i = 0; i < count; ++i) (expr); t_end; t_print(expr, count); }
 
 template<typename ...Args>
-std::string tostr(const Args &...args)
+std::string sstostr(const Args &...args)
 {
 	std::ostringstream ostr;
 	(ostr << ... << args);
@@ -364,51 +364,51 @@ void detail_tests()
 }
 void smol_tests()
 {
-	assert(tostr(uint_t<128>(2) * uint_t<128>(13)) == "26");
-	assert(tostr(uint_t<128>(2) + uint_t<128>(13)) == "15");
-	assert(tostr(uint_t<128>(20) - uint_t<128>(13)) == "7");
-	assert(tostr(uint_t<128>(2) / uint_t<128>(13)) == "0");
-	assert(tostr(uint_t<128>(2) % uint_t<128>(13)) == "2");
+	assert(sstostr(uint_t<128>(2) * uint_t<128>(13)) == "26");
+	assert(sstostr(uint_t<128>(2) + uint_t<128>(13)) == "15");
+	assert(sstostr(uint_t<128>(20) - uint_t<128>(13)) == "7");
+	assert(sstostr(uint_t<128>(2) / uint_t<128>(13)) == "0");
+	assert(sstostr(uint_t<128>(2) % uint_t<128>(13)) == "2");
 
-	assert(tostr(2u * uint_t<128>(13)) == "26");
-	assert(tostr(2u + uint_t<128>(13)) == "15");
-	assert(tostr(20u - uint_t<128>(13)) == "7");
-	assert(tostr(uint_t<128>(2) / 13u) == "0");
-	assert(tostr(uint_t<128>(2) % 13u) == "2");
+	assert(sstostr(2u * uint_t<128>(13)) == "26");
+	assert(sstostr(2u + uint_t<128>(13)) == "15");
+	assert(sstostr(20u - uint_t<128>(13)) == "7");
+	assert(sstostr(uint_t<128>(2) / 13u) == "0");
+	assert(sstostr(uint_t<128>(2) % 13u) == "2");
 
-	assert(tostr(uint_t<128>(52) * uint_t<128>(3)) == "156");
-	assert(tostr(uint_t<128>(52) + uint_t<128>(3)) == "55");
-	assert(tostr(uint_t<128>(52) / uint_t<128>(3)) == "17");
-	assert(tostr(uint_t<128>(52) % uint_t<128>(3)) == "1");
+	assert(sstostr(uint_t<128>(52) * uint_t<128>(3)) == "156");
+	assert(sstostr(uint_t<128>(52) + uint_t<128>(3)) == "55");
+	assert(sstostr(uint_t<128>(52) / uint_t<128>(3)) == "17");
+	assert(sstostr(uint_t<128>(52) % uint_t<128>(3)) == "1");
 
-	assert(tostr(int_t<128>(2) * int_t<128>(-13)) == "-26");
-	assert(tostr(int_t<128>(2) + int_t<128>(-13)) == "-11");
-	assert(tostr(int_t<128>(2) / int_t<128>(-13)) == "0");
-	assert(tostr(int_t<128>(2) % int_t<128>(13)) == "2");
+	assert(sstostr(int_t<128>(2) * int_t<128>(-13)) == "-26");
+	assert(sstostr(int_t<128>(2) + int_t<128>(-13)) == "-11");
+	assert(sstostr(int_t<128>(2) / int_t<128>(-13)) == "0");
+	assert(sstostr(int_t<128>(2) % int_t<128>(13)) == "2");
 
-	assert(tostr(int_t<128>(2) & int_t<128>(-13)) == "2");
-	assert(tostr(int_t<128>(2) | int_t<128>(-13)) == "-13");
-	assert(tostr(int_t<128>(2) ^ int_t<128>(-13)) == "-15");
+	assert(sstostr(int_t<128>(2) & int_t<128>(-13)) == "2");
+	assert(sstostr(int_t<128>(2) | int_t<128>(-13)) == "-13");
+	assert(sstostr(int_t<128>(2) ^ int_t<128>(-13)) == "-15");
 
-	assert(tostr(int_t<128>(-13) << 1) == "-26");
-	assert(tostr(int_t<128>(-13) << 2) == "-52");
+	assert(sstostr(int_t<128>(-13) << 1) == "-26");
+	assert(sstostr(int_t<128>(-13) << 2) == "-52");
 
-	assert(tostr(int_t<128>(-13) >> 1) == "-7");
-	assert(tostr(int_t<128>(-13) >> 2) == "-4");
+	assert(sstostr(int_t<128>(-13) >> 1) == "-7");
+	assert(sstostr(int_t<128>(-13) >> 2) == "-4");
 }
 void bigboi_tests()
 {
 	uint_t<8192> big_mul = 947563412;
-	assert(tostr(big_mul) == "947563412");
+	assert(sstostr(big_mul) == "947563412");
 
 	big_mul *= big_mul;
-	assert(tostr(big_mul) == "897876419761081744");
+	assert(sstostr(big_mul) == "897876419761081744");
 
 	big_mul *= big_mul;
-	assert(tostr(big_mul) == "806182065162978263317234893050081536");
+	assert(sstostr(big_mul) == "806182065162978263317234893050081536");
 
 	big_mul *= big_mul;
-	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119296");
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119296");
 
 	big_mul += 17;
 	big_mul += (decltype(big_mul))0;
@@ -416,71 +416,71 @@ void bigboi_tests()
 	big_mul = (decltype(big_mul))0 + big_mul;
 	big_mul = big_mul + 0;
 	big_mul = 0 + big_mul;
-	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
 	big_mul -= 0;
 	big_mul = big_mul - (decltype(big_mul))0;
 	big_mul = (decltype(big_mul))0 - big_mul;
 	big_mul = big_mul - 0;
 	big_mul = 0 - big_mul;
-	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
 	big_mul &= (decltype(big_mul))-1;
 	big_mul &= -1;
 	big_mul = big_mul & (decltype(big_mul))-1;
 	big_mul = big_mul & -1;
 	big_mul = (decltype(big_mul))-1 & big_mul;
 	big_mul = -1 & big_mul;
-	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
 	big_mul |= (decltype(big_mul))0;
 	big_mul |= 0;
 	big_mul = big_mul | (decltype(big_mul))0;
 	big_mul = big_mul | 0;
 	big_mul = (decltype(big_mul))0 | big_mul;
 	big_mul = 0 | big_mul;
-	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
 	big_mul ^= (decltype(big_mul))0;
 	big_mul ^= 0;
 	big_mul = big_mul ^ (decltype(big_mul))0;
 	big_mul = big_mul ^ 0;
 	big_mul = (decltype(big_mul))0 ^ big_mul;
 	big_mul = 0 ^ big_mul;
-	assert(tostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
 
 	big_mul <<= 621;
-	assert(tostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272576");
 
 	big_mul &= big_mul;
-	assert(tostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272576");
 
 	big_mul |= big_mul;
-	assert(tostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272576");
 
 	auto post_dec = big_mul--;
-	assert(tostr(post_dec) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(post_dec) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272576");
-	assert(tostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272575");
 
 	auto post_inc = big_mul++;
-	assert(tostr(post_inc) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(post_inc) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272575");
-	assert(tostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272576");
 
 	auto pre_inc = ++big_mul;
-	assert(tostr(pre_inc) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(pre_inc) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272577");
-	assert(tostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272577");
 	assert(pre_inc == big_mul);
@@ -488,10 +488,10 @@ void bigboi_tests()
 	assert(pre_inc >= big_mul);
 
 	auto pre_dec = --big_mul;
-	assert(tostr(pre_dec) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(pre_dec) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272576");
-	assert(tostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
+	assert(sstostr(big_mul) == "56557938587827109863786197009098171333880971620065133028223237982646344014826583116417132"
 		"577306321974342507460953540245890763571403111747364084775326663465806403623083715574"
 		"23307676007538288423649789830139543353463939819407429243267044228077146543261877272576");
 	assert(pre_dec == big_mul);
@@ -499,70 +499,70 @@ void bigboi_tests()
 	assert(pre_dec >= big_mul);
 
 	big_mul >>= 191;
-	assert(tostr(big_mul) == "1802039889491867190810467664715451904918476332004551151301726717494487639814495660570778575783656"
+	assert(sstostr(big_mul) == "1802039889491867190810467664715451904918476332004551151301726717494487639814495660570778575783656"
 		"106649698951732305310318830222989557694740573768908873663803263415298739647066704572678996885278044454912");
 	big_mul <<= 73;
-	assert(tostr(big_mul) == "1701978554986102599652944396520696900597046164730926970313320209887640881966509866088480298291994"
+	assert(sstostr(big_mul) == "1701978554986102599652944396520696900597046164730926970313320209887640881966509866088480298291994"
 		"7794655263581165454491067120838946815593625140970325732225722954705464939198103933056536439508186725987781864851905868153749504");
 
 	big_mul += big_mul;
-	assert(tostr(big_mul) == "34039571099722051993058887930413938011940923294618539406266404197752817639330197321769605965839895589"
+	assert(sstostr(big_mul) == "34039571099722051993058887930413938011940923294618539406266404197752817639330197321769605965839895589"
 		"310527162330908982134241677893631187250281940651464451445909410929878396207866113072879016373451975563729703811736307499008");
 
 	big_mul <<= 1;
-	assert(tostr(big_mul) == "68079142199444103986117775860827876023881846589237078812532808395505635278660394643539211931679791178"
+	assert(sstostr(big_mul) == "68079142199444103986117775860827876023881846589237078812532808395505635278660394643539211931679791178"
 		"621054324661817964268483355787262374500563881302928902891818821859756792415732226145758032746903951127459407623472614998016");
 
 	big_mul = 465;
-	assert(tostr(big_mul) == "465");
+	assert(sstostr(big_mul) == "465");
 
-	assert(tostr(big_mul + 75u) == "540");
-	assert(tostr(big_mul ^ big_mul) == "0");
+	assert(sstostr(big_mul + 75u) == "540");
+	assert(sstostr(big_mul ^ big_mul) == "0");
 }
 void numeric_limits_tests()
 {
-	assert(tostr(std::numeric_limits<uint_t<512>>::min()) == "0");
-	assert(tostr(std::numeric_limits<uint_t<512>>::max()) == "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095");
-	assert(tostr(std::numeric_limits<uint_t<512>>::lowest()) == "0");
+	assert(sstostr(std::numeric_limits<uint_t<512>>::min()) == "0");
+	assert(sstostr(std::numeric_limits<uint_t<512>>::max()) == "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095");
+	assert(sstostr(std::numeric_limits<uint_t<512>>::lowest()) == "0");
 
-	assert(tostr(std::numeric_limits<int_t<512>>::min()) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
-	assert(tostr(std::numeric_limits<int_t<512>>::max()) == "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047");
-	assert(tostr(std::numeric_limits<int_t<512>>::lowest()) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
+	assert(sstostr(std::numeric_limits<int_t<512>>::min()) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
+	assert(sstostr(std::numeric_limits<int_t<512>>::max()) == "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047");
+	assert(sstostr(std::numeric_limits<int_t<512>>::lowest()) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
 
-	assert(tostr(std::numeric_limits<uint_t<128>>::min()) == "0");
-	assert(tostr(std::numeric_limits<uint_t<128>>::max()) == "340282366920938463463374607431768211455");
-	assert(tostr(std::numeric_limits<uint_t<128>>::lowest()) == "0");
+	assert(sstostr(std::numeric_limits<uint_t<128>>::min()) == "0");
+	assert(sstostr(std::numeric_limits<uint_t<128>>::max()) == "340282366920938463463374607431768211455");
+	assert(sstostr(std::numeric_limits<uint_t<128>>::lowest()) == "0");
 
-	assert(tostr(std::numeric_limits<int_t<128>>::min()) == "-170141183460469231731687303715884105728");
-	assert(tostr(std::numeric_limits<int_t<128>>::max()) == "170141183460469231731687303715884105727");
-	assert(tostr(std::numeric_limits<int_t<128>>::lowest()) == "-170141183460469231731687303715884105728");
+	assert(sstostr(std::numeric_limits<int_t<128>>::min()) == "-170141183460469231731687303715884105728");
+	assert(sstostr(std::numeric_limits<int_t<128>>::max()) == "170141183460469231731687303715884105727");
+	assert(sstostr(std::numeric_limits<int_t<128>>::lowest()) == "-170141183460469231731687303715884105728");
 
-	assert(tostr(std::numeric_limits<uint_t<64>>::min()) == "0");
-	assert(tostr(std::numeric_limits<uint_t<64>>::max()) == "18446744073709551615");
-	assert(tostr(std::numeric_limits<uint_t<64>>::lowest()) == "0");
+	assert(sstostr(std::numeric_limits<uint_t<64>>::min()) == "0");
+	assert(sstostr(std::numeric_limits<uint_t<64>>::max()) == "18446744073709551615");
+	assert(sstostr(std::numeric_limits<uint_t<64>>::lowest()) == "0");
 
-	assert(tostr(std::numeric_limits<int_t<64>>::min()) == "-9223372036854775808");
-	assert(tostr(std::numeric_limits<int_t<64>>::max()) == "9223372036854775807");
-	assert(tostr(std::numeric_limits<int_t<64>>::lowest()) == "-9223372036854775808");
+	assert(sstostr(std::numeric_limits<int_t<64>>::min()) == "-9223372036854775808");
+	assert(sstostr(std::numeric_limits<int_t<64>>::max()) == "9223372036854775807");
+	assert(sstostr(std::numeric_limits<int_t<64>>::lowest()) == "-9223372036854775808");
 }
 void simple_parse_tests()
 {
-	assert(tostr(uint_t<256>::parse("184738578493786576848368767654873647697975746763857664")) == "184738578493786576848368767654873647697975746763857664");
-	assert(tostr(uint_t<256>::parse("18")) == "18");
+	assert(sstostr(uint_t<256>::parse("184738578493786576848368767654873647697975746763857664")) == "184738578493786576848368767654873647697975746763857664");
+	assert(sstostr(uint_t<256>::parse("18")) == "18");
 	assert(uint_t<256>::parse("18") == 18u);
 
-	assert(tostr(int_t<256>::parse("184738578493786576848368767654873647697975746763857664")) == "184738578493786576848368767654873647697975746763857664");
-	assert(tostr(int_t<256>::parse("18")) == "18");
+	assert(sstostr(int_t<256>::parse("184738578493786576848368767654873647697975746763857664")) == "184738578493786576848368767654873647697975746763857664");
+	assert(sstostr(int_t<256>::parse("18")) == "18");
 	assert(int_t<256>::parse("18") == 18);
 	assert(int_t<256>::parse("+18") == 18);
 
-	assert(tostr(int_t<256>::parse("-184738578493786576848368767654873647697975746763857664")) == "-184738578493786576848368767654873647697975746763857664");
-	assert(tostr(int_t<256>::parse("-18")) == "-18");
+	assert(sstostr(int_t<256>::parse("-184738578493786576848368767654873647697975746763857664")) == "-184738578493786576848368767654873647697975746763857664");
+	assert(sstostr(int_t<256>::parse("-18")) == "-18");
 	assert(int_t<256>::parse("-18") == -18);
 
-	assert(tostr(int_t<256>::parse(" -18")) == "-18");
-	assert(tostr(int_t<256>::parse("-18 ")) == "-18");
-	assert(tostr(int_t<256>::parse(" -18 ")) == "-18");
+	assert(sstostr(int_t<256>::parse(" -18")) == "-18");
+	assert(sstostr(int_t<256>::parse("-18 ")) == "-18");
+	assert(sstostr(int_t<256>::parse(" -18 ")) == "-18");
 	assert(int_t<256>::parse("-18") == -18);
 	assert(int_t<256>::parse("-18 ") == -18);
 	assert(int_t<256>::parse(" -18") == -18);
@@ -603,20 +603,20 @@ void simple_parse_tests()
 	assert_throws(std::invalid_argument, uint_t<256>::parse("0x764", 10));
 	assert_throws(std::invalid_argument, uint_t<256>::parse("0x764", 8));
 	assert_throws(std::invalid_argument, uint_t<256>::parse("0x764", 16));
-	assert(tostr(uint_t<256>::parse("0x764", 0)) == "1892");
-	assert(tostr(uint_t<256>::parse("0764", 0)) == "500");
-	assert(tostr(uint_t<256>::parse("764", 0)) == "764");
+	assert(sstostr(uint_t<256>::parse("0x764", 0)) == "1892");
+	assert(sstostr(uint_t<256>::parse("0764", 0)) == "500");
+	assert(sstostr(uint_t<256>::parse("764", 0)) == "764");
 
-	assert(tostr(uint_t<256>::parse("167345562314657356422211643535261643535621", 10)) == "167345562314657356422211643535261643535621");
-	assert(tostr(uint_t<256>::parse("167345562314657356422211643535261643535621", 8)) == "19846815955032434075951735996930767761");
-	assert(tostr(uint_t<256>::parse("167345562314657356422211643535261643535621", 16)) == "32811116214936888653588305588611479218962394469921");
+	assert(sstostr(uint_t<256>::parse("167345562314657356422211643535261643535621", 10)) == "167345562314657356422211643535261643535621");
+	assert(sstostr(uint_t<256>::parse("167345562314657356422211643535261643535621", 8)) == "19846815955032434075951735996930767761");
+	assert(sstostr(uint_t<256>::parse("167345562314657356422211643535261643535621", 16)) == "32811116214936888653588305588611479218962394469921");
 
-	assert(tostr(int_t<256>::parse("167345562314657356422211643535261643535621", 10)) == "167345562314657356422211643535261643535621");
-	assert(tostr(int_t<256>::parse("+167345562314657356422211643535261643535621", 10)) == "167345562314657356422211643535261643535621");
-	assert(tostr(int_t<256>::parse("-167345562314657356422211643535261643535621", 10)) == "-167345562314657356422211643535261643535621");
+	assert(sstostr(int_t<256>::parse("167345562314657356422211643535261643535621", 10)) == "167345562314657356422211643535261643535621");
+	assert(sstostr(int_t<256>::parse("+167345562314657356422211643535261643535621", 10)) == "167345562314657356422211643535261643535621");
+	assert(sstostr(int_t<256>::parse("-167345562314657356422211643535261643535621", 10)) == "-167345562314657356422211643535261643535621");
 
-	assert(tostr(int_t<256>::parse("167345562314657356422211643535261643535621", 8)) == "19846815955032434075951735996930767761");
-	assert(tostr(int_t<256>::parse("167345562314657356422211643535261643535621", 16)) == "32811116214936888653588305588611479218962394469921");
+	assert(sstostr(int_t<256>::parse("167345562314657356422211643535261643535621", 8)) == "19846815955032434075951735996930767761");
+	assert(sstostr(int_t<256>::parse("167345562314657356422211643535261643535621", 16)) == "32811116214936888653588305588611479218962394469921");
 
 	// zero parsing edge cases
 
@@ -688,36 +688,36 @@ void big_parse_tests()
 	{
 		int_t<256> temp;
 		assert(int_t<256>::try_parse(temp, "-167345562314657356422211643535261643535621", 10));
-		assert(tostr(temp) == "-167345562314657356422211643535261643535621");
+		assert(sstostr(temp) == "-167345562314657356422211643535261643535621");
 
 		assert(int_t<256>::try_parse(temp, "167345562314657356422211643535261643535621", 8));
-		assert(tostr(temp) == "19846815955032434075951735996930767761");
+		assert(sstostr(temp) == "19846815955032434075951735996930767761");
 
 		assert(int_t<256>::try_parse(temp, "167345562314657356422211643535261643535621", 16));
-		assert(tostr(temp) == "32811116214936888653588305588611479218962394469921");
+		assert(sstostr(temp) == "32811116214936888653588305588611479218962394469921");
 	}
 
 	{
 		bigint v = 453;
-		assert(tostr(v) == "453");
-		assert(tostr(std::setw(10), v) == "       453");
-		assert(tostr(std::showpos, v) == "+453");
-		assert(tostr(std::showpos, std::setw(10), v) == "      +453");
-		assert(tostr(std::dec, v) == "453");
-		assert(tostr(std::oct, v) == "0705");
-		assert(tostr(std::hex, v) == "1c5");
-		assert(tostr(std::dec, std::showpos, v) == "+453");
-		assert(tostr(std::oct, std::showpos, v) == "0705");
-		assert(tostr(std::hex, std::showpos, v) == "1c5");
-		assert(tostr(std::dec, std::showbase, v) == "453");
-		assert(tostr(std::oct, std::showbase, v) == "00705");
-		assert(tostr(std::hex, std::showbase, v) == "0x1c5");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "+453");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "00705");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0x1c5");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "      +453");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "     00705");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "     0x1c5");
+		assert(sstostr(v) == "453");
+		assert(sstostr(std::setw(10), v) == "       453");
+		assert(sstostr(std::showpos, v) == "+453");
+		assert(sstostr(std::showpos, std::setw(10), v) == "      +453");
+		assert(sstostr(std::dec, v) == "453");
+		assert(sstostr(std::oct, v) == "0705");
+		assert(sstostr(std::hex, v) == "1c5");
+		assert(sstostr(std::dec, std::showpos, v) == "+453");
+		assert(sstostr(std::oct, std::showpos, v) == "0705");
+		assert(sstostr(std::hex, std::showpos, v) == "1c5");
+		assert(sstostr(std::dec, std::showbase, v) == "453");
+		assert(sstostr(std::oct, std::showbase, v) == "00705");
+		assert(sstostr(std::hex, std::showbase, v) == "0x1c5");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "+453");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "00705");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0x1c5");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "      +453");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "     00705");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "     0x1c5");
 
 		assert(bigint::parse("453") == 453);
 		assert(bigint::parse("       453") == 453);
@@ -741,25 +741,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = 1;
-		assert(tostr(v) == "1");
-		assert(tostr(std::setw(10), v) == "         1");
-		assert(tostr(std::showpos, v) == "+1");
-		assert(tostr(std::showpos, std::setw(10), v) == "        +1");
-		assert(tostr(std::dec, v) == "1");
-		assert(tostr(std::oct, v) == "1");
-		assert(tostr(std::hex, v) == "1");
-		assert(tostr(std::dec, std::showpos, v) == "+1");
-		assert(tostr(std::oct, std::showpos, v) == "1");
-		assert(tostr(std::hex, std::showpos, v) == "1");
-		assert(tostr(std::dec, std::showbase, v) == "1");
-		assert(tostr(std::oct, std::showbase, v) == "01");
-		assert(tostr(std::hex, std::showbase, v) == "0x1");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "+1");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "01");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0x1");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        +1");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        01");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0x1");
+		assert(sstostr(v) == "1");
+		assert(sstostr(std::setw(10), v) == "         1");
+		assert(sstostr(std::showpos, v) == "+1");
+		assert(sstostr(std::showpos, std::setw(10), v) == "        +1");
+		assert(sstostr(std::dec, v) == "1");
+		assert(sstostr(std::oct, v) == "1");
+		assert(sstostr(std::hex, v) == "1");
+		assert(sstostr(std::dec, std::showpos, v) == "+1");
+		assert(sstostr(std::oct, std::showpos, v) == "1");
+		assert(sstostr(std::hex, std::showpos, v) == "1");
+		assert(sstostr(std::dec, std::showbase, v) == "1");
+		assert(sstostr(std::oct, std::showbase, v) == "01");
+		assert(sstostr(std::hex, std::showbase, v) == "0x1");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "+1");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "01");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0x1");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        +1");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        01");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0x1");
 
 		assert(bigint::parse("1") == 1);
 		assert(bigint::parse("         1") == 1);
@@ -783,25 +783,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = 4;
-		assert(tostr(v) == "4");
-		assert(tostr(std::setw(10), v) == "         4");
-		assert(tostr(std::showpos, v) == "+4");
-		assert(tostr(std::showpos, std::setw(10), v) == "        +4");
-		assert(tostr(std::dec, v) == "4");
-		assert(tostr(std::oct, v) == "04");
-		assert(tostr(std::hex, v) == "4");
-		assert(tostr(std::dec, std::showpos, v) == "+4");
-		assert(tostr(std::oct, std::showpos, v) == "04");
-		assert(tostr(std::hex, std::showpos, v) == "4");
-		assert(tostr(std::dec, std::showbase, v) == "4");
-		assert(tostr(std::oct, std::showbase, v) == "004");
-		assert(tostr(std::hex, std::showbase, v) == "0x4");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "+4");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "004");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0x4");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        +4");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       004");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0x4");
+		assert(sstostr(v) == "4");
+		assert(sstostr(std::setw(10), v) == "         4");
+		assert(sstostr(std::showpos, v) == "+4");
+		assert(sstostr(std::showpos, std::setw(10), v) == "        +4");
+		assert(sstostr(std::dec, v) == "4");
+		assert(sstostr(std::oct, v) == "04");
+		assert(sstostr(std::hex, v) == "4");
+		assert(sstostr(std::dec, std::showpos, v) == "+4");
+		assert(sstostr(std::oct, std::showpos, v) == "04");
+		assert(sstostr(std::hex, std::showpos, v) == "4");
+		assert(sstostr(std::dec, std::showbase, v) == "4");
+		assert(sstostr(std::oct, std::showbase, v) == "004");
+		assert(sstostr(std::hex, std::showbase, v) == "0x4");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "+4");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "004");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0x4");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        +4");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       004");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0x4");
 
 		assert(bigint::parse("4") == 4);
 		assert(bigint::parse("         4") == 4);
@@ -825,25 +825,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = 8;
-		assert(tostr(v) == "8");
-		assert(tostr(std::setw(10), v) == "         8");
-		assert(tostr(std::showpos, v) == "+8");
-		assert(tostr(std::showpos, std::setw(10), v) == "        +8");
-		assert(tostr(std::dec, v) == "8");
-		assert(tostr(std::oct, v) == "10");
-		assert(tostr(std::hex, v) == "08");
-		assert(tostr(std::dec, std::showpos, v) == "+8");
-		assert(tostr(std::oct, std::showpos, v) == "10");
-		assert(tostr(std::hex, std::showpos, v) == "08");
-		assert(tostr(std::dec, std::showbase, v) == "8");
-		assert(tostr(std::oct, std::showbase, v) == "010");
-		assert(tostr(std::hex, std::showbase, v) == "0x08");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "+8");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "010");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0x08");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        +8");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       010");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "      0x08");
+		assert(sstostr(v) == "8");
+		assert(sstostr(std::setw(10), v) == "         8");
+		assert(sstostr(std::showpos, v) == "+8");
+		assert(sstostr(std::showpos, std::setw(10), v) == "        +8");
+		assert(sstostr(std::dec, v) == "8");
+		assert(sstostr(std::oct, v) == "10");
+		assert(sstostr(std::hex, v) == "08");
+		assert(sstostr(std::dec, std::showpos, v) == "+8");
+		assert(sstostr(std::oct, std::showpos, v) == "10");
+		assert(sstostr(std::hex, std::showpos, v) == "08");
+		assert(sstostr(std::dec, std::showbase, v) == "8");
+		assert(sstostr(std::oct, std::showbase, v) == "010");
+		assert(sstostr(std::hex, std::showbase, v) == "0x08");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "+8");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "010");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0x08");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        +8");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       010");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "      0x08");
 
 		assert(bigint::parse("8") == 8);
 		assert(bigint::parse("         8") == 8);
@@ -867,25 +867,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = 0x966;
-		assert(tostr(v) == "2406");
-		assert(tostr(std::setw(10), v) == "      2406");
-		assert(tostr(std::showpos, v) == "+2406");
-		assert(tostr(std::showpos, std::setw(10), v) == "     +2406");
-		assert(tostr(std::dec, v) == "2406");
-		assert(tostr(std::oct, v) == "04546");
-		assert(tostr(std::hex, v) == "0966");
-		assert(tostr(std::dec, std::showpos, v) == "+2406");
-		assert(tostr(std::oct, std::showpos, v) == "04546");
-		assert(tostr(std::hex, std::showpos, v) == "0966");
-		assert(tostr(std::dec, std::showbase, v) == "2406");
-		assert(tostr(std::oct, std::showbase, v) == "004546");
-		assert(tostr(std::hex, std::showbase, v) == "0x0966");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "+2406");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "004546");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0x0966");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "     +2406");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "    004546");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "    0x0966");
+		assert(sstostr(v) == "2406");
+		assert(sstostr(std::setw(10), v) == "      2406");
+		assert(sstostr(std::showpos, v) == "+2406");
+		assert(sstostr(std::showpos, std::setw(10), v) == "     +2406");
+		assert(sstostr(std::dec, v) == "2406");
+		assert(sstostr(std::oct, v) == "04546");
+		assert(sstostr(std::hex, v) == "0966");
+		assert(sstostr(std::dec, std::showpos, v) == "+2406");
+		assert(sstostr(std::oct, std::showpos, v) == "04546");
+		assert(sstostr(std::hex, std::showpos, v) == "0966");
+		assert(sstostr(std::dec, std::showbase, v) == "2406");
+		assert(sstostr(std::oct, std::showbase, v) == "004546");
+		assert(sstostr(std::hex, std::showbase, v) == "0x0966");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "+2406");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "004546");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0x0966");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "     +2406");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "    004546");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "    0x0966");
 
 		assert(bigint::parse("2406") == 0x966);
 		assert(bigint::parse("      2406") == 0x966);
@@ -909,25 +909,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = -1;
-		assert(tostr(v) == "-1");
-		assert(tostr(std::setw(10), v) == "        -1");
-		assert(tostr(std::showpos, v) == "-1");
-		assert(tostr(std::showpos, std::setw(10), v) == "        -1");
-		assert(tostr(std::dec, v) == "-1");
-		assert(tostr(std::oct, v) == "7");
-		assert(tostr(std::hex, v) == "f");
-		assert(tostr(std::dec, std::showpos, v) == "-1");
-		assert(tostr(std::oct, std::showpos, v) == "7");
-		assert(tostr(std::hex, std::showpos, v) == "f");
-		assert(tostr(std::dec, std::showbase, v) == "-1");
-		assert(tostr(std::oct, std::showbase, v) == "07");
-		assert(tostr(std::hex, std::showbase, v) == "0xf");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "-1");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "07");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0xf");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -1");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        07");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xf");
+		assert(sstostr(v) == "-1");
+		assert(sstostr(std::setw(10), v) == "        -1");
+		assert(sstostr(std::showpos, v) == "-1");
+		assert(sstostr(std::showpos, std::setw(10), v) == "        -1");
+		assert(sstostr(std::dec, v) == "-1");
+		assert(sstostr(std::oct, v) == "7");
+		assert(sstostr(std::hex, v) == "f");
+		assert(sstostr(std::dec, std::showpos, v) == "-1");
+		assert(sstostr(std::oct, std::showpos, v) == "7");
+		assert(sstostr(std::hex, std::showpos, v) == "f");
+		assert(sstostr(std::dec, std::showbase, v) == "-1");
+		assert(sstostr(std::oct, std::showbase, v) == "07");
+		assert(sstostr(std::hex, std::showbase, v) == "0xf");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "-1");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "07");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0xf");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -1");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        07");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xf");
 
 		assert(bigint::parse("-1") == -1);
 		assert(bigint::parse("        -1") == -1);
@@ -951,25 +951,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = -2;
-		assert(tostr(v) == "-2");
-		assert(tostr(std::setw(10), v) == "        -2");
-		assert(tostr(std::showpos, v) == "-2");
-		assert(tostr(std::showpos, std::setw(10), v) == "        -2");
-		assert(tostr(std::dec, v) == "-2");
-		assert(tostr(std::oct, v) == "6");
-		assert(tostr(std::hex, v) == "e");
-		assert(tostr(std::dec, std::showpos, v) == "-2");
-		assert(tostr(std::oct, std::showpos, v) == "6");
-		assert(tostr(std::hex, std::showpos, v) == "e");
-		assert(tostr(std::dec, std::showbase, v) == "-2");
-		assert(tostr(std::oct, std::showbase, v) == "06");
-		assert(tostr(std::hex, std::showbase, v) == "0xe");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "-2");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "06");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0xe");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -2");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        06");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xe");
+		assert(sstostr(v) == "-2");
+		assert(sstostr(std::setw(10), v) == "        -2");
+		assert(sstostr(std::showpos, v) == "-2");
+		assert(sstostr(std::showpos, std::setw(10), v) == "        -2");
+		assert(sstostr(std::dec, v) == "-2");
+		assert(sstostr(std::oct, v) == "6");
+		assert(sstostr(std::hex, v) == "e");
+		assert(sstostr(std::dec, std::showpos, v) == "-2");
+		assert(sstostr(std::oct, std::showpos, v) == "6");
+		assert(sstostr(std::hex, std::showpos, v) == "e");
+		assert(sstostr(std::dec, std::showbase, v) == "-2");
+		assert(sstostr(std::oct, std::showbase, v) == "06");
+		assert(sstostr(std::hex, std::showbase, v) == "0xe");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "-2");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "06");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0xe");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -2");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        06");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xe");
 
 		assert(bigint::parse("-2") == -2);
 		assert(bigint::parse("        -2") == -2);
@@ -993,25 +993,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = -4;
-		assert(tostr(v) == "-4");
-		assert(tostr(std::setw(10), v) == "        -4");
-		assert(tostr(std::showpos, v) == "-4");
-		assert(tostr(std::showpos, std::setw(10), v) == "        -4");
-		assert(tostr(std::dec, v) == "-4");
-		assert(tostr(std::oct, v) == "4");
-		assert(tostr(std::hex, v) == "c");
-		assert(tostr(std::dec, std::showpos, v) == "-4");
-		assert(tostr(std::oct, std::showpos, v) == "4");
-		assert(tostr(std::hex, std::showpos, v) == "c");
-		assert(tostr(std::dec, std::showbase, v) == "-4");
-		assert(tostr(std::oct, std::showbase, v) == "04");
-		assert(tostr(std::hex, std::showbase, v) == "0xc");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "-4");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "04");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0xc");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -4");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        04");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xc");
+		assert(sstostr(v) == "-4");
+		assert(sstostr(std::setw(10), v) == "        -4");
+		assert(sstostr(std::showpos, v) == "-4");
+		assert(sstostr(std::showpos, std::setw(10), v) == "        -4");
+		assert(sstostr(std::dec, v) == "-4");
+		assert(sstostr(std::oct, v) == "4");
+		assert(sstostr(std::hex, v) == "c");
+		assert(sstostr(std::dec, std::showpos, v) == "-4");
+		assert(sstostr(std::oct, std::showpos, v) == "4");
+		assert(sstostr(std::hex, std::showpos, v) == "c");
+		assert(sstostr(std::dec, std::showbase, v) == "-4");
+		assert(sstostr(std::oct, std::showbase, v) == "04");
+		assert(sstostr(std::hex, std::showbase, v) == "0xc");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "-4");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "04");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0xc");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -4");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "        04");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xc");
 
 		assert(bigint::parse("-4") == -4);
 		assert(bigint::parse("        -4") == -4);
@@ -1035,25 +1035,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = -5;
-		assert(tostr(v) == "-5");
-		assert(tostr(std::setw(10), v) == "        -5");
-		assert(tostr(std::showpos, v) == "-5");
-		assert(tostr(std::showpos, std::setw(10), v) == "        -5");
-		assert(tostr(std::dec, v) == "-5");
-		assert(tostr(std::oct, v) == "73");
-		assert(tostr(std::hex, v) == "b");
-		assert(tostr(std::dec, std::showpos, v) == "-5");
-		assert(tostr(std::oct, std::showpos, v) == "73");
-		assert(tostr(std::hex, std::showpos, v) == "b");
-		assert(tostr(std::dec, std::showbase, v) == "-5");
-		assert(tostr(std::oct, std::showbase, v) == "073");
-		assert(tostr(std::hex, std::showbase, v) == "0xb");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "-5");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "073");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0xb");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -5");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       073");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xb");
+		assert(sstostr(v) == "-5");
+		assert(sstostr(std::setw(10), v) == "        -5");
+		assert(sstostr(std::showpos, v) == "-5");
+		assert(sstostr(std::showpos, std::setw(10), v) == "        -5");
+		assert(sstostr(std::dec, v) == "-5");
+		assert(sstostr(std::oct, v) == "73");
+		assert(sstostr(std::hex, v) == "b");
+		assert(sstostr(std::dec, std::showpos, v) == "-5");
+		assert(sstostr(std::oct, std::showpos, v) == "73");
+		assert(sstostr(std::hex, std::showpos, v) == "b");
+		assert(sstostr(std::dec, std::showbase, v) == "-5");
+		assert(sstostr(std::oct, std::showbase, v) == "073");
+		assert(sstostr(std::hex, std::showbase, v) == "0xb");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "-5");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "073");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0xb");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "        -5");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       073");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "       0xb");
 
 		assert(bigint::parse("-5") == -5);
 		assert(bigint::parse("        -5") == -5);
@@ -1077,25 +1077,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = -16;
-		assert(tostr(v) == "-16");
-		assert(tostr(std::setw(10), v) == "       -16");
-		assert(tostr(std::showpos, v) == "-16");
-		assert(tostr(std::showpos, std::setw(10), v) == "       -16");
-		assert(tostr(std::dec, v) == "-16");
-		assert(tostr(std::oct, v) == "60");
-		assert(tostr(std::hex, v) == "f0");
-		assert(tostr(std::dec, std::showpos, v) == "-16");
-		assert(tostr(std::oct, std::showpos, v) == "60");
-		assert(tostr(std::hex, std::showpos, v) == "f0");
-		assert(tostr(std::dec, std::showbase, v) == "-16");
-		assert(tostr(std::oct, std::showbase, v) == "060");
-		assert(tostr(std::hex, std::showbase, v) == "0xf0");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "-16");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "060");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0xf0");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "       -16");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       060");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "      0xf0");
+		assert(sstostr(v) == "-16");
+		assert(sstostr(std::setw(10), v) == "       -16");
+		assert(sstostr(std::showpos, v) == "-16");
+		assert(sstostr(std::showpos, std::setw(10), v) == "       -16");
+		assert(sstostr(std::dec, v) == "-16");
+		assert(sstostr(std::oct, v) == "60");
+		assert(sstostr(std::hex, v) == "f0");
+		assert(sstostr(std::dec, std::showpos, v) == "-16");
+		assert(sstostr(std::oct, std::showpos, v) == "60");
+		assert(sstostr(std::hex, std::showpos, v) == "f0");
+		assert(sstostr(std::dec, std::showbase, v) == "-16");
+		assert(sstostr(std::oct, std::showbase, v) == "060");
+		assert(sstostr(std::hex, std::showbase, v) == "0xf0");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "-16");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "060");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0xf0");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "       -16");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "       060");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "      0xf0");
 
 		assert(bigint::parse("-16") == -16);
 		assert(bigint::parse("       -16") == -16);
@@ -1119,25 +1119,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = 0xffffffffffffffffull;
-		assert(tostr(v) == "18446744073709551615");
-		assert(tostr(std::setw(10), v) == "18446744073709551615");
-		assert(tostr(std::showpos, v) == "+18446744073709551615");
-		assert(tostr(std::showpos, std::setw(10), v) == "+18446744073709551615");
-		assert(tostr(std::dec, v) == "18446744073709551615");
-		assert(tostr(std::oct, v) == "1777777777777777777777");
-		assert(tostr(std::hex, v) == "0ffffffffffffffff");
-		assert(tostr(std::dec, std::showpos, v) == "+18446744073709551615");
-		assert(tostr(std::oct, std::showpos, v) == "1777777777777777777777");
-		assert(tostr(std::hex, std::showpos, v) == "0ffffffffffffffff");
-		assert(tostr(std::dec, std::showbase, v) == "18446744073709551615");
-		assert(tostr(std::oct, std::showbase, v) == "01777777777777777777777");
-		assert(tostr(std::hex, std::showbase, v) == "0x0ffffffffffffffff");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "+18446744073709551615");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "01777777777777777777777");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0x0ffffffffffffffff");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "+18446744073709551615");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "01777777777777777777777");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "0x0ffffffffffffffff");
+		assert(sstostr(v) == "18446744073709551615");
+		assert(sstostr(std::setw(10), v) == "18446744073709551615");
+		assert(sstostr(std::showpos, v) == "+18446744073709551615");
+		assert(sstostr(std::showpos, std::setw(10), v) == "+18446744073709551615");
+		assert(sstostr(std::dec, v) == "18446744073709551615");
+		assert(sstostr(std::oct, v) == "1777777777777777777777");
+		assert(sstostr(std::hex, v) == "0ffffffffffffffff");
+		assert(sstostr(std::dec, std::showpos, v) == "+18446744073709551615");
+		assert(sstostr(std::oct, std::showpos, v) == "1777777777777777777777");
+		assert(sstostr(std::hex, std::showpos, v) == "0ffffffffffffffff");
+		assert(sstostr(std::dec, std::showbase, v) == "18446744073709551615");
+		assert(sstostr(std::oct, std::showbase, v) == "01777777777777777777777");
+		assert(sstostr(std::hex, std::showbase, v) == "0x0ffffffffffffffff");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "+18446744073709551615");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "01777777777777777777777");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0x0ffffffffffffffff");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "+18446744073709551615");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "01777777777777777777777");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "0x0ffffffffffffffff");
 
 		assert(bigint::parse("18446744073709551615") == 0xffffffffffffffffull);
 		assert(bigint::parse("18446744073709551615") == 0xffffffffffffffffull);
@@ -1161,25 +1161,25 @@ void big_parse_tests()
 	}
 	{
 		bigint v = 0777777777777777777777ull;
-		assert(tostr(v) == "9223372036854775807");
-		assert(tostr(std::setw(10), v) == "9223372036854775807");
-		assert(tostr(std::showpos, v) == "+9223372036854775807");
-		assert(tostr(std::showpos, std::setw(10), v) == "+9223372036854775807");
-		assert(tostr(std::dec, v) == "9223372036854775807");
-		assert(tostr(std::oct, v) == "0777777777777777777777");
-		assert(tostr(std::hex, v) == "7fffffffffffffff");
-		assert(tostr(std::dec, std::showpos, v) == "+9223372036854775807");
-		assert(tostr(std::oct, std::showpos, v) == "0777777777777777777777");
-		assert(tostr(std::hex, std::showpos, v) == "7fffffffffffffff");
-		assert(tostr(std::dec, std::showbase, v) == "9223372036854775807");
-		assert(tostr(std::oct, std::showbase, v) == "00777777777777777777777");
-		assert(tostr(std::hex, std::showbase, v) == "0x7fffffffffffffff");
-		assert(tostr(std::dec, std::showbase, std::showpos, v) == "+9223372036854775807");
-		assert(tostr(std::oct, std::showbase, std::showpos, v) == "00777777777777777777777");
-		assert(tostr(std::hex, std::showbase, std::showpos, v) == "0x7fffffffffffffff");
-		assert(tostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "+9223372036854775807");
-		assert(tostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "00777777777777777777777");
-		assert(tostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "0x7fffffffffffffff");
+		assert(sstostr(v) == "9223372036854775807");
+		assert(sstostr(std::setw(10), v) == "9223372036854775807");
+		assert(sstostr(std::showpos, v) == "+9223372036854775807");
+		assert(sstostr(std::showpos, std::setw(10), v) == "+9223372036854775807");
+		assert(sstostr(std::dec, v) == "9223372036854775807");
+		assert(sstostr(std::oct, v) == "0777777777777777777777");
+		assert(sstostr(std::hex, v) == "7fffffffffffffff");
+		assert(sstostr(std::dec, std::showpos, v) == "+9223372036854775807");
+		assert(sstostr(std::oct, std::showpos, v) == "0777777777777777777777");
+		assert(sstostr(std::hex, std::showpos, v) == "7fffffffffffffff");
+		assert(sstostr(std::dec, std::showbase, v) == "9223372036854775807");
+		assert(sstostr(std::oct, std::showbase, v) == "00777777777777777777777");
+		assert(sstostr(std::hex, std::showbase, v) == "0x7fffffffffffffff");
+		assert(sstostr(std::dec, std::showbase, std::showpos, v) == "+9223372036854775807");
+		assert(sstostr(std::oct, std::showbase, std::showpos, v) == "00777777777777777777777");
+		assert(sstostr(std::hex, std::showbase, std::showpos, v) == "0x7fffffffffffffff");
+		assert(sstostr(std::dec, std::showbase, std::showpos, std::setw(10), v) == "+9223372036854775807");
+		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "00777777777777777777777");
+		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "0x7fffffffffffffff");
 
 		assert(bigint::parse("9223372036854775807") == 0777777777777777777777ull);
 		assert(bigint::parse("9223372036854775807") == 0777777777777777777777ull);
@@ -1227,11 +1227,11 @@ void block_parse_tests()
 		assert(u.blocks[5] == 5165088340638674452ull);
 		assert(u.blocks[6] == 1475739525896764129ull);
 		assert(u.blocks[7] == 92233720368547758ull);
-		assert(tostr(u) == strs[0]);
+		assert(sstostr(u) == strs[0]);
 		u *= 100ull;
-		assert(tostr(u) == strs[1]);
+		assert(sstostr(u) == strs[1]);
 		u += 48ull;
-		assert(tostr(u) == strs[2]);
+		assert(sstostr(u) == strs[2]);
 
 		b = bigint::parse(strs[0]);
 		assert(b.blocks.size() == 8);
@@ -1243,10 +1243,10 @@ void block_parse_tests()
 		assert(b.blocks[5] == 5165088340638674452ull);
 		assert(b.blocks[6] == 1475739525896764129ull);
 		assert(b.blocks[7] == 92233720368547758ull);
-		assert(tostr(b) == strs[0]);
+		assert(sstostr(b) == strs[0]);
 
 		b = bigint::parse(bigstr);
-		assert(tostr(b) == bigstr);
+		assert(sstostr(b) == bigstr);
 	}
 }
 void overflow_parse_tests()
@@ -1255,9 +1255,9 @@ void overflow_parse_tests()
 		uint_t<512> u;
 		int_t<512> s;
 
-		assert(tostr(uint_t<512>::parse("13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095")) == "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095");
-		assert(tostr(int_t<512>::parse("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
-		assert(tostr(int_t<512>::parse("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047")) == "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047");
+		assert(sstostr(uint_t<512>::parse("13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095")) == "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095");
+		assert(sstostr(int_t<512>::parse("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
+		assert(sstostr(int_t<512>::parse("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047")) == "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047");
 
 		assert_throws(std::invalid_argument, uint_t<512>::parse("13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084096"));
 		assert_throws(std::invalid_argument, int_t<512>::parse("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042049"));
@@ -1456,53 +1456,53 @@ void more_ops_tests()
 				assert(sum + 1 > sum);
 				assert(sum > sum - 1);
 				assert(sum - 1 < sum);
-				assert(tostr(sum) == tostr(vals[i] + vals[j]));
+				assert(sstostr(sum) == sstostr(vals[i] + vals[j]));
 
 				bigint notsum = ~sum;
 				assert(notsum == -(vals[i] + vals[j]) - 1);
 				assert(-(vals[i] + vals[j]) - 1 == 0 ? notsum.blocks.size() == 0 : notsum.blocks.size() == 1);
-				assert(tostr(notsum) == tostr(-(vals[i] + vals[j]) - 1));
+				assert(sstostr(notsum) == sstostr(-(vals[i] + vals[j]) - 1));
 
 				bigint negsum = -sum;
 				assert(negsum == -(vals[i] + vals[j]));
 				assert(-(vals[i] + vals[j]) == 0 ? negsum.blocks.size() == 0 : negsum.blocks.size() == 1);
-				assert(tostr(negsum) == tostr(-(vals[i] + vals[j])));
+				assert(sstostr(negsum) == sstostr(-(vals[i] + vals[j])));
 
 				assert(notsum + 1 == negsum);
-				assert(tostr(notsum + 1) == tostr(negsum));
+				assert(sstostr(notsum + 1) == sstostr(negsum));
 
 				bigint diff = (bigint)vals[i] - (bigint)vals[j];
 				assert(diff == vals[i] - vals[j]);
 				assert(vals[i] - vals[j] == 0 ? diff.blocks.size() == 0 : diff.blocks.size() == 1);
-				assert(tostr(diff) == tostr(vals[i] - vals[j]));
+				assert(sstostr(diff) == sstostr(vals[i] - vals[j]));
 
 				bigint prod = (bigint)vals[i] * (bigint)vals[j];
 				assert(prod == vals[i] * vals[j]);
 				assert(vals[i] * vals[j] == 0 ? prod.blocks.size() == 0 : prod.blocks.size() == 1);
-				assert(tostr(prod) == tostr(vals[i] * vals[j]));
+				assert(sstostr(prod) == sstostr(vals[i] * vals[j]));
 
 				if (vals[j] != 0)
 				{
 					bigint quo = (bigint)vals[i] / (bigint)vals[j];
 					assert(quo == vals[i] / vals[j]);
 					assert(vals[i] / vals[j] == 0 ? quo.blocks.size() == 0 : quo.blocks.size() == 1);
-					assert(tostr(quo) == tostr(vals[i] / vals[j]));
+					assert(sstostr(quo) == sstostr(vals[i] / vals[j]));
 				}
 
 				bigint band = (bigint)vals[i] & (bigint)vals[j];
 				assert(band == (vals[i] & vals[j]));
 				assert((vals[i] & vals[j]) == 0 ? band.blocks.size() == 0 : band.blocks.size() == 1);
-				assert(tostr(band) == tostr(vals[i] & vals[j]));
+				assert(sstostr(band) == sstostr(vals[i] & vals[j]));
 
 				bigint bor = (bigint)vals[i] | (bigint)vals[j];
 				assert(bor == (vals[i] | vals[j]));
 				assert((vals[i] | vals[j]) == 0 ? bor.blocks.size() == 0 : bor.blocks.size() == 1);
-				assert(tostr(bor) == tostr(vals[i] | vals[j]));
+				assert(sstostr(bor) == sstostr(vals[i] | vals[j]));
 
 				bigint bxor = (bigint)vals[i] ^ (bigint)vals[j];
 				assert(bxor == (vals[i] ^ vals[j]));
 				assert((vals[i] ^ vals[j]) == 0 ? bxor.blocks.size() == 0 : bxor.blocks.size() == 1);
-				assert(tostr(bxor) == tostr(vals[i] ^ vals[j]));
+				assert(sstostr(bxor) == sstostr(vals[i] ^ vals[j]));
 			}
 
 		{
@@ -1575,7 +1575,7 @@ void big_promotion_tests()
 	{
 		bigint v = bigint::parse("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16);
 		bigint r = v * v;
-		assert(tostr(r) == "1026301351570233739499293428424157827113862320509474868877723027253195088579758740627615722253086934881590063514230345951830442386318246187269187562628311952630251852968692235997360173760639550065418089580517919902935726984364421732731351192069777176001110091235222448929542559681760328631249946802584338006151524151805763498018141131455523556616803713025");
+		assert(sstostr(r) == "1026301351570233739499293428424157827113862320509474868877723027253195088579758740627615722253086934881590063514230345951830442386318246187269187562628311952630251852968692235997360173760639550065418089580517919902935726984364421732731351192069777176001110091235222448929542559681760328631249946802584338006151524151805763498018141131455523556616803713025");
 		uint_t<1024> v1024;
 
 		const char *bigint_strs[] =
@@ -1621,9 +1621,9 @@ void big_promotion_tests()
 		for (std::size_t i = 0; i < count; ++i)
 		{
 			bigint::parse(v, bigint_strs[i], 16);
-			assert(tostr(std::hex, v) == bigint_strs[i]);
+			assert(sstostr(std::hex, v) == bigint_strs[i]);
 			v *= v;
-			assert(tostr(v) == ans[i]);
+			assert(sstostr(v) == ans[i]);
 
 			assert((v | 0) == v);
 			assert((-v | 0) == -v);
@@ -1635,9 +1635,9 @@ void big_promotion_tests()
 		for (std::size_t i = 0; i < count; ++i)
 		{
 			uint_t<1024>::parse(v1024, other_strs[i], 16);
-			assert(tostr(std::hex, v1024) == other_strs[i]);
+			assert(sstostr(std::hex, v1024) == other_strs[i]);
 			v1024 *= v1024;
-			assert(tostr(v1024) == ans[i]);
+			assert(sstostr(v1024) == ans[i]);
 		}
 	}
 }
@@ -1655,10 +1655,10 @@ void misc_tests()
 		assert(int_t<256>(-5) < int_t<256>(6));
 	}
 	{
-		assert(tostr(bigint::parse("12") * bigint::parse("12")) == "144");
-		assert(tostr(bigint::parse("-12") * bigint::parse("12")) == "-144");
-		assert(tostr(bigint::parse("12") * bigint::parse("-12")) == "-144");
-		assert(tostr(bigint::parse("-12") * bigint::parse("-12")) == "144");
+		assert(sstostr(bigint::parse("12") * bigint::parse("12")) == "144");
+		assert(sstostr(bigint::parse("-12") * bigint::parse("12")) == "-144");
+		assert(sstostr(bigint::parse("12") * bigint::parse("-12")) == "-144");
+		assert(sstostr(bigint::parse("-12") * bigint::parse("-12")) == "144");
 
 		bigint v = 12;
 		v *= v;
@@ -1682,22 +1682,22 @@ void misc_tests()
 void pow_tests()
 {
 	{
-		assert(tostr(bigint::pow(12, -1)) == "0");
-		assert(tostr(bigint::pow(12, 0)) == "1");
-		assert(tostr(bigint::pow(12, 1)) == "12");
-		assert(tostr(bigint::pow(12, 2)) == "144");
-		assert(tostr(bigint::pow(12, 3)) == "1728");
-		assert(tostr(bigint::pow(12, 4)) == "20736");
+		assert(sstostr(bigint::pow(12, -1)) == "0");
+		assert(sstostr(bigint::pow(12, 0)) == "1");
+		assert(sstostr(bigint::pow(12, 1)) == "12");
+		assert(sstostr(bigint::pow(12, 2)) == "144");
+		assert(sstostr(bigint::pow(12, 3)) == "1728");
+		assert(sstostr(bigint::pow(12, 4)) == "20736");
 
-		assert(tostr(bigint::pow(-12, -1)) == "0");
-		assert(tostr(bigint::pow(-12, 0)) == "1");
-		assert(tostr(bigint::pow(-12, 1)) == "-12");
-		assert(tostr(bigint::pow(-12, 2)) == "144");
-		assert(tostr(bigint::pow(-12, 3)) == "-1728");
-		assert(tostr(bigint::pow(-12, 4)) == "20736");
+		assert(sstostr(bigint::pow(-12, -1)) == "0");
+		assert(sstostr(bigint::pow(-12, 0)) == "1");
+		assert(sstostr(bigint::pow(-12, 1)) == "-12");
+		assert(sstostr(bigint::pow(-12, 2)) == "144");
+		assert(sstostr(bigint::pow(-12, 3)) == "-1728");
+		assert(sstostr(bigint::pow(-12, 4)) == "20736");
 
-		assert(tostr(bigint::pow(122, 32)) == "5801156497853265440881973185035019503869198362251315125887713673216");
-		assert(tostr(bigint::pow(56, 73)) == "41469229998734605907229666533990439080884762393847798172038084645287681671512979662987869210144861737361911662097025032274313216");
+		assert(sstostr(bigint::pow(122, 32)) == "5801156497853265440881973185035019503869198362251315125887713673216");
+		assert(sstostr(bigint::pow(56, 73)) == "41469229998734605907229666533990439080884762393847798172038084645287681671512979662987869210144861737361911662097025032274313216");
 	}
 }
 void factorial_tests()
@@ -1811,7 +1811,7 @@ void factorial_tests()
 		for (std::size_t i = 0; i < factorial_test_count; ++i)
 		{
 			bigint v = bigint::factorial(i);
-			assert(tostr(v) == factorial_tests[i]);
+			assert(sstostr(v) == factorial_tests[i]);
 		}
 	}
 }
@@ -1843,6 +1843,12 @@ static_assert(std::is_same<int_t<16>, std::int16_t>::value, "type equivalence vi
 static_assert(std::is_same<int_t<32>, std::int32_t>::value, "type equivalence violation");
 static_assert(std::is_same<int_t<64>, std::int64_t>::value, "type equivalence violation");
 
+static_assert(std::is_same<std::common_type_t<int, long>, long>::value, "common type violation");
+static_assert(std::is_same<std::common_type_t<int, int_t<256>>, int_t<256>>::value, "common type violation");
+static_assert(std::is_same<std::common_type_t<int, bigint>, bigint>::value, "common type violation");
+static_assert(std::is_same<std::common_type_t<int_t<256>, bigint>, bigint>::value, "common type violation");
+static_assert(std::is_same<std::common_type_t<int_t<256>, int_t<512>>, int_t<512>>::value, "common type violation");
+
 int main()
 {
 	// -- core tests -- //
@@ -1867,9 +1873,9 @@ int main()
 
 	benchmark_binary("multiply ", 200000, 20000, 1000, 5000, [](const auto &a, const auto &b) { return a * b; });
 	benchmark_binary("divmod   ", 4000, 2000, 100, 500, [](const auto &a, const auto &b) { return detail::divmod(a, b); });
-	benchmark_binary("tostr dec", 1000, 1000, 100, 100, [](const auto &a, const auto &b) { return tostr(a) + tostr(b); });
-	benchmark_binary("tostr hex", 1000, 1000, 1000, 1000, [](const auto &a, const auto &b) { return tostr(std::hex, a) + tostr(std::hex, b); });
-	benchmark_binary("tostr oct", 1000, 1000, 1000, 1000, [](const auto &a, const auto &b) { return tostr(std::oct, a) + tostr(std::oct, b); });
+	benchmark_binary("tostr dec", 1000, 1000, 100, 100, [fmt = tostr_fmt{}](const auto &a, const auto &b) { return fmt(a) + fmt(b); });
+	benchmark_binary("tostr hex", 1000, 1000, 1000, 1000, [fmt = tostr_fmt{ 16 }](const auto &a, const auto &b) { return fmt(a) + fmt(b); });
+	benchmark_binary("tostr oct", 1000, 1000, 1000, 1000, [fmt = tostr_fmt{ 8 }](const auto &a, const auto &b) { return fmt(a) + fmt(b); });
 
 	// -- all tests completed -- //
 

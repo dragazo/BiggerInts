@@ -6,7 +6,8 @@
 
 using namespace BiggerInts;
 
-void detail::_collapse(bigint &a)
+// collapses the value in the given bigint to make it satisfy the requirements of the blocks array
+void collapse(bigint &a)
 {
 	if (detail::is_neg(a))
 	{
@@ -34,7 +35,7 @@ void detail::make_not(bigint &a)
 	else
 	{
 		for (std::uint64_t &v : a.blocks) v = ~v;
-		_collapse(a);
+		collapse(a);
 	}
 }
 void detail::make_neg(bigint &a) { make_not(a); ++a; }
@@ -63,7 +64,7 @@ void detail::bit_set(bigint &val, std::uint64_t bit) noexcept
 	val.blocks[block] |= 1ull << bit;
 	if (!neg && detail::is_neg(val)) val.blocks.push_back(0ull); // make sure positive things remain positive
 
-	_collapse(val);
+	collapse(val);
 }
 
 bool detail::cmp_less_non_negative(const bigint &a, const bigint &b) noexcept // same as cmp() but requires they both be non-negative
@@ -120,12 +121,12 @@ void bigint::zero_extend(detail::const_fixed_int_wrapper val)
 void bigint::sign_extend(detail::const_fixed_int_wrapper val)
 {
 	blocks.assign(val.blocks, val.blocks + val.blocks_n);
-	_collapse(*this);
+	collapse(*this);
 }
 
 bigint &bigint::operator++()
 {
-	for (std::size_t i = 1; i < blocks.size(); ++i) if (++blocks[i - 1]) { _collapse(*this); return *this; }
+	for (std::size_t i = 1; i < blocks.size(); ++i) if (++blocks[i - 1]) { collapse(*this); return *this; }
 
 	if (blocks.empty()) blocks.push_back(1ull);
 	else
@@ -133,7 +134,7 @@ bigint &bigint::operator++()
 		std::uint64_t high = ++blocks.back();
 		if (high == 0) blocks.clear();
 		else if (high == 0x8000000000000000ull) blocks.push_back(0ull);
-		else _collapse(*this);
+		else collapse(*this);
 	}
 
 	return *this;
@@ -142,7 +143,7 @@ bigint bigint::operator++(int) { bigint cpy = *this; ++*this; return cpy; }
 
 bigint &bigint::operator--()
 {
-	for (std::size_t i = 1; i < blocks.size(); ++i) if (blocks[i - 1]--) { _collapse(*this); return *this; }
+	for (std::size_t i = 1; i < blocks.size(); ++i) if (blocks[i - 1]--) { collapse(*this); return *this; }
 
 	if (blocks.empty()) blocks.push_back(0xffffffffffffffffull);
 	else
@@ -150,7 +151,7 @@ bigint &bigint::operator--()
 		std::uint64_t high = blocks.back()--;
 		/* high == 0 case cannot happen because 0 is represented by empty array and is therefore handled above */
 		if (high == 0x8000000000000000ull) blocks.push_back(0xffffffffffffffffull);
-		else _collapse(*this);
+		else collapse(*this);
 	}
 
 	return *this;
@@ -215,7 +216,7 @@ bigint &_add(bigint &a, const bigint &b)
 		}
 	}
 
-	_collapse(a);
+	collapse(a);
 	return a;
 }
 
@@ -264,7 +265,7 @@ bigint &bigint::operator&=(const bigint &b)
 		}
 	}
 
-	_collapse(*this);
+	collapse(*this);
 	return *this;
 }
 
@@ -301,7 +302,7 @@ bigint &bigint::operator|=(const bigint &b)
 		}
 	}
 
-	_collapse(*this);
+	collapse(*this);
 	return *this;
 }
 
@@ -341,7 +342,7 @@ bigint &bigint::operator^=(const bigint &b)
 		}
 	}
 
-	_collapse(*this);
+	collapse(*this);
 	return *this;
 }
 
@@ -396,7 +397,7 @@ bigint &bigint::operator>>=(std::uint64_t count)
 			for (std::size_t i = full; i < blocks.size() - 1; ++i) blocks[i] = (blocks[i] >> count) | (blocks[i + 1] << (64 - count));
 			blocks[blocks.size() - 1] = (blocks[blocks.size() - 1] >> count) | (fill << (64 - count));
 		}
-		_collapse(*this);
+		collapse(*this);
 	}
 	return *this;
 }
@@ -438,7 +439,7 @@ bigint _multiply_positive(const bigint &a, const bigint &b)
 		}
 	}
 
-	detail::_collapse(res); // we need to perform one collapse operation on the finished result to put it into a valid state
+	collapse(res); // we need to perform one collapse operation on the finished result to put it into a valid state
 	return res;
 }
 template<typename U, typename V, std::enable_if_t<std::is_same_v<std::decay_t<U>, bigint> && std::is_same_v<std::decay_t<V>, bigint>, int> = 0>
@@ -659,224 +660,255 @@ constexpr bool ext_hex(int &ch) noexcept
 	return false;
 }
 
-// prints the value - interpreted as non-negative - sign_ch (if not null) is appended to the front of the printed value
-template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
-std::ostream &print_positive(std::ostream &ostr, T val, char sign_ch)
+tostr_fmt::tostr_fmt(const std::ios_base &stream)
 {
-	std::ostream::sentry sentry(ostr);
-	if (!sentry) return ostr;
+	switch ((int)(stream.flags() & std::ios::basefield))
+	{
+	case (int)std::ios::dec: base = 10; break;
+	case (int)std::ios::hex: base = 16; break;
+	case (int)std::ios::oct: base = 8; break;
+	default: throw std::invalid_argument("multiple base flags were set for stream object");
+	}
 
+	showpos = stream.flags() & std::ios::showpos;
+	showbase = stream.flags() & std::ios::showbase;
+	uppercase = stream.flags() & std::ios::uppercase;
+}
+
+template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
+std::string tostr_positive_hex(T val, const tostr_fmt &fmt, char sign_ch)
+{
 	std::string str;
 	int digit, dcount;
 	std::uint64_t block;
 
-	// build the string
-	if (ostr.flags() & std::ios::hex)
+	const bool sign = detail::is_neg(val);
+	const char hex_alpha = fmt.uppercase ? 'A' : 'a';
+
+	(void)sign; // suppress unused warnings
+	if constexpr (std::is_same_v<T, bigint>)
 	{
-		const bool sign = detail::is_neg(val);
-		const char hex_alpha = ostr.flags() & std::ios::uppercase ? 'A' : 'a';
-
-		(void)sign; // suppress unused warnings
-		if constexpr (std::is_same_v<T, bigint>)
-		{
-			if (sign) val.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
-		}
-
-		while (true)
-		{
-			// get a block
-			if constexpr (std::is_same_v<T, bigint>)
-			{
-				block = val.blocks.empty() ? 0ull : val.blocks[0];
-				val >>= 64;
-			}
-			else
-			{
-				block = val.blocks[0];
-				shr(val, 64);
-			}
-			dcount = 0;
-
-			do // write the block - do-while to ensure 0 gets printed
-			{
-				digit = block & 15;
-				str.push_back(digit < 10 ? '0' + digit : hex_alpha + digit - 10);
-				block >>= 4;
-				++dcount;
-			} while (block);
-
-			if (detail::nonzero(val)) { for (; dcount < 16; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
-			else break; // otherwise we're done
-		}
-		if constexpr (std::is_same_v<T, bigint>)
-		{
-			if (sign)
-			{
-				const char f = ostr.flags() & std::ios::uppercase ? 'F' : 'f';
-
-				std::size_t s; // now we truncate all leading f's
-				for (s = str.size(); s > 0; --s) if (str[s - 1] != f) break;
-				str.resize(s); // chop off everything we don't want
-				if (str.empty() || str.back() <= '7') str.push_back(f); // if the string is now empty or no longer sign extends to negative, add a (single) f back on
-			}
-			else if (str.back() >= '8') str.push_back('0'); // if val was positive but ends in an 8 or higher, add a 0 to prevent sign extending to negative on parsing
-		}
-		if (ostr.flags() & std::ios::showbase)
-		{
-			str.push_back('x'); // uses put() to make sure we don't clobber ostr.width()
-			str.push_back('0');
-		}
+		if (sign) val.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
 	}
-	else if (ostr.flags() & std::ios::oct)
-	{
-		const bool sign = detail::is_neg(val);
 
-		(void)sign; // suppress unused warnings
+	while (true)
+	{
+		// get a block
 		if constexpr (std::is_same_v<T, bigint>)
 		{
-			if (sign) val.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
-		}
-
-		while (true)
-		{
-			// get a block
-			if constexpr (std::is_same_v<T, bigint>)
-			{
-				block = val.blocks.empty() ? 0ull : val.blocks[0];
-				val >>= 63;
-			}
-			else
-			{
-				block = val.blocks[0];
-				shr(val, 63);
-			}
-			block &= 0777777777777777777777ull;
-			dcount = 0;
-
-			// write the block - do-while to ensure 0 gets printed
-			do
-			{
-				str.push_back('0' + (block & 7));
-				block >>= 3;
-				++dcount;
-			} while (block);
-
-			if (detail::nonzero(val)) { for (; dcount < 21; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
-			else break; // otherwise we're done
-		}
-		if constexpr (std::is_same_v<T, bigint>)
-		{
-			if (sign)
-			{
-				// if it was negative we need to ensure that the high char will sign extend to negative
-				if (str.back() == '1') str.back() = '7'; // 001 -> 111
-				else if (str.back() <= '3') str.back() += 4; // 010, 011 -> 110, 111
-				// otherwise is at least 4 and therefore already good to go
-
-				std::size_t s; // now we truncate all leading 7's
-				for (s = str.size(); s > 0; --s) if (str[s - 1] != '7') break;
-				str.resize(s); // chop off everything we don't want
-				if (str.empty() || str.back() <= '3') str.push_back('7'); // if the string is now empty or no longer sign extends to negative, add a (single) 7 back on
-			}
-			else if (str.back() >= '4') str.push_back('0'); // if val was positive but ends in a 4 or higher, add a 0 to prevent sign extending to negative on parsing
-		}
-		if (ostr.flags() & std::ios::showbase) str.push_back('0');
-	}
-	else // default to dec mode
-	{
-		std::conditional_t<std::is_same_v<T, detail::fixed_int_wrapper>, std::vector<std::uint64_t>, int> buffer; // buffer area for use with fixed_int
-		std::pair<T, T> temp;
-		T base;
-		if constexpr (std::is_same_v<T, detail::fixed_int_wrapper>)
-		{
-			buffer.resize(val.blocks_n * 3, 0); // allocate space for temp.first, temp.second, and base
-			temp.first = { &buffer[0], val.blocks_n };
-			temp.second = { &buffer[val.blocks_n], val.blocks_n };
-			base = { &buffer[2 * val.blocks_n], val.blocks_n };
-			base.blocks[0] = 10000000000000000000ull; // initialize base
+			block = val.blocks.empty() ? 0ull : val.blocks[0];
+			val >>= 64;
 		}
 		else
 		{
-			(void)buffer; // suppress unused warnings (will just be optimized away)
-			base = 10000000000000000000ull; // initialize base
+			block = val.blocks[0];
+			shr(val, 64);
 		}
+		dcount = 0;
 
-		while (true)
+		do // write the block - do-while to ensure 0 gets printed
 		{
-			// get a block
-			if constexpr (std::is_same_v<T, detail::fixed_int_wrapper>)
-			{
-				for (std::size_t i = 0; i < val.blocks_n * 2; ++i) buffer[i] = 0; // zero temp for the next step
-				detail::divmod_unchecked_positive_already_zero(temp.first, temp.second, val, base);
-				block = temp.second.blocks[0];
-				for (std::size_t i = 0; i < val.blocks_n; ++i) val.blocks[i] = buffer[i]; // copy quotient back to val
-			}
-			else
-			{
-				using std::swap; // import std::swap for adl
+			digit = block & 15;
+			str.push_back(digit < 10 ? '0' + digit : hex_alpha + digit - 10);
+			block >>= 4;
+			++dcount;
+		} while (block);
 
-				temp.first.blocks.clear(); // zero temp for the next step
-				temp.second.blocks.clear();
-				detail::divmod_unchecked_positive_already_zero(temp.first, temp.second, val, base);
-				block = temp.second.blocks.empty() ? 0ull : temp.second.blocks[0];
-				swap(val, temp.first); // copy quotient back to val (swap is so we don't reallocate a vector each time we loop)
-			}
-			dcount = 0;
+		if (detail::nonzero(val)) { for (; dcount < 16; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
+		else break; // otherwise we're done
+	}
+	if constexpr (std::is_same_v<T, bigint>)
+	{
+		if (sign)
+		{
+			const char f = fmt.uppercase ? 'F' : 'f';
 
-			// write the block - do-while to ensure 0 gets printed
-			do
-			{
-				str.push_back('0' + block % 10);
-				block /= 10;
-				++dcount;
-			} while (block);
-
-			if (detail::nonzero(val)) { for (; dcount < 19; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
-			else break; // otherwise we're done
+			std::size_t s; // now we truncate all leading f's
+			for (s = str.size(); s > 0; --s) if (str[s - 1] != f) break;
+			str.resize(s); // chop off everything we don't want
+			if (str.empty() || str.back() <= '7') str.push_back(f); // if the string is now empty or no longer sign extends to negative, add a (single) f back on
 		}
+		else if (str.back() >= '8') str.push_back('0'); // if val was positive but ends in an 8 or higher, add a 0 to prevent sign extending to negative on parsing
+	}
+	if (fmt.showbase)
+	{
+		str.push_back('x');
+		str.push_back('0');
 	}
 
-	if (sign_ch) str.push_back(sign_ch); // append the sign character if specified
-
+	if (sign_ch) str.push_back(sign_ch);  // append the sign character if specified
 	std::reverse(str.begin(), str.end()); // reverse the string for printing
-	ostr << str;                          // print the string (this applies the width/fill)
 
-	return ostr;
+	return str;
 }
 template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
-std::ostream &print_signed(std::ostream &ostr, T val)
+std::string tostr_positive_oct(T val, const tostr_fmt &fmt, char sign_ch)
+{
+	std::string str;
+	int dcount;
+	std::uint64_t block;
+
+	const bool sign = detail::is_neg(val);
+
+	(void)sign; // suppress unused warnings
+	if constexpr (std::is_same_v<T, bigint>)
+	{
+		if (sign) val.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
+	}
+
+	while (true)
+	{
+		// get a block
+		if constexpr (std::is_same_v<T, bigint>)
+		{
+			block = val.blocks.empty() ? 0ull : val.blocks[0];
+			val >>= 63;
+		}
+		else
+		{
+			block = val.blocks[0];
+			shr(val, 63);
+		}
+		block &= 0777777777777777777777ull;
+		dcount = 0;
+
+		// write the block - do-while to ensure 0 gets printed
+		do
+		{
+			str.push_back('0' + (block & 7));
+			block >>= 3;
+			++dcount;
+		} while (block);
+
+		if (detail::nonzero(val)) { for (; dcount < 21; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
+		else break; // otherwise we're done
+	}
+	if constexpr (std::is_same_v<T, bigint>)
+	{
+		if (sign)
+		{
+			// if it was negative we need to ensure that the high char will sign extend to negative
+			if (str.back() == '1') str.back() = '7'; // 001 -> 111
+			else if (str.back() <= '3') str.back() += 4; // 010, 011 -> 110, 111
+			// otherwise is at least 4 and therefore already good to go
+
+			std::size_t s; // now we truncate all leading 7's
+			for (s = str.size(); s > 0; --s) if (str[s - 1] != '7') break;
+			str.resize(s); // chop off everything we don't want
+			if (str.empty() || str.back() <= '3') str.push_back('7'); // if the string is now empty or no longer sign extends to negative, add a (single) 7 back on
+		}
+		else if (str.back() >= '4') str.push_back('0'); // if val was positive but ends in a 4 or higher, add a 0 to prevent sign extending to negative on parsing
+	}
+	if (fmt.showbase) str.push_back('0');
+
+	if (sign_ch) str.push_back(sign_ch);  // append the sign character if specified
+	std::reverse(str.begin(), str.end()); // reverse the string for printing
+
+	return str;
+}
+template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
+std::string tostr_positive_dec(T val, const tostr_fmt &fmt, char sign_ch)
+{
+	std::string str;
+	int dcount;
+	std::uint64_t block;
+
+	std::conditional_t<std::is_same_v<T, detail::fixed_int_wrapper>, std::vector<std::uint64_t>, int> buffer; // buffer area for use with fixed_int
+	std::pair<T, T> temp;
+	T base;
+	if constexpr (std::is_same_v<T, detail::fixed_int_wrapper>)
+	{
+		buffer.resize(val.blocks_n * 3, 0); // allocate space for temp.first, temp.second, and base
+		temp.first = { &buffer[0], val.blocks_n };
+		temp.second = { &buffer[val.blocks_n], val.blocks_n };
+		base = { &buffer[2 * val.blocks_n], val.blocks_n };
+		base.blocks[0] = 10000000000000000000ull; // initialize base
+	}
+	else
+	{
+		(void)buffer; // suppress unused warnings (will just be optimized away)
+		base = 10000000000000000000ull; // initialize base
+	}
+
+	while (true)
+	{
+		// get a block
+		if constexpr (std::is_same_v<T, detail::fixed_int_wrapper>)
+		{
+			for (std::size_t i = 0; i < val.blocks_n * 2; ++i) buffer[i] = 0; // zero temp for the next step
+			detail::divmod_unchecked_positive_already_zero(temp.first, temp.second, val, base);
+			block = temp.second.blocks[0];
+			for (std::size_t i = 0; i < val.blocks_n; ++i) val.blocks[i] = buffer[i]; // copy quotient back to val
+		}
+		else
+		{
+			using std::swap; // import std::swap for adl
+
+			temp.first.blocks.clear(); // zero temp for the next step
+			temp.second.blocks.clear();
+			detail::divmod_unchecked_positive_already_zero(temp.first, temp.second, val, base);
+			block = temp.second.blocks.empty() ? 0ull : temp.second.blocks[0];
+			swap(val, temp.first); // copy quotient back to val (swap is so we don't reallocate a vector each time we loop)
+		}
+		dcount = 0;
+
+		// write the block - do-while to ensure 0 gets printed
+		do
+		{
+			str.push_back('0' + block % 10);
+			block /= 10;
+			++dcount;
+		} while (block);
+
+		if (detail::nonzero(val)) { for (; dcount < 19; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
+		else break; // otherwise we're done
+	}
+
+	if (sign_ch) str.push_back(sign_ch);  // append the sign character if specified
+	std::reverse(str.begin(), str.end()); // reverse the string for printing
+
+	return str;
+}
+
+template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
+std::string tostr_positive(T val, const tostr_fmt &fmt, char sign_ch)
+{
+	switch (fmt.base)
+	{
+	case 10: return tostr_positive_dec(std::move(val), fmt, sign_ch);
+	case 16: return tostr_positive_hex(std::move(val), fmt, sign_ch);
+	case 8: return tostr_positive_oct(std::move(val), fmt, sign_ch);
+	default: throw std::invalid_argument("unsupported base specified for conversion to string");
+	}
+}
+
+template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
+std::string tostr_signed_raw(T val, const tostr_fmt &fmt)
 {
 	char sign_ch = 0;
-
-	if ((ostr.flags() & std::ios::basefield) == std::ios::dec) // decimal is the only base where signs come into play
+	if (fmt.base == 10) // decimal is the only base where signs come into play
 	{
 		if (detail::is_neg(val))
 		{
 			detail::make_neg(val);
 			sign_ch = '-';
 		}
-		else if (ostr.flags() & std::ios::showpos) sign_ch = '+';
+		else if (fmt.showpos) sign_ch = '+';
 	}
-
-	print_positive(ostr, val, sign_ch);
-	return ostr;
+	return tostr_positive(std::move(val), fmt, sign_ch);
 }
 
-void detail::print_positive_core(std::ostream &ostr, const_fixed_int_wrapper val)
-{
-	std::vector<std::uint64_t> buffer(val.blocks_n);
-	for (std::size_t i = 0; i < val.blocks_n; ++i) buffer[i] = val.blocks[i]; // copy to a location we can modify
-	print_positive<fixed_int_wrapper>(ostr, { &buffer[0], buffer.size() }, 0);
-}
-void detail::print_signed_core(std::ostream &ostr, const_fixed_int_wrapper val)
-{
-	std::vector<std::uint64_t> buffer(val.blocks_n);
-	for (std::size_t i = 0; i < val.blocks_n; ++i) buffer[i] = val.blocks[i]; // copy to a location we can modify
-	print_signed<fixed_int_wrapper>(ostr, { &buffer[0], buffer.size() });
-}
+std::string detail::tostr_unsigned(detail::fixed_int_wrapper val, const tostr_fmt &fmt) { return tostr_positive(val, fmt, 0); }
+std::string detail::tostr_signed(detail::fixed_int_wrapper val, const tostr_fmt &fmt) { return tostr_signed_raw(val, fmt); }
 
-std::ostream &detail::operator<<(std::ostream &ostr, const bigint &val) { return print_signed<bigint>(ostr, val); }
-std::ostream &detail::operator<<(std::ostream &ostr, bigint &&val) { return print_signed<bigint>(ostr, std::move(val)); }
+std::string tostr_fmt::operator()(const bigint &val) const { return tostr_signed_raw(val, *this); }
+std::string tostr_fmt::operator()(bigint &&val) const { return tostr_signed_raw(std::move(val), *this); }
+
+std::ostream &detail::print_unsigned(std::ostream &ostr, detail::fixed_int_wrapper val) { return ostr << detail::tostr_unsigned(val, tostr_fmt{ ostr }); }
+std::ostream &detail::print_signed(std::ostream &ostr, detail::fixed_int_wrapper val) { return ostr << detail::tostr_signed(val, tostr_fmt{ ostr }); }
+
+std::ostream &detail::operator<<(std::ostream &ostr, const bigint &val) { return ostr << tostr_fmt{ ostr }(val); }
+std::ostream &detail::operator<<(std::ostream &ostr, bigint &&val) { return ostr << tostr_fmt{ ostr }(std::move(val)); }
 
 template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint>, int> = 0>
 std::istream &parse_positive_hex(std::istream &istr, T &val, bool noskipws = false)
@@ -937,7 +969,7 @@ std::istream &parse_positive_hex(std::istream &istr, T &val, bool noskipws = fal
 		if (first_digit >= 8) // if the value should sign extend to negative
 		{
 			val.blocks.back() |= ~((1ull << detail::highest_set_bit(val.blocks.back())) - 1); // set all bits after the high bit to one
-			detail::_collapse(val);
+			collapse(val);
 		}
 		else // otherwise should sign extend to positive
 		{
@@ -1007,7 +1039,7 @@ std::istream &parse_positive_oct(std::istream &istr, T &val, bool noskipws = fal
 		if (first_digit >= 4) // if the value should sign extend to negative
 		{
 			val.blocks.back() |= ~((1ull << detail::highest_set_bit(val.blocks.back())) - 1); // set all bits after the high bit to one
-			detail::_collapse(val);
+			collapse(val);
 		}
 		else // otherwise should sign extend to positive
 		{
