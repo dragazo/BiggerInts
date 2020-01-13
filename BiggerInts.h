@@ -41,13 +41,43 @@ report any bugs to https://github.com/dragazo/BiggerInts/issues
 
 namespace BiggerInts
 {
-	struct tostr_fmt;
-
 	namespace detail
 	{
 		template<std::uint64_t bits, bool sign> struct fixed_int;
 		class bigint;
-		
+	}
+
+	// represents a collection of formatting settings for converting values to strings
+	struct tostr_fmt
+	{
+		int base = 10;          // the base to use for the conversion (must be 10, 16, or 8)
+		bool showpos = false;   // if set to true positive values printed in decimal will have a '+' sign on the front
+		bool showbase = false;  // if set to true a radix prefix will be appended to the front of the string
+		bool uppercase = false; // if set to true alphabetic characters in the result will be uppercase
+
+		// sets all format settings to the defaults
+		constexpr tostr_fmt() noexcept = default;
+		// creates a format settings object for the specified base
+		explicit constexpr tostr_fmt(int _base) noexcept : base(_base) {}
+		// extracts the format settings from the specified stream
+		explicit tostr_fmt(const std::ios_base &stream);
+
+		// converts the value into a string using these conversion settings
+		template<std::uint64_t bits, bool sign>
+		[[nodiscard]] std::string operator()(const detail::fixed_int<bits, sign> &val) const
+		{
+			auto cpy = val;
+			if constexpr (sign) return detail::tostr_signed(detail::wrap(cpy), *this); else return detail::tostr_unsigned(detail::wrap(cpy), *this);
+		}
+		[[nodiscard]] std::string operator()(const detail::bigint &val) const;
+		[[nodiscard]] std::string operator()(detail::bigint &&val) const;
+
+		// returns the base that should be passed to a parsing function to parse a string created by this function
+		constexpr int parse_base() const noexcept { return showbase ? 0 : base; }
+	};
+
+	namespace detail
+	{
 		// -- fixed-sized int type selection -- //
 
 		template<std::uint64_t bits, bool sign> struct fixed_int_selector { typedef detail::fixed_int<bits, sign> type; };
@@ -85,7 +115,7 @@ namespace BiggerInts
 			return false;
 		}
 
-		constexpr std::size_t highest_set_bit(std::uint64_t val)
+		constexpr std::size_t highest_set_bit(std::uint64_t val) noexcept
 		{
 			std::size_t i = 32, res = 0;
 			for (; i > 0; i >>= 1)
@@ -232,7 +262,7 @@ namespace BiggerInts
 		constexpr void sar(detail::fixed_int_wrapper a, std::uint64_t count) noexcept
 		{
 			count &= a.blocks_n * 64 - 1;
-			const std::uint64_t fill = (a.blocks[a.blocks_n - 1] & 0x8000000000000000) ? -1 : 0;
+			const std::uint64_t fill = detail::is_neg(a) ? -1 : 0;
 			const std::size_t full = count / 64;
 			if (full)
 			{
@@ -338,7 +368,7 @@ namespace BiggerInts
 
 			shl(rem, shift_count);
 		}
-		constexpr void divmod_unchecked_already_zero(fixed_int_wrapper quo, fixed_int_wrapper rem, fixed_int_wrapper num, fixed_int_wrapper den)
+		constexpr void divmod_unchecked_already_zero(fixed_int_wrapper quo, fixed_int_wrapper rem, fixed_int_wrapper num, fixed_int_wrapper den) noexcept
 		{
 			bool num_neg = detail::is_neg(num);
 			bool den_neg = detail::is_neg(den);
@@ -352,26 +382,26 @@ namespace BiggerInts
 			if (num_neg) detail::make_neg(rem);
 		}
 
-		constexpr void zero_extend(fixed_int_wrapper a, unsigned long long val)
+		constexpr void zero_extend(fixed_int_wrapper a, unsigned long long val) noexcept
 		{
 			a.blocks[0] = val;
 			for (std::size_t i = 1; i < a.blocks_n; ++i) a.blocks[i] = 0;
 		}
 		// a must be at least as large as val
-		constexpr void zero_extend(fixed_int_wrapper a, const_fixed_int_wrapper val)
+		constexpr void zero_extend(fixed_int_wrapper a, const_fixed_int_wrapper val) noexcept
 		{
 			for (std::size_t i = 0; i < val.blocks_n; ++i) a.blocks[i] = val.blocks[i];
 			for (std::size_t i = val.blocks_n; i < a.blocks_n; ++i) a.blocks[i] = 0;
 		}
 
-		constexpr void sign_extend(fixed_int_wrapper a, signed long long val)
+		constexpr void sign_extend(fixed_int_wrapper a, signed long long val) noexcept
 		{
 			a.blocks[0] = val;
 			std::uint64_t fill = val < 0 ? -1 : 0;
 			for (std::size_t i = 1; i < a.blocks_n; ++i) a.blocks[i] = fill;
 		}
 		// a must be at least as large as val
-		constexpr void sign_extend(fixed_int_wrapper a, const_fixed_int_wrapper val)
+		constexpr void sign_extend(fixed_int_wrapper a, const_fixed_int_wrapper val) noexcept
 		{
 			for (std::size_t i = 0; i < val.blocks_n; ++i) a.blocks[i] = val.blocks[i];
 			std::uint64_t fill = detail::is_neg(val) ? -1 : 0;
@@ -379,10 +409,12 @@ namespace BiggerInts
 		}
 
 		// a must be no larger than val
-		constexpr void demote(fixed_int_wrapper a, const_fixed_int_wrapper val)
+		constexpr void demote(fixed_int_wrapper a, const_fixed_int_wrapper val) noexcept
 		{
 			for (std::size_t i = 0; i < a.blocks_n; ++i) a.blocks[i] = val.blocks[i];
 		}
+		// works independent of size
+		void demote(fixed_int_wrapper a, const bigint &val) noexcept;
 
 		// -- custom intrinsics -- //
 
@@ -400,14 +432,16 @@ namespace BiggerInts
 		// checks if T is a biggerings type (signed or unsigned)
 		template<typename T> struct is_biggerints_type : std::false_type {};
 		template<std::uint64_t bits, bool sign> struct is_biggerints_type<fixed_int<bits, sign>> : std::true_type {};
-		template<> struct is_biggerints_type<bigint> : std::true_type{};
+		template<> struct is_biggerints_type<bigint> : std::true_type {};
 
 		// -- container impl -- //
+
+		std::string tostr_unsigned(fixed_int_wrapper val, const tostr_fmt &fmt);
+		std::string tostr_signed(fixed_int_wrapper val, const tostr_fmt &fmt);
 
 		bool try_parse_unsigned(fixed_int_wrapper res, std::string_view str, int base);
 		bool try_parse_signed(fixed_int_wrapper res, std::string_view str, int base);
 
-		// given a desired number of bits (power of 2), simulates it with 2 ints of half that size - sign flag marks signed/unsigned
 		template<std::uint64_t bits, bool sign> struct fixed_int
 		{
 		public: // -- data -- //
@@ -418,20 +452,14 @@ namespace BiggerInts
 
 		public: // -- core -- //
 
+			// creates a new fixed_int that is zero initialized
 			constexpr fixed_int() noexcept : blocks{} {};
 
 			constexpr fixed_int(const fixed_int&) noexcept = default;
 			constexpr fixed_int &operator=(const fixed_int&) noexcept = default;
 
-			constexpr fixed_int(const fixed_int<bits, !sign> &other) noexcept
-			{
-				for (std::size_t i = 0; i < bits / 64; ++i) blocks[i] = other.blocks[i];
-			}
-			constexpr fixed_int &operator=(const fixed_int<bits, !sign> &other) noexcept
-			{
-				for (std::size_t i = 0; i < bits / 64; ++i) blocks[i] = other.blocks[i];
-				return *this;
-			}
+			constexpr fixed_int(const fixed_int<bits, !sign> &other) noexcept { *this = other; }
+			constexpr fixed_int &operator=(const fixed_int<bits, !sign> &other) noexcept { detail::demote(wrap(*this), wrap(other)); return *this; }
 
 		public: // -- promotion constructors -- //
 
@@ -467,10 +495,12 @@ namespace BiggerInts
 					return *this;
 				}
 
-		public: // -- fixed_int demotions -- //
+		public: // -- demotion -- //
 
 			template<std::uint64_t _bits, bool _sign, std::enable_if_t<(bits < _bits), int> = 0>
 			constexpr explicit fixed_int(const fixed_int<_bits, _sign> &other) noexcept : blocks{} { detail::demote(wrap(*this), wrap(other)); }
+
+			explicit fixed_int(const bigint &other) noexcept { detail::demote(wrap(*this), other); }
 
 		public: // -- demotion conversion -- //
 
@@ -516,15 +546,23 @@ namespace BiggerInts
 			constexpr fixed_int &operator/=(const fixed_int &other) noexcept { *this = divmod(*this, other).first; return *this; }
 			constexpr fixed_int &operator%=(const fixed_int &other) noexcept { *this = divmod(*this, other).second; return *this; }
 
-		public: // -- static utilities -- //
+		public: // -- limits aliases -- //
+
+			static constexpr const fixed_int &min() noexcept { return std::numeric_limits<fixed_int>::min(); }
+			static constexpr const fixed_int &max() noexcept { return std::numeric_limits<fixed_int>::max(); }
+
+		public: // -- string conversion -- //
+
+			// converts this value into a string using the specified format settings
+			[[nodiscard]] std::string tostr(const tostr_fmt &fmt = {}) const { return fmt(*this); }
 
 			// attempts to parse the string into an integer value - returns true on successful parse.
 			// base must be 10 (dec), 16 (hex), 8 (oct), or 0 to automatically determine base from C-style prefix in str.
-			static bool try_parse(fixed_int &res, std::string_view str, int base = 10) { if constexpr (sign) return detail::try_parse_signed(wrap(res), str, base); else return detail::try_parse_unsigned(wrap(res), str, base); }
+			[[nodiscard]] static bool try_parse(fixed_int &res, std::string_view str, int base = 10) { if constexpr (sign) return detail::try_parse_signed(wrap(res), str, base); else return detail::try_parse_unsigned(wrap(res), str, base); }
 			// as try_parse() but throws std::invalid_argument on failure
 			static void parse(fixed_int &res, std::string_view str, int base = 10) { if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string"); }
 			// as parse() but allocates a new object to hold the result (less efficient if you're just going to assign it to a variable)
-			static fixed_int parse(std::string_view str, int base = 10) { fixed_int res; parse(res, str, base); return res; }
+			[[nodiscard]] static fixed_int parse(std::string_view str, int base = 10) { fixed_int res; parse(res, str, base); return res; }
 		};
 
 		// represents an arbitrarily large (signed) integer type in 2's complement
@@ -657,20 +695,34 @@ namespace BiggerInts
 			bigint &operator%=(const bigint &den);
 			bigint &operator%=(bigint &&den);
 
-		public: // -- static utilities -- //
+		public: // -- adl stuff -- //
+
+			friend void swap(bigint &a, bigint &b)
+			{
+				using std::swap;
+				swap(a.blocks, b.blocks);
+			}
+
+		public: // -- string conversion -- //
+
+			// converts this value into a string using the specified format settings
+			[[nodiscard]] std::string tostr(const tostr_fmt &fmt = {}) const& { return fmt(*this); }
+			[[nodiscard]] std::string tostr(const tostr_fmt &fmt = {}) && { return fmt(std::move(*this)); }
 
 			// attempts to parse the string into an integer value - returns true on successful parse.
 			// base must be 10 (dec), 16 (hex), 8 (oct), or 0 to automatically determine base from C-style prefix in str.
-			static bool try_parse(bigint &res, std::string_view str, int base = 10);
+			[[nodiscard]] static bool try_parse(bigint &res, std::string_view str, int base = 10);
 			// as try_parse() but throws std::invalid_argument on failure
 			static void parse(bigint &res, std::string_view str, int base = 10);
 			// as parse() but allocates a new object to hold the result (less efficient if you're just going to assign it to a variable)
-			static bigint parse(std::string_view str, int base = 10);
+			[[nodiscard]] static bigint parse(std::string_view str, int base = 10);
+
+		public: // -- static utilities -- //
 
 			// computes the result of raising a to the power of b
-			static bigint pow(bigint a, const bigint &b);
+			[[nodiscard]] static bigint pow(bigint a, const bigint &b);
 			// computes v!
-			static bigint factorial(std::uint64_t v);
+			[[nodiscard]] static bigint factorial(std::uint64_t v);
 		};
 
 		// -- wrapping utils -- //
@@ -697,104 +749,98 @@ namespace BiggerInts
 
 		// -- add -- //
 
-		template<std::uint64_t bits, bool sign> constexpr fixed_int<bits, sign> operator+(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy += b; return cpy; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> constexpr fixed_int<bits, sign> operator+(const fixed_int<bits, sign> &a, T b) { return a + (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> constexpr fixed_int<bits, sign> operator+(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a + b; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator+(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy += b; return cpy; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator+(const fixed_int<bits, sign> &a, T b) { return a + (fixed_int<bits, sign>)b; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator+(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a + b; }
 
-		bigint operator+(const bigint &a, const bigint &b);
-		bigint operator+(bigint &&a, const bigint &b);
-		bigint operator+(const bigint &a, bigint &&b);
-		bigint operator+(bigint &&a, bigint &&b);
+		[[nodiscard]] bigint operator+(const bigint &a, const bigint &b);
+		[[nodiscard]] bigint operator+(bigint &&a, const bigint &b);
+		[[nodiscard]] bigint operator+(const bigint &a, bigint &&b);
+		[[nodiscard]] bigint operator+(bigint &&a, bigint &&b);
 
 		// -- sub -- //
 
-		template<std::uint64_t bits, bool sign> constexpr fixed_int<bits, sign> operator-(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy -= b; return cpy; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> constexpr fixed_int<bits, sign> operator-(const fixed_int<bits, sign> &a, T b) { return a - (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> constexpr fixed_int<bits, sign> operator-(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a - b; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator-(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy -= b; return cpy; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator-(const fixed_int<bits, sign> &a, T b) { return a - (fixed_int<bits, sign>)b; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator-(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a - b; }
 
-		bigint operator-(const bigint &a, const bigint &b);
-		bigint operator-(bigint &&a, const bigint &b);
-		bigint operator-(const bigint &a, bigint &&b);
-		bigint operator-(bigint &&a, bigint &&b);
+		[[nodiscard]] bigint operator-(const bigint &a, const bigint &b);
+		[[nodiscard]] bigint operator-(bigint &&a, const bigint &b);
+		[[nodiscard]] bigint operator-(const bigint &a, bigint &&b);
+		[[nodiscard]] bigint operator-(bigint &&a, bigint &&b);
 
 		// -- and -- //
 
-		template<std::uint64_t bits, bool sign> constexpr fixed_int<bits, sign> operator&(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy &= b; return cpy; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> constexpr fixed_int<bits, sign> operator&(const fixed_int<bits, sign> &a, T b) { return a & (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> constexpr fixed_int<bits, sign> operator&(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a & b; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator&(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy &= b; return cpy; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator&(const fixed_int<bits, sign> &a, T b) { return a & (fixed_int<bits, sign>)b; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator&(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a & b; }
 
-		bigint operator&(const bigint &a, const bigint &b);
-		bigint operator&(bigint &&a, const bigint &b);
-		bigint operator&(const bigint &a, bigint &&b);
-		bigint operator&(bigint &&a, bigint &&b);
+		[[nodiscard]] bigint operator&(const bigint &a, const bigint &b);
+		[[nodiscard]] bigint operator&(bigint &&a, const bigint &b);
+		[[nodiscard]] bigint operator&(const bigint &a, bigint &&b);
+		[[nodiscard]] bigint operator&(bigint &&a, bigint &&b);
 
 		// -- or -- //
 
-		template<std::uint64_t bits, bool sign> constexpr fixed_int<bits, sign> operator|(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy |= b; return cpy; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> constexpr fixed_int<bits, sign> operator|(const fixed_int<bits, sign> &a, T b) { return a | (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> constexpr fixed_int<bits, sign> operator|(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a | b; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator|(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy |= b; return cpy; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator|(const fixed_int<bits, sign> &a, T b) { return a | (fixed_int<bits, sign>)b; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator|(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a | b; }
 
-		bigint operator|(const bigint &a, const bigint &b);
-		bigint operator|(bigint &&a, const bigint &b);
-		bigint operator|(const bigint &a, bigint &&b);
-		bigint operator|(bigint &&a, bigint &&b);
+		[[nodiscard]] bigint operator|(const bigint &a, const bigint &b);
+		[[nodiscard]] bigint operator|(bigint &&a, const bigint &b);
+		[[nodiscard]] bigint operator|(const bigint &a, bigint &&b);
+		[[nodiscard]] bigint operator|(bigint &&a, bigint &&b);
 
 		// -- xor -- //
 
-		template<std::uint64_t bits, bool sign> constexpr fixed_int<bits, sign> operator^(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy ^= b; return cpy; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> constexpr fixed_int<bits, sign> operator^(const fixed_int<bits, sign> &a, T b) { return a ^ (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> constexpr fixed_int<bits, sign> operator^(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a ^ b; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator^(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy ^= b; return cpy; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator^(const fixed_int<bits, sign> &a, T b) { return a ^ (fixed_int<bits, sign>)b; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator^(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a ^ b; }
 
-		bigint operator^(const bigint &a, const bigint &b);
-		bigint operator^(bigint &&a, const bigint &b);
-		bigint operator^(const bigint &a, bigint &&b);
-		bigint operator^(bigint &&a, bigint &&b);
+		[[nodiscard]] bigint operator^(const bigint &a, const bigint &b);
+		[[nodiscard]] bigint operator^(bigint &&a, const bigint &b);
+		[[nodiscard]] bigint operator^(const bigint &a, bigint &&b);
+		[[nodiscard]] bigint operator^(bigint &&a, bigint &&b);
 
 		// -- shl/sal -- //
 
-		template<std::uint64_t bits, bool sign>
-		constexpr fixed_int<bits, sign> operator<<(const fixed_int<bits, sign> &a, std::uint64_t count) noexcept { auto cpy = a; cpy <<= count; return cpy; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator<<(const fixed_int<bits, sign> &a, std::uint64_t count) noexcept { auto cpy = a; cpy <<= count; return cpy; }
 
-		bigint operator<<(const bigint &val, std::uint64_t count);
-		bigint operator<<(bigint &&val, std::uint64_t count);
+		[[nodiscard]] bigint operator<<(const bigint &val, std::uint64_t count);
+		[[nodiscard]] bigint operator<<(bigint &&val, std::uint64_t count);
 
 		// -- shr/sar -- //
 
-		template<std::uint64_t bits, bool sign>
-		constexpr fixed_int<bits, sign> operator>>(const fixed_int<bits, sign> &a, std::uint64_t count) noexcept { auto cpy = a; cpy >>= count; return cpy; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator>>(const fixed_int<bits, sign> &a, std::uint64_t count) noexcept { auto cpy = a; cpy >>= count; return cpy; }
 
-		bigint operator>>(const bigint &val, std::uint64_t count);
-		bigint operator>>(bigint &&val, std::uint64_t count);
+		[[nodiscard]] bigint operator>>(const bigint &val, std::uint64_t count);
+		[[nodiscard]] bigint operator>>(bigint &&val, std::uint64_t count);
 
 		// -- unary -- //
 
-		template<std::uint64_t bits, bool sign>
-		constexpr fixed_int<bits, sign> operator+(const fixed_int<bits, sign> &a) noexcept { return a; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator+(const fixed_int<bits, sign> &a) noexcept { return a; }
 
-		bigint operator+(const bigint &a);
-		bigint operator+(bigint &&a);
+		[[nodiscard]] bigint operator+(const bigint &a);
+		[[nodiscard]] bigint operator+(bigint &&a);
 
-		template<std::uint64_t bits>
-		constexpr fixed_int<bits, true> operator-(const fixed_int<bits, true> &a) noexcept { fixed_int<bits, true> res = a; detail::make_neg(wrap(res)); return res; }
+		template<std::uint64_t bits> [[nodiscard]] constexpr fixed_int<bits, true> operator-(const fixed_int<bits, true> &a) noexcept { fixed_int<bits, true> res = a; detail::make_neg(wrap(res)); return res; }
 
-		bigint operator-(const bigint &a);
-		bigint operator-(bigint &&a);
+		[[nodiscard]] bigint operator-(const bigint &a);
+		[[nodiscard]] bigint operator-(bigint &&a);
 
-		template<std::uint64_t bits, bool sign>
-		constexpr fixed_int<bits, sign> operator~(const fixed_int<bits, sign> &a) noexcept { fixed_int<bits, sign> res = a; detail::make_not(wrap(res)); return res; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator~(const fixed_int<bits, sign> &a) noexcept { fixed_int<bits, sign> res = a; detail::make_not(wrap(res)); return res; }
 
-		bigint operator~(const bigint &a);
-		bigint operator~(bigint &&a);
+		[[nodiscard]] bigint operator~(const bigint &a);
+		[[nodiscard]] bigint operator~(bigint &&a);
 
 		// -- mul -- //
 
-		template<std::uint64_t bits, bool sign>
-		constexpr fixed_int<bits, sign> operator*(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) noexcept { fixed_int<bits, sign> res = 0; detail::multiply_same_size_already_zero(wrap(res), wrap(a), wrap(b)); return res; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator*(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) noexcept { fixed_int<bits, sign> res = 0; detail::multiply_same_size_already_zero(wrap(res), wrap(a), wrap(b)); return res; }
 
-		bigint operator*(const bigint &a, const bigint &b);
-		bigint operator*(bigint &&a, const bigint &b);
-		bigint operator*(const bigint &a, bigint &&b);
-		bigint operator*(bigint &&a, bigint &&b);
+		[[nodiscard]] bigint operator*(const bigint &a, const bigint &b);
+		[[nodiscard]] bigint operator*(bigint &&a, const bigint &b);
+		[[nodiscard]] bigint operator*(const bigint &a, bigint &&b);
+		[[nodiscard]] bigint operator*(bigint &&a, bigint &&b);
 
 		// -- divmod -- //
 
@@ -890,33 +936,36 @@ namespace BiggerInts
 		}
 		int cmp_bigint_builtin(const bigint &a, long long val) noexcept;
 		int cmp_bigint_builtin(const bigint &a, unsigned long long val) noexcept;
-
-		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>
-		constexpr int cmp(const fixed_int<bits_1, sign> &a, const fixed_int<bits_2, sign> &b) noexcept { return detail::cmp_wrapped_wrapped<sign>(wrap(a), wrap(b)); }
-
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T>, int> = 0>
-		constexpr int cmp(const fixed_int<bits, sign> &a, T val) noexcept { return detail::cmp_wrapped_builtin<sign>(wrap(a), val); }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value && std::is_signed_v<T>, int> = 0>
-		constexpr int cmp(T val, const fixed_int<bits, sign> &a) noexcept { return -detail::cmp_wrapped_builtin<sign>(wrap(a), val); }
-
-		int cmp(const bigint &a, const bigint &b) noexcept;
 		
-		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator==(const T &a, const U &b) noexcept { return cmp(a, b) == 0; }
-		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator!=(const T &a, const U &b) noexcept { return cmp(a, b) != 0; }
-		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator<(const T &a, const U &b) noexcept { return cmp(a, b) < 0; }
-		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator<=(const T &a, const U &b) noexcept { return cmp(a, b) <= 0; }
-		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator>(const T &a, const U &b) noexcept { return cmp(a, b) > 0; }
-		template<typename T, typename U, std::enable_if_t<detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value, int> = 0> constexpr bool operator>=(const T &a, const U &b) noexcept { return cmp(a, b) >= 0; }
+		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>
+		constexpr int cmp_helper(const detail::fixed_int<bits_1, sign> &a, const detail::fixed_int<bits_2, sign> &b) noexcept { return detail::cmp_wrapped_wrapped<sign>(wrap(a), wrap(b)); }
 
-		// -- string conversions -- //
+		template<std::uint64_t bits, bool sign>
+		constexpr int cmp_helper(const detail::fixed_int<bits, sign> &a, std::conditional_t<sign, long long, unsigned long long> val) noexcept { return detail::cmp_wrapped_builtin<sign>(wrap(a), val); }
+		template<std::uint64_t bits, bool sign>
+		constexpr int cmp_helper(std::conditional_t<sign, long long, unsigned long long> val, const detail::fixed_int<bits, sign> &a) noexcept { return -detail::cmp_wrapped_builtin<sign>(wrap(a), val); }
 
-		std::string tostr_unsigned(fixed_int_wrapper val, const tostr_fmt &fmt);
-		std::string tostr_signed(fixed_int_wrapper val, const tostr_fmt &fmt);
+		int cmp_helper(const bigint &a, const bigint &b) noexcept;
+
+		inline int cmp_helper(const bigint &a, long long val) noexcept { return cmp_bigint_builtin(a, val); }
+		inline int cmp_helper(long long val, const bigint &a) noexcept { return -cmp_bigint_builtin(a, val); }
+
+		template<typename T, typename U> inline constexpr bool comparable = (detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value) && std::is_signed_v<T> == std::is_signed_v<U>;
+
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator==(const T &a, const U &b) noexcept { return cmp_helper(a, b) == 0; }
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator!=(const T &a, const U &b) noexcept { return cmp_helper(a, b) != 0; }
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator<(const T &a, const U &b) noexcept { return cmp_helper(a, b) < 0; }
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator<=(const T &a, const U &b) noexcept { return cmp_helper(a, b) <= 0; }
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator>(const T &a, const U &b) noexcept { return cmp_helper(a, b) > 0; }
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator>=(const T &a, const U &b) noexcept { return cmp_helper(a, b) >= 0; }
 
 		// -- io -- //
 
 		std::ostream &print_unsigned(std::ostream &ostr, fixed_int_wrapper val);
 		std::ostream &print_signed(std::ostream &ostr, fixed_int_wrapper val);
+
+		std::istream &extract_unsigned(std::istream &istr, fixed_int_wrapper val);
+		std::istream &extract_signed(std::istream &istr, fixed_int_wrapper val);
 
 		template<std::uint64_t bits, bool sign>
 		std::ostream &operator<<(std::ostream &ostr, const fixed_int<bits, sign> &val)
@@ -927,14 +976,11 @@ namespace BiggerInts
 		std::ostream &operator<<(std::ostream &ostr, const bigint &val);
 		std::ostream &operator<<(std::ostream &ostr, bigint &&val);
 
-		void parse_positive_core(std::istream &istr, fixed_int_wrapper val);
-		void parse_signed_core(std::istream &istr, fixed_int_wrapper val);
-
-		template<std::uint64_t bits>
-		std::istream &operator>>(std::istream &istr, fixed_int<bits, false> &val) { parse_positive_core(istr, wrap(val)); return istr; }
-		template<std::uint64_t bits>
-		std::istream &operator>>(std::istream &istr, fixed_int<bits, true> &val) { parse_signed_core(istr, wrap(val)); return istr; }
-
+		template<std::uint64_t bits, bool sign>
+		std::istream &operator>>(std::istream &istr, fixed_int<bits, sign> &val)
+		{
+			if constexpr (sign) return extract_signed(istr, wrap(val)); else return extract_unsigned(istr, wrap(val));
+		}
 		std::istream &operator>>(std::istream &istr, bigint &val);
 	}
 
@@ -943,42 +989,14 @@ namespace BiggerInts
 	// ------------------ //
 
 	// these are the public type aliases that users of this library should use.
-	// they behave exactly like their builtin counterparts, just bigger.
+	// they behave exactly like their builtin counterparts (but bigger), except that they default construct to zero.
 	template<std::uint64_t bits> using uint_t = typename detail::fixed_int_selector<bits, false>::type;
 	template<std::uint64_t bits> using int_t = typename detail::fixed_int_selector<bits, true>::type;
 	using bigint = detail::bigint;
 
-	// represents a collection of formatting settings for converting values to strings
-	struct tostr_fmt
-	{
-		int base = 10;          // the base to use for the conversion (must be 10, 
-		bool showpos = false;   // if set to true positive values printed in decimal will have a '+' sign on the front
-		bool showbase = false;  // if set to true a radix prefix will be appended to the front of the string
-		bool uppercase = false; // if set to true alphabetic characters in the result will be uppercase
-
-		// sets all format settings to the defaults
-		tostr_fmt() = default;
-		// creates a format settings object for the specified base
-		explicit tostr_fmt(int _base) : base(_base) {}
-		// extracts the format settings from the specified stream
-		explicit tostr_fmt(const std::ios_base &stream);
-
-		// converts the value into a string using these conversion settings
-		template<std::uint64_t bits, bool sign>
-		std::string operator()(const detail::fixed_int<bits, sign> &val) const
-		{
-			auto cpy = val;
-			if constexpr (sign) return detail::tostr_signed(detail::wrap(cpy), *this); else return detail::tostr_unsigned(detail::wrap(cpy), *this);
-		}
-		std::string operator()(const bigint &val) const;
-		std::string operator()(bigint &&val) const;
-	};
-
-	// converts the value into a string using the specified format
-	template<std::uint64_t bits, bool sign>
-	inline std::string tostr(const detail::fixed_int<bits, sign> &val, const tostr_fmt &fmt = {}) { return fmt(val); }
-	inline std::string tostr(const bigint &val, const tostr_fmt &fmt = {}) { return fmt(val); }
-	inline std::string tostr(bigint &&val, const tostr_fmt &fmt = {}) { return fmt(std::move(val)); }
+	// returns -1 if a < b, 1 if a > b, or 0 if a == b
+	template<typename T, typename U, std::enable_if_t<detail::comparable<T, U>, int> = 0>
+	[[nodiscard]] constexpr int cmp(const T &a, const U &b) noexcept { return detail::cmp_helper(a, b); }
 }
 
 // -- std info definitions -- //

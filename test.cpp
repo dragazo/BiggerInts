@@ -347,6 +347,97 @@ void benchmark_binary(const char *name, std::size_t count_1, std::size_t count_2
 	std::cerr << '\n';
 }
 
+void benchmark_string(std::size_t count_1, std::size_t count_2)
+{
+	const char *strs_1[] = {
+		"164953864532146553885641326541323564132",
+		"68573958787958483948687979685743988795",
+		"47785319425432789132452387667540040594",
+		"62641345234867594511231243576678624112",
+		"12642723264275675264211264237286172641",
+		"41672765971459452836324591059442640942",
+		"46176276219426832272141594256267216412",
+		"16126745353512798654214787864567825452",
+		"13786541237897643215487675429731824613",
+		"45389783215348783514264316267678795642",
+		"26461343345768768645949213234357678665",
+		"45676597896543534326162612343537367866",
+		"16435738689456523313264567898883765642",
+		"46567383388656261334357573838366565421",
+	};
+	const char *strs_2[] = {
+		"164953864532146553323564132",
+		"685739587879584839743988795",
+		"477853194254327891540040594",
+		"626413452348675945678624112",
+		"126427232642756752286172641",
+		"416727659714594528442640942",
+		"461762762194268322267216412",
+		"161267453535127986567825452",
+		"137865412378976432731824613",
+		"453897832153487835678795642",
+		"264613433457687686357678665",
+		"456765978965435343537367866",
+		"164357386894565233883765642",
+		"465673833886562613366565421",
+	};
+
+	{
+		uint_t<128> dd;
+
+		t_start;
+		for (std::size_t i = 0; i < count_1; ++i)
+		{
+			for (const char *v : strs_1)
+			{
+				uint_t<128>::parse(dd, v, 10); do_something(dd);
+			}
+		}
+		t_end("1) parse unsigned 128 dec", count_1);
+	}
+	{
+		uint_t<128> dd;
+
+		t_start;
+		for (std::size_t i = 0; i < count_2; ++i)
+		{
+			for (const char *v : strs_2)
+			{
+				uint_t<128>::parse(dd, v, 16); do_something(dd);
+			}
+		}
+		t_end("2) parse unsigned 128 hex", count_2);
+	}
+	{
+		bigint dd;
+
+		t_start;
+		for (std::size_t i = 0; i < count_1; ++i)
+		{
+			for (const char *v : strs_1)
+			{
+				bigint::parse(dd, v, 10); do_something(dd);
+			}
+		}
+		t_end("1) parse bigint dec", count_1);
+	}
+	{
+		bigint dd;
+
+		t_start;
+		for (std::size_t i = 0; i < count_2; ++i)
+		{
+			for (const char *v : strs_2)
+			{
+				bigint::parse(dd, v, 16); do_something(dd);
+			}
+		}
+		t_end("2) parse bigint hex", count_2);
+	}
+
+	std::cerr << '\n';
+}
+
 void detail_tests()
 {
 	assert(detail::_mul_u64(0 COMMA 0) == std::make_pair<std::uint64_t COMMA std::uint64_t>(0ull COMMA 0ull));
@@ -521,29 +612,40 @@ void bigboi_tests()
 }
 void numeric_limits_tests()
 {
-	assert(sstostr(std::numeric_limits<uint_t<512>>::min()) == "0");
-	assert(sstostr(std::numeric_limits<uint_t<512>>::max()) == "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095");
-	assert(sstostr(std::numeric_limits<uint_t<512>>::lowest()) == "0");
+	static_assert(std::is_reference_v<decltype(std::numeric_limits<uint_t<512>>::min())>, "large constexpr object returned by value");
+	static_assert(std::is_reference_v<decltype(std::numeric_limits<int_t<512>>::max())>, "large constexpr object returned by value");
+	
+	static_assert(std::is_reference_v<decltype(uint_t<512>::min())>, "large constexpr object returned by value");
+	static_assert(std::is_reference_v<decltype(int_t<512>::max())>, "large constexpr object returned by value");
 
-	assert(sstostr(std::numeric_limits<int_t<512>>::min()) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
-	assert(sstostr(std::numeric_limits<int_t<512>>::max()) == "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047");
-	assert(sstostr(std::numeric_limits<int_t<512>>::lowest()) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
+	tostr_fmt dec;
 
-	assert(sstostr(std::numeric_limits<uint_t<128>>::min()) == "0");
-	assert(sstostr(std::numeric_limits<uint_t<128>>::max()) == "340282366920938463463374607431768211455");
-	assert(sstostr(std::numeric_limits<uint_t<128>>::lowest()) == "0");
+	assert(dec(std::numeric_limits<uint_t<512>>::min()) == "0");
+	assert(dec(std::numeric_limits<uint_t<512>>::max()) == "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095");
+	assert(dec(std::numeric_limits<uint_t<512>>::lowest()) == "0");
 
-	assert(sstostr(std::numeric_limits<int_t<128>>::min()) == "-170141183460469231731687303715884105728");
-	assert(sstostr(std::numeric_limits<int_t<128>>::max()) == "170141183460469231731687303715884105727");
-	assert(sstostr(std::numeric_limits<int_t<128>>::lowest()) == "-170141183460469231731687303715884105728");
+	assert(dec(std::numeric_limits<int_t<512>>::min()) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
+	assert(dec(std::numeric_limits<int_t<512>>::max()) == "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047");
+	assert(dec(std::numeric_limits<int_t<512>>::lowest()) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
 
-	assert(sstostr(std::numeric_limits<uint_t<64>>::min()) == "0");
-	assert(sstostr(std::numeric_limits<uint_t<64>>::max()) == "18446744073709551615");
-	assert(sstostr(std::numeric_limits<uint_t<64>>::lowest()) == "0");
+	assert(std::numeric_limits<uint_t<128>>::min().tostr(dec) == "0");
+	assert(std::numeric_limits<uint_t<128>>::max().tostr(dec) == "340282366920938463463374607431768211455");
+	assert(std::numeric_limits<uint_t<128>>::lowest().tostr(dec) == "0");
 
-	assert(sstostr(std::numeric_limits<int_t<64>>::min()) == "-9223372036854775808");
-	assert(sstostr(std::numeric_limits<int_t<64>>::max()) == "9223372036854775807");
-	assert(sstostr(std::numeric_limits<int_t<64>>::lowest()) == "-9223372036854775808");
+	assert(std::numeric_limits<int_t<128>>::min().tostr(dec) == "-170141183460469231731687303715884105728");
+	assert(std::numeric_limits<int_t<128>>::max().tostr(dec) == "170141183460469231731687303715884105727");
+	assert(std::numeric_limits<int_t<128>>::lowest().tostr(dec) == "-170141183460469231731687303715884105728");
+
+	assert(dec(std::numeric_limits<uint_t<64>>::min()) == "0");
+	assert(dec(std::numeric_limits<uint_t<64>>::max()) == "18446744073709551615");
+	assert(dec(std::numeric_limits<uint_t<64>>::lowest()) == "0");
+
+	assert(dec(std::numeric_limits<int_t<64>>::min()) == "-9223372036854775808");
+	assert(dec(std::numeric_limits<int_t<64>>::max()) == "9223372036854775807");
+	assert(dec(std::numeric_limits<int_t<64>>::lowest()) == "-9223372036854775808");
+
+	assert(&uint_t<512>::min() == &std::numeric_limits<uint_t<512>>::min()); // we ensure reference equality to save space
+	assert(&int_t<512>::max() == &std::numeric_limits<int_t<512>>::max());
 }
 void simple_parse_tests()
 {
@@ -567,42 +669,47 @@ void simple_parse_tests()
 	assert(int_t<256>::parse("-18 ") == -18);
 	assert(int_t<256>::parse(" -18") == -18);
 
-	assert_throws(std::invalid_argument, uint_t<512>::parse("- 18"));
-	assert_throws(std::invalid_argument, uint_t<512>::parse("+ 18"));
+	uint_t<512> temp_u512;
+	int_t<512> temp_i512;
+	uint_t<256> temp_u256;
+	int_t<256> temp_i256;
 
-	assert_throws(std::invalid_argument, uint_t<512>::parse("abc"));
-	assert_throws(std::invalid_argument, uint_t<512>::parse(" abc"));
-	assert_throws(std::invalid_argument, uint_t<512>::parse("abc "));
-	assert_throws(std::invalid_argument, uint_t<512>::parse(" abc "));
+	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, "- 18"));
+	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, "+ 18"));
 
-	assert_throws(std::invalid_argument, uint_t<512>::parse("a18"));
-	assert_throws(std::invalid_argument, uint_t<512>::parse("18a"));
+	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, "abc"));
+	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, " abc"));
+	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, "abc "));
+	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, " abc "));
 
-	assert_throws(std::invalid_argument, uint_t<512>::parse("a 18"));
-	assert_throws(std::invalid_argument, uint_t<512>::parse("18 a"));
+	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, "a18"));
+	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, "18a"));
+
+	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, "a 18"));
+	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, "18 a"));
 
 	// ----------
 
-	assert_throws(std::invalid_argument, int_t<512>::parse("- 18"));
-	assert_throws(std::invalid_argument, int_t<512>::parse("+ 18"));
+	assert_throws(std::invalid_argument, int_t<512>::parse(temp_i512, "- 18"));
+	assert_throws(std::invalid_argument, int_t<512>::parse(temp_i512, "+ 18"));
 
-	assert_throws(std::invalid_argument, int_t<512>::parse("abc"));
-	assert_throws(std::invalid_argument, int_t<512>::parse(" abc"));
-	assert_throws(std::invalid_argument, int_t<512>::parse("abc "));
-	assert_throws(std::invalid_argument, int_t<512>::parse(" abc "));
+	assert_throws(std::invalid_argument, int_t<512>::parse(temp_i512, "abc"));
+	assert_throws(std::invalid_argument, int_t<512>::parse(temp_i512, " abc"));
+	assert_throws(std::invalid_argument, int_t<512>::parse(temp_i512, "abc "));
+	assert_throws(std::invalid_argument, int_t<512>::parse(temp_i512, " abc "));
 
-	assert_throws(std::invalid_argument, int_t<512>::parse("a18"));
-	assert_throws(std::invalid_argument, int_t<512>::parse("18a"));
+	assert_throws(std::invalid_argument, int_t<512>::parse(temp_i512, "a18"));
+	assert_throws(std::invalid_argument, int_t<512>::parse(temp_i512, "18a"));
 
-	assert_throws(std::invalid_argument, int_t<512>::parse("a 18"));
-	assert_throws(std::invalid_argument, int_t<512>::parse("18 a"));
+	assert_throws(std::invalid_argument, int_t<512>::parse(temp_i512, "a 18"));
+	assert_throws(std::invalid_argument, int_t<512>::parse(temp_i512, "18 a"));
 
 	// base parsing tests
 
-	assert_throws(std::invalid_argument, uint_t<256>::parse("0x764"));
-	assert_throws(std::invalid_argument, uint_t<256>::parse("0x764", 10));
-	assert_throws(std::invalid_argument, uint_t<256>::parse("0x764", 8));
-	assert_throws(std::invalid_argument, uint_t<256>::parse("0x764", 16));
+	assert_throws(std::invalid_argument, uint_t<256>::parse(temp_u256, "0x764"));
+	assert_throws(std::invalid_argument, uint_t<256>::parse(temp_u256, "0x764", 10));
+	assert_throws(std::invalid_argument, uint_t<256>::parse(temp_u256, "0x764", 8));
+	assert_throws(std::invalid_argument, uint_t<256>::parse(temp_u256, "0x764", 16));
 	assert(sstostr(uint_t<256>::parse("0x764", 0)) == "1892");
 	assert(sstostr(uint_t<256>::parse("0764", 0)) == "500");
 	assert(sstostr(uint_t<256>::parse("764", 0)) == "764");
@@ -621,30 +728,32 @@ void simple_parse_tests()
 	// zero parsing edge cases
 
 	auto zero_tester = [](auto v) {
-		assert(decltype(v)::parse("0") == 0);
-		assert(decltype(v)::parse(" 0") == 0);
-		assert(decltype(v)::parse("0 ") == 0);
-		assert(decltype(v)::parse(" 0 ") == 0);
+		std::conditional_t<std::is_signed_v<decltype(v)>, int, unsigned> zero = 0;
 
-		assert(decltype(v)::parse("0", 10) == 0);
-		assert(decltype(v)::parse(" 0", 10) == 0);
-		assert(decltype(v)::parse("0 ", 10) == 0);
-		assert(decltype(v)::parse(" 0 ", 10) == 0);
+		assert(decltype(v)::parse("0") == zero);
+		assert(decltype(v)::parse(" 0") == zero);
+		assert(decltype(v)::parse("0 ") == zero);
+		assert(decltype(v)::parse(" 0 ") == zero);
 
-		assert(decltype(v)::parse("0", 8) == 0);
-		assert(decltype(v)::parse(" 0", 8) == 0);
-		assert(decltype(v)::parse("0 ", 8) == 0);
-		assert(decltype(v)::parse(" 0 ", 8) == 0);
+		assert(decltype(v)::parse("0", 10) == zero);
+		assert(decltype(v)::parse(" 0", 10) == zero);
+		assert(decltype(v)::parse("0 ", 10) == zero);
+		assert(decltype(v)::parse(" 0 ", 10) == zero);
 
-		assert(decltype(v)::parse("0", 16) == 0);
-		assert(decltype(v)::parse(" 0", 16) == 0);
-		assert(decltype(v)::parse("0 ", 16) == 0);
-		assert(decltype(v)::parse(" 0 ", 16) == 0);
+		assert(decltype(v)::parse("0", 8) == zero);
+		assert(decltype(v)::parse(" 0", 8) == zero);
+		assert(decltype(v)::parse("0 ", 8) == zero);
+		assert(decltype(v)::parse(" 0 ", 8) == zero);
 
-		assert(decltype(v)::parse("0", 0) == 0);
-		assert(decltype(v)::parse(" 0", 0) == 0);
-		assert(decltype(v)::parse("0 ", 0) == 0);
-		assert(decltype(v)::parse(" 0 ", 0) == 0);
+		assert(decltype(v)::parse("0", 16) == zero);
+		assert(decltype(v)::parse(" 0", 16) == zero);
+		assert(decltype(v)::parse("0 ", 16) == zero);
+		assert(decltype(v)::parse(" 0 ", 16) == zero);
+
+		assert(decltype(v)::parse("0", 0) == zero);
+		assert(decltype(v)::parse(" 0", 0) == zero);
+		assert(decltype(v)::parse("0 ", 0) == zero);
+		assert(decltype(v)::parse(" 0 ", 0) == zero);
 
 		assert(!decltype(v)::try_parse(v, "0x", 0));
 		assert(!decltype(v)::try_parse(v, " 0x", 0));
@@ -665,6 +774,31 @@ void simple_parse_tests()
 	zero_tester(uint_t<256>{});
 	zero_tester(int_t<256>{});
 	zero_tester(bigint{});
+
+	{
+		std::istringstream ss("  543   ");
+		uint_t<256> v;
+		ss >> v;
+		assert((bool)ss);
+		assert(v == 543u);
+		assert(ss.get() == ' ');
+	}
+	{
+		std::istringstream ss("  543   ");
+		int_t<256> v;
+		ss >> v;
+		assert((bool)ss);
+		assert(v == 543);
+		assert(ss.get() == ' ');
+	}
+	{
+		std::istringstream ss("  543   ");
+		bigint v;
+		ss >> v;
+		assert((bool)ss);
+		assert(v == 543);
+		assert(ss.get() == ' ');
+	}
 }
 void big_parse_tests()
 {
@@ -1139,25 +1273,25 @@ void big_parse_tests()
 		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "01777777777777777777777");
 		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "0x0ffffffffffffffff");
 
-		assert(bigint::parse("18446744073709551615") == 0xffffffffffffffffull);
-		assert(bigint::parse("18446744073709551615") == 0xffffffffffffffffull);
-		assert(bigint::parse("+18446744073709551615") == 0xffffffffffffffffull);
-		assert(bigint::parse("+18446744073709551615") == 0xffffffffffffffffull);
-		assert(bigint::parse("18446744073709551615", 10) == 0xffffffffffffffffull);
-		assert(bigint::parse("1777777777777777777777", 8) == 0xffffffffffffffffull);
-		assert(bigint::parse("0ffffffffffffffff", 16) == 0xffffffffffffffffull);
-		assert(bigint::parse("+18446744073709551615", 10) == 0xffffffffffffffffull);
-		assert(bigint::parse("1777777777777777777777", 8) == 0xffffffffffffffffull);
-		assert(bigint::parse("0ffffffffffffffff", 16) == 0xffffffffffffffffull);
-		assert(bigint::parse("18446744073709551615", 0) == 0xffffffffffffffffull);
-		assert(bigint::parse("01777777777777777777777", 0) == 0xffffffffffffffffull);
-		assert(bigint::parse("0x0ffffffffffffffff", 0) == 0xffffffffffffffffull);
-		assert(bigint::parse("+18446744073709551615", 0) == 0xffffffffffffffffull);
-		assert(bigint::parse("01777777777777777777777", 0) == 0xffffffffffffffffull);
-		assert(bigint::parse("0x0ffffffffffffffff", 0) == 0xffffffffffffffffull);
-		assert(bigint::parse("+18446744073709551615", 0) == 0xffffffffffffffffull);
-		assert(bigint::parse("01777777777777777777777", 0) == 0xffffffffffffffffull);
-		assert(bigint::parse("0x0ffffffffffffffff", 0) == 0xffffffffffffffffull);
+		assert(bigint::parse("18446744073709551615") == v);
+		assert(bigint::parse("18446744073709551615") == v);
+		assert(bigint::parse("+18446744073709551615") == v);
+		assert(bigint::parse("+18446744073709551615") == v);
+		assert(bigint::parse("18446744073709551615", 10) == v);
+		assert(bigint::parse("1777777777777777777777", 8) == v);
+		assert(bigint::parse("0ffffffffffffffff", 16) == v);
+		assert(bigint::parse("+18446744073709551615", 10) == v);
+		assert(bigint::parse("1777777777777777777777", 8) == v);
+		assert(bigint::parse("0ffffffffffffffff", 16) == v);
+		assert(bigint::parse("18446744073709551615", 0) == v);
+		assert(bigint::parse("01777777777777777777777", 0) == v);
+		assert(bigint::parse("0x0ffffffffffffffff", 0) == v);
+		assert(bigint::parse("+18446744073709551615", 0) == v);
+		assert(bigint::parse("01777777777777777777777", 0) == v);
+		assert(bigint::parse("0x0ffffffffffffffff", 0) == v);
+		assert(bigint::parse("+18446744073709551615", 0) == v);
+		assert(bigint::parse("01777777777777777777777", 0) == v);
+		assert(bigint::parse("0x0ffffffffffffffff", 0) == v);
 	}
 	{
 		bigint v = 0777777777777777777777ull;
@@ -1181,25 +1315,25 @@ void big_parse_tests()
 		assert(sstostr(std::oct, std::showbase, std::showpos, std::setw(10), v) == "00777777777777777777777");
 		assert(sstostr(std::hex, std::showbase, std::showpos, std::setw(10), v) == "0x7fffffffffffffff");
 
-		assert(bigint::parse("9223372036854775807") == 0777777777777777777777ull);
-		assert(bigint::parse("9223372036854775807") == 0777777777777777777777ull);
-		assert(bigint::parse("+9223372036854775807") == 0777777777777777777777ull);
-		assert(bigint::parse("+9223372036854775807") == 0777777777777777777777ull);
-		assert(bigint::parse("9223372036854775807", 10) == 0777777777777777777777ull);
-		assert(bigint::parse("0777777777777777777777", 8) == 0777777777777777777777ull);
-		assert(bigint::parse("7fffffffffffffff", 16) == 0777777777777777777777ull);
-		assert(bigint::parse("+9223372036854775807", 10) == 0777777777777777777777ull);
-		assert(bigint::parse("0777777777777777777777", 8) == 0777777777777777777777ull);
-		assert(bigint::parse("7fffffffffffffff", 16) == 0777777777777777777777ull);
-		assert(bigint::parse("9223372036854775807", 0) == 0777777777777777777777ull);
-		assert(bigint::parse("00777777777777777777777", 0) == 0777777777777777777777ull);
-		assert(bigint::parse("0x7fffffffffffffff", 0) == 0777777777777777777777ull);
-		assert(bigint::parse("+9223372036854775807", 0) == 0777777777777777777777ull);
-		assert(bigint::parse("00777777777777777777777", 0) == 0777777777777777777777ull);
-		assert(bigint::parse("0x7fffffffffffffff", 0) == 0777777777777777777777ull);
-		assert(bigint::parse("+9223372036854775807", 0) == 0777777777777777777777ull);
-		assert(bigint::parse("00777777777777777777777", 0) == 0777777777777777777777ull);
-		assert(bigint::parse("0x7fffffffffffffff", 0) == 0777777777777777777777ull);
+		assert(bigint::parse("9223372036854775807") == v);
+		assert(bigint::parse("9223372036854775807") == v);
+		assert(bigint::parse("+9223372036854775807") == v);
+		assert(bigint::parse("+9223372036854775807") == v);
+		assert(bigint::parse("9223372036854775807", 10) == v);
+		assert(bigint::parse("0777777777777777777777", 8) == v);
+		assert(bigint::parse("7fffffffffffffff", 16) == v);
+		assert(bigint::parse("+9223372036854775807", 10) == v);
+		assert(bigint::parse("0777777777777777777777", 8) == v);
+		assert(bigint::parse("7fffffffffffffff", 16) == v);
+		assert(bigint::parse("9223372036854775807", 0) == v);
+		assert(bigint::parse("00777777777777777777777", 0) == v);
+		assert(bigint::parse("0x7fffffffffffffff", 0) == v);
+		assert(bigint::parse("+9223372036854775807", 0) == v);
+		assert(bigint::parse("00777777777777777777777", 0) == v);
+		assert(bigint::parse("0x7fffffffffffffff", 0) == v);
+		assert(bigint::parse("+9223372036854775807", 0) == v);
+		assert(bigint::parse("00777777777777777777777", 0) == v);
+		assert(bigint::parse("0x7fffffffffffffff", 0) == v);
 	}
 }
 void block_parse_tests()
@@ -1259,9 +1393,9 @@ void overflow_parse_tests()
 		assert(sstostr(int_t<512>::parse("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048")) == "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048");
 		assert(sstostr(int_t<512>::parse("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047")) == "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047");
 
-		assert_throws(std::invalid_argument, uint_t<512>::parse("13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084096"));
-		assert_throws(std::invalid_argument, int_t<512>::parse("-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042049"));
-		assert_throws(std::invalid_argument, int_t<512>::parse("6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048"));
+		assert_throws(std::invalid_argument, uint_t<512>::parse(u, "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084096"));
+		assert_throws(std::invalid_argument, int_t<512>::parse(s, "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042049"));
+		assert_throws(std::invalid_argument, int_t<512>::parse(s, "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048"));
 
 		assert(uint_t<512>::try_parse(u, "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"));
 		assert(int_t<512>::try_parse(s, "-6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042048"));
@@ -1353,6 +1487,7 @@ void promotion_demotion_tests()
 		bigint val_1{ 46 };
 		bigint val_2 = 46;
 
+		assert((uint_t<256>)val == 46u);
 		assert((unsigned long)val == 46);
 		assert((unsigned int)val_1 == 46);
 		assert((unsigned short)val_2 == 46);
@@ -1361,6 +1496,7 @@ void promotion_demotion_tests()
 		bigint val_4{ -46 };
 		bigint val_5 = -46;
 
+		assert((int_t<256>)val_3 == -46);
 		assert((long)val_3 == -46);
 		assert((int)val_4 == -46);
 		assert((short)val_5 == -46);
@@ -1373,6 +1509,12 @@ void promotion_demotion_tests()
 		{
 			assert(val_3 == i);
 		}
+	}
+
+	{
+		bigint v = int_t<256>::max();
+		assert((int_t<128>)v == -1);
+		assert((int_t<512>)v == int_t<256>::max());
 	}
 
 	{
@@ -1506,11 +1648,11 @@ void more_ops_tests()
 			}
 
 		{
-			bigint bigpos = (bigint)0x8000000000000000ull;
+			bigint bigpos = 0x8000000000000000ull;
 			assert(bigpos.blocks.size() == 2);
 			assert(bigpos.blocks[0] == 0x8000000000000000ull);
 			assert(bigpos.blocks[1] == 0ull);
-			assert(bigpos == 0x8000000000000000ull);
+			assert(bigpos == bigpos);
 		}
 
 		{
@@ -1644,7 +1786,7 @@ void big_promotion_tests()
 void misc_tests()
 {
 	{
-		assert(uint_t<256>(5) == 5);
+		assert(uint_t<256>(5) == 5u);
 		assert(int_t<256>(5) == 5);
 		assert(bigint(5) == 5);
 
@@ -1677,6 +1819,33 @@ void misc_tests()
 		v = detail::divmod(5, (bigint)3);
 		assert(v.first == 1);
 		assert(v.second == 2);
+	}
+	{
+		uint_t<256> v;
+		assert(v == 0u);
+		assert(0u == v);
+		assert(v == v);
+		assert(cmp(v, 0u) == 0);
+		assert(cmp(0u, v) == 0);
+		assert(cmp(v, v) == 0);
+	}
+	{
+		int_t<256> v;
+		assert(v == 0);
+		assert(0 == v);
+		assert(v == v);
+		assert(cmp(v, 0) == 0);
+		assert(cmp(0, v) == 0);
+		assert(cmp(v, v) == 0);
+	}
+	{
+		bigint v;
+		assert(v == 0);
+		assert(0 == v);
+		assert(v == v);
+		assert(cmp(v, 0) == 0);
+		assert(cmp(0, v) == 0);
+		assert(cmp(v, v) == 0);
 	}
 }
 void pow_tests()
@@ -1832,6 +2001,175 @@ void divmod_sign_tests()
 	assert(detail::divmod(bigint(-6) COMMA bigint(5)) == std::make_pair<bigint COMMA bigint>(-1 COMMA - 1));
 	assert(detail::divmod(bigint(-6) COMMA bigint(-5)) == std::make_pair<bigint COMMA bigint>(1 COMMA - 1));
 }
+void extract_termpos_tests()
+{
+	{
+		std::istringstream ss("");
+		uint_t<128> v;
+		ss >> v;
+		assert(!ss);
+		assert(ss.get() == EOF);
+	}
+	{
+		std::istringstream ss("");
+		int_t<128> v;
+		ss >> v;
+		assert(!ss);
+		assert(ss.get() == EOF);
+	}
+	{
+		std::istringstream ss("\t");
+		uint_t<128> v;
+		ss >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == EOF);
+	}
+	{
+		std::istringstream ss("\t");
+		int_t<128> v;
+		ss >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == EOF);
+	}
+	{
+		std::istringstream ss("12");
+		uint_t<128> v;
+		ss >> v;
+		assert((bool)ss);
+		assert(ss.get() == EOF);
+		assert(v == 12u);
+	}
+	{
+		std::istringstream ss("12");
+		int_t<128> v;
+		ss >> v;
+		assert((bool)ss);
+		assert(ss.get() == EOF);
+		assert(v == 12);
+	}
+	{
+		std::istringstream ss("12 ");
+		uint_t<128> v;
+		ss >> v;
+		assert((bool)ss);
+		assert(ss.get() == ' ');
+		assert(v == 12u);
+	}
+	{
+		std::istringstream ss("12 ");
+		int_t<128> v;
+		ss >> v;
+		assert((bool)ss);
+		assert(ss.get() == ' ');
+		assert(v == 12);
+	}
+	{
+		std::istringstream ss("12j");
+		uint_t<128> v;
+		ss >> v;
+		assert((bool)ss);
+		assert(ss.get() == 'j');
+		assert(v == 12u);
+	}
+	{
+		std::istringstream ss("12j");
+		int_t<128> v;
+		ss >> v;
+		assert((bool)ss);
+		assert(ss.get() == 'j');
+		assert(v == 12);
+	}
+	{
+		std::istringstream ss("x12j");
+		uint_t<128> v;
+		ss >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == 'x');
+	}
+	{
+		std::istringstream ss(" x12j");
+		int_t<128> v;
+		ss >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == 'x');
+	}
+	{
+		std::istringstream ss("7777777777777777777777777777777777777777777777777777777777777777777");
+		uint_t<128> v;
+		ss >> std::oct >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == EOF);
+	}
+	{
+		std::istringstream ss("9999999999999999999999999999999999999999999999999999999999999999999");
+		uint_t<128> v;
+		ss >> std::dec >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == EOF);
+	}
+	{
+		std::istringstream ss("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+		uint_t<128> v;
+		ss >> std::hex >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == EOF);
+	}
+	{
+		std::istringstream ss("7777777777777777777777777777777777777777777777777777777777777777777 ");
+		uint_t<128> v;
+		ss >> std::oct >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == ' ');
+	}
+	{
+		std::istringstream ss("9999999999999999999999999999999999999999999999999999999999999999999 ");
+		uint_t<128> v;
+		ss >> std::dec >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == ' ');
+	}
+	{
+		std::istringstream ss("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff ");
+		uint_t<128> v;
+		ss >> std::hex >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == ' ');
+	}
+	{
+		std::istringstream ss("7777777777777777777777777777777777777777777777777777777777777777777x");
+		uint_t<128> v;
+		ss >> std::oct >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == 'x');
+	}
+	{
+		std::istringstream ss("9999999999999999999999999999999999999999999999999999999999999999999x");
+		uint_t<128> v;
+		ss >> std::dec >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == 'x');
+	}
+	{
+		std::istringstream ss("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffx");
+		uint_t<128> v;
+		ss >> std::hex >> v;
+		assert(!ss);
+		ss.clear();
+		assert(ss.get() == 'x');
+	}
+}
 
 static_assert(std::is_same<uint_t<8>, std::uint8_t>::value, "type equivalence violation");
 static_assert(std::is_same<uint_t<16>, std::uint16_t>::value, "type equivalence violation");
@@ -1868,6 +2206,7 @@ int main()
 	pow_tests();
 	factorial_tests();
 	divmod_sign_tests();
+	extract_termpos_tests();
 
 	// -- benchmarks -- //
 
@@ -1876,6 +2215,7 @@ int main()
 	benchmark_binary("tostr dec", 1000, 1000, 100, 100, [fmt = tostr_fmt{}](const auto &a, const auto &b) { return fmt(a) + fmt(b); });
 	benchmark_binary("tostr hex", 1000, 1000, 1000, 1000, [fmt = tostr_fmt{ 16 }](const auto &a, const auto &b) { return fmt(a) + fmt(b); });
 	benchmark_binary("tostr oct", 1000, 1000, 1000, 1000, [fmt = tostr_fmt{ 8 }](const auto &a, const auto &b) { return fmt(a) + fmt(b); });
+	benchmark_string(10000, 10000);
 
 	// -- all tests completed -- //
 
