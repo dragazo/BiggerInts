@@ -41,16 +41,77 @@ report any bugs to https://github.com/dragazo/BiggerInts/issues
 
 namespace BiggerInts
 {
+	struct parse_fmt;
+	struct tostr_fmt;
+
 	namespace detail
 	{
 		template<std::uint64_t bits, bool sign> struct fixed_int;
 		class bigint;
+
+		struct const_fixed_int_wrapper
+		{
+			const std::uint64_t *blocks;   // pointer to the blocks array
+			std::size_t          blocks_n; // the number of blocks
+		};
+		struct fixed_int_wrapper
+		{
+			std::uint64_t *blocks;   // pointer to the blocks array
+			std::size_t    blocks_n; // the number of blocks
+			constexpr inline operator const_fixed_int_wrapper() noexcept { return { blocks, blocks_n }; }
+		};
+
+		template<std::uint64_t bits, bool sign> constexpr fixed_int_wrapper wrap(fixed_int<bits, sign>&&) noexcept = delete;
+		template<std::uint64_t bits, bool sign> constexpr fixed_int_wrapper wrap(fixed_int<bits, sign> &v) noexcept { return { v.blocks, bits / 64 }; }
+		template<std::uint64_t bits, bool sign> constexpr const_fixed_int_wrapper wrap(const fixed_int<bits, sign> &v) noexcept { return { v.blocks, bits / 64 }; }
+
+		std::string tostr_unsigned(fixed_int_wrapper val, const tostr_fmt &fmt);
+		std::string tostr_signed(fixed_int_wrapper val, const tostr_fmt &fmt);
+
+		bool try_parse_unsigned(fixed_int_wrapper res, std::string_view str, int base);
+		bool try_parse_signed(fixed_int_wrapper res, std::string_view str, int base);
+
+		std::istream &extract_unsigned(fixed_int_wrapper res, std::istream &istr, int base);
+		std::istream &extract_signed(fixed_int_wrapper res, std::istream &istr, int base);
 	}
 
+	// represents a collection of formatting settings for parsing values from strings
+	struct parse_fmt
+	{
+		int base = 10; // the base to use for the conversion (must be 10, 16, 8, 2, or 0) (0 is prefix mode)
+
+		// sets all format settings to the defaults
+		constexpr parse_fmt() noexcept = default;
+		// creates a format settings object for the specified base
+		constexpr parse_fmt(int _base) noexcept : base(_base) {}
+		// extracts the format settings from the specified stream
+		explicit parse_fmt(const std::ios_base &stream);
+
+		// attempts to convert str into an integer, storing the result in res. returns true on success.
+		template<std::uint64_t bits, bool sign>
+		[[nodiscard]] bool operator()(detail::fixed_int<bits, sign> &res, std::string_view str) const
+		{
+			if constexpr (sign) return try_parse_signed(wrap(res), str, base); else return try_parse_unsigned(wrap(res), str, base);
+		}
+		[[nodiscard]] bool operator()(detail::bigint &res, std::string_view str) const;
+
+		// converts str into an integer - throws on parse failure.
+		template<std::uint64_t bits, bool sign>
+		[[nodiscard]] detail::fixed_int<bits, sign> operator()(std::string_view str) const { detail::fixed_int<bits, sign> res; if (!operator()(res, str)) throw std::invalid_argument("failed to parse string"); return res; }
+		[[nodiscard]] detail::bigint operator()(std::string_view str) const;
+
+		// attempts to extract a value from the stream, storing the result in res.
+		template<std::uint64_t bits, bool sign>
+		std::istream &operator()(detail::fixed_int<bits, sign> &res, std::istream &istr) const
+		{
+			if constexpr (sign) return extract_signed(wrap(res), istr, base); else return extract_unsigned(wrap(res), istr, base);
+		}
+		std::istream &operator()(detail::bigint &res, std::istream &istr) const;
+	};
 	// represents a collection of formatting settings for converting values to strings
 	struct tostr_fmt
 	{
-		int base = 10;          // the base to use for the conversion (must be 10, 16, or 8)
+		int base = 10;          // the base to use for the conversion (must be 10, 16, 8, or 2)
 		bool showpos = false;   // if set to true positive values printed in decimal will have a '+' sign on the front
 		bool showbase = false;  // if set to true a radix prefix will be appended to the front of the string
 		bool uppercase = false; // if set to true alphabetic characters in the result will be uppercase
@@ -58,7 +119,7 @@ namespace BiggerInts
 		// sets all format settings to the defaults
 		constexpr tostr_fmt() noexcept = default;
 		// creates a format settings object for the specified base
-		explicit constexpr tostr_fmt(int _base) noexcept : base(_base) {}
+		constexpr tostr_fmt(int _base) noexcept : base(_base) {}
 		// extracts the format settings from the specified stream
 		explicit tostr_fmt(const std::ios_base &stream);
 
@@ -72,10 +133,12 @@ namespace BiggerInts
 		[[nodiscard]] std::string operator()(const detail::bigint &val) const;
 		[[nodiscard]] std::string operator()(detail::bigint &&val) const;
 
-		// returns the base that should be passed to a parsing function to parse a string created by this function
+		// returns the base that should be passed to a parsing function to parse a string created by this formatter
 		constexpr int parse_base() const noexcept { return showbase ? 0 : base; }
+		// returns a parser object that can be used to parse a string created by this formatter
+		constexpr parse_fmt parser() const noexcept { return parse_fmt{ parse_base() }; }
 	};
-
+	
 	namespace detail
 	{
 		// -- fixed-sized int type selection -- //
@@ -85,20 +148,6 @@ namespace BiggerInts
 		template<bool sign> struct fixed_int_selector<32, sign> { typedef std::conditional_t<sign, std::int32_t, std::uint32_t> type; };
 		template<bool sign> struct fixed_int_selector<16, sign> { typedef std::conditional_t<sign, std::int16_t, std::uint16_t> type; };
 		template<bool sign> struct fixed_int_selector<8, sign> { typedef std::conditional_t<sign, std::int8_t, std::uint8_t> type; };
-
-		// -- fixed-sized wrapper types -- //
-
-		struct const_fixed_int_wrapper
-		{
-			const std::uint64_t *blocks;   // pointer to the blocks array
-			std::size_t          blocks_n; // the number of blocks
-		};
-		struct fixed_int_wrapper
-		{
-			std::uint64_t *blocks;   // pointer to the blocks array
-			std::size_t    blocks_n; // the number of blocks
-			constexpr inline operator const_fixed_int_wrapper() noexcept { return { blocks, blocks_n }; }
-		};
 
 		// -- core fixed-sizes util -- //
 
@@ -436,12 +485,6 @@ namespace BiggerInts
 
 		// -- container impl -- //
 
-		std::string tostr_unsigned(fixed_int_wrapper val, const tostr_fmt &fmt);
-		std::string tostr_signed(fixed_int_wrapper val, const tostr_fmt &fmt);
-
-		bool try_parse_unsigned(fixed_int_wrapper res, std::string_view str, int base);
-		bool try_parse_signed(fixed_int_wrapper res, std::string_view str, int base);
-
 		template<std::uint64_t bits, bool sign> struct fixed_int
 		{
 		public: // -- data -- //
@@ -558,7 +601,7 @@ namespace BiggerInts
 
 			// attempts to parse the string into an integer value - returns true on successful parse.
 			// base must be 10 (dec), 16 (hex), 8 (oct), or 0 to automatically determine base from C-style prefix in str.
-			[[nodiscard]] static bool try_parse(fixed_int &res, std::string_view str, int base = 10) { if constexpr (sign) return detail::try_parse_signed(wrap(res), str, base); else return detail::try_parse_unsigned(wrap(res), str, base); }
+			[[nodiscard]] static bool try_parse(fixed_int &res, std::string_view str, int base = 10) { return parse_fmt{ base }(res, str); }
 			// as try_parse() but throws std::invalid_argument on failure
 			static void parse(fixed_int &res, std::string_view str, int base = 10) { if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string"); }
 			// as parse() but allocates a new object to hold the result (less efficient if you're just going to assign it to a variable)
@@ -711,11 +754,11 @@ namespace BiggerInts
 
 			// attempts to parse the string into an integer value - returns true on successful parse.
 			// base must be 10 (dec), 16 (hex), 8 (oct), or 0 to automatically determine base from C-style prefix in str.
-			[[nodiscard]] static bool try_parse(bigint &res, std::string_view str, int base = 10);
+			[[nodiscard]] static bool try_parse(bigint &res, std::string_view str, int base = 10) { return parse_fmt{ base }(res, str); }
 			// as try_parse() but throws std::invalid_argument on failure
-			static void parse(bigint &res, std::string_view str, int base = 10);
+			static void parse(bigint &res, std::string_view str, int base = 10) { if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string"); }
 			// as parse() but allocates a new object to hold the result (less efficient if you're just going to assign it to a variable)
-			[[nodiscard]] static bigint parse(std::string_view str, int base = 10);
+			[[nodiscard]] static bigint parse(std::string_view str, int base = 10) { bigint res; parse(res, str, base); return res; }
 
 		public: // -- static utilities -- //
 
@@ -724,12 +767,6 @@ namespace BiggerInts
 			// computes v!
 			[[nodiscard]] static bigint factorial(std::uint64_t v);
 		};
-
-		// -- wrapping utils -- //
-
-		template<std::uint64_t bits, bool sign> constexpr fixed_int_wrapper wrap(fixed_int<bits, sign>&&) noexcept = delete;
-		template<std::uint64_t bits, bool sign> constexpr fixed_int_wrapper wrap(fixed_int<bits, sign> &v) noexcept { return { v.blocks, bits / 64 }; }
-		template<std::uint64_t bits, bool sign> constexpr const_fixed_int_wrapper wrap(const fixed_int<bits, sign> &v) noexcept { return { v.blocks, bits / 64 }; }
 
 		// -- bigint utility definitions -- //
 
@@ -964,9 +1001,6 @@ namespace BiggerInts
 		std::ostream &print_unsigned(std::ostream &ostr, fixed_int_wrapper val);
 		std::ostream &print_signed(std::ostream &ostr, fixed_int_wrapper val);
 
-		std::istream &extract_unsigned(std::istream &istr, fixed_int_wrapper val);
-		std::istream &extract_signed(std::istream &istr, fixed_int_wrapper val);
-
 		template<std::uint64_t bits, bool sign>
 		std::ostream &operator<<(std::ostream &ostr, const fixed_int<bits, sign> &val)
 		{
@@ -977,11 +1011,8 @@ namespace BiggerInts
 		std::ostream &operator<<(std::ostream &ostr, bigint &&val);
 
 		template<std::uint64_t bits, bool sign>
-		std::istream &operator>>(std::istream &istr, fixed_int<bits, sign> &val)
-		{
-			if constexpr (sign) return extract_signed(istr, wrap(val)); else return extract_unsigned(istr, wrap(val));
-		}
-		std::istream &operator>>(std::istream &istr, bigint &val);
+		inline std::istream &operator>>(std::istream &istr, fixed_int<bits, sign> &res) { return parse_fmt{ istr }(res, istr); }
+		inline std::istream &operator>>(std::istream &istr, bigint &res) { return parse_fmt{ istr }(res, istr); }
 	}
 
 	// ------------------ //

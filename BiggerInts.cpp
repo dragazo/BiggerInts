@@ -684,6 +684,8 @@ int parse_base(const std::ios_base &stream)
 	default: throw std::invalid_argument("multiple base flags were set for stream object");
 	}
 }
+
+parse_fmt::parse_fmt(const std::ios_base &stream) : base(parse_base(stream)) {}
 tostr_fmt::tostr_fmt(const std::ios_base &stream)
 {
 	switch ((int)(stream.flags() & std::ios::basefield))
@@ -712,10 +714,15 @@ std::string tostr_positive_hex(T val, const tostr_fmt &fmt, char sign_ch)
 	const bool sign = detail::is_neg(val);
 	const char hex_alpha = fmt.uppercase ? 'A' : 'a';
 
-	(void)sign; // suppress unused warnings
 	if constexpr (is_bigint)
 	{
 		if (sign) val.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
+		str.reserve(val.blocks.size() * 16 + 4);
+	}
+	else
+	{
+		(void)sign; // suppress unused warnings
+		str.reserve(val.blocks_n * 16 + 4);
 	}
 
 	while (true)
@@ -769,6 +776,76 @@ std::string tostr_positive_hex(T val, const tostr_fmt &fmt, char sign_ch)
 	return str;
 }
 template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint&>, int> = 0>
+std::string tostr_positive_bin(T val, const tostr_fmt &fmt, char sign_ch)
+{
+	constexpr bool is_bigint = std::is_same_v<T, bigint&>;
+
+	std::string str;
+	int digit, dcount;
+	std::uint64_t block;
+
+	const bool sign = detail::is_neg(val);
+
+	if constexpr (is_bigint)
+	{
+		if (sign) val.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
+		str.reserve(val.blocks.size() * 64 + 4);
+	}
+	else
+	{
+		(void)sign; // suppress unused warnings
+		str.reserve(val.blocks_n * 64 + 4);
+	}
+
+	while (true)
+	{
+		// get a block
+		if constexpr (is_bigint)
+		{
+			block = val.blocks.empty() ? 0ull : val.blocks[0];
+			val >>= 64;
+		}
+		else
+		{
+			block = val.blocks[0];
+			shr(val, 64);
+		}
+		dcount = 0;
+
+		do // write the block - do-while to ensure 0 gets printed
+		{
+			digit = block & 1;
+			str.push_back('0' + digit);
+			block >>= 1;
+			++dcount;
+		} while (block);
+
+		if (detail::nonzero(val)) { for (; dcount < 64; ++dcount) str.push_back('0'); } // if there's still stuff, pad with zeroes and continue
+		else break; // otherwise we're done
+	}
+	if constexpr (is_bigint)
+	{
+		if (sign)
+		{
+			std::size_t s; // now we truncate all leading 1's
+			for (s = str.size(); s > 0; --s) if (str[s - 1] != '1') break;
+			str.resize(s); // chop off everything we don't want
+			if (str.empty() || str.back() == '0') str.push_back('1'); // if the string is now empty or no longer sign extends to negative, add a (single) 1 back on
+		}
+		else if (str.back() == '1') str.push_back('0'); // if val was positive but ends in a 1, add a 0 to prevent sign extending to negative on parsing
+	}
+	if (fmt.showbase)
+	{
+		str.push_back('b');
+		str.push_back('0');
+	}
+
+	if (sign_ch) str.push_back(sign_ch);  // append the sign character if specified
+	std::reverse(str.begin(), str.end()); // reverse the string for printing
+
+	return str;
+}
+template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint&>, int> = 0>
 std::string tostr_positive_oct(T val, const tostr_fmt &fmt, char sign_ch)
 {
 	constexpr bool is_bigint = std::is_same_v<T, bigint&>;
@@ -779,10 +856,15 @@ std::string tostr_positive_oct(T val, const tostr_fmt &fmt, char sign_ch)
 
 	const bool sign = detail::is_neg(val);
 
-	(void)sign; // suppress unused warnings
 	if constexpr (is_bigint)
 	{
 		if (sign) val.blocks.push_back(0ull); // fix the issue of using arithmetic right shifts for bigint (negative would be infinite loop)
+		str.reserve(val.blocks.size() * 22 + 4);
+	}
+	else
+	{
+		(void)sign; // suppress unused warnings
+		str.reserve(val.blocks_n * 22 + 4);
 	}
 
 	while (true)
@@ -828,7 +910,11 @@ std::string tostr_positive_oct(T val, const tostr_fmt &fmt, char sign_ch)
 		}
 		else if (str.back() >= '4') str.push_back('0'); // if val was positive but ends in a 4 or higher, add a 0 to prevent sign extending to negative on parsing
 	}
-	if (fmt.showbase) str.push_back('0');
+	if (fmt.showbase)
+	{
+		str.push_back('o');
+		str.push_back('0');
+	}
 
 	if (sign_ch) str.push_back(sign_ch);  // append the sign character if specified
 	std::reverse(str.begin(), str.end()); // reverse the string for printing
@@ -855,11 +941,15 @@ std::string tostr_positive_dec(T val, const tostr_fmt &fmt, char sign_ch)
 		temp.second = { &buffer[val.blocks_n], val.blocks_n };
 		base = { &buffer[2 * val.blocks_n], val.blocks_n };
 		base.blocks[0] = 10000000000000000000ull; // initialize base
+
+		str.reserve(val.blocks_n * 20 + 4);
 	}
 	else
 	{
 		(void)buffer; // suppress unused warnings (will just be optimized away)
 		base = 10000000000000000000ull; // initialize base
+
+		str.reserve(val.blocks.size() * 20 + 4);
 	}
 
 	while (true)
@@ -909,6 +999,7 @@ std::string tostr_positive(T val, const tostr_fmt &fmt, char sign_ch)
 	case 10: return tostr_positive_dec<T>(val, fmt, sign_ch);
 	case 16: return tostr_positive_hex<T>(val, fmt, sign_ch);
 	case 8: return tostr_positive_oct<T>(val, fmt, sign_ch);
+	case 2: return tostr_positive_bin<T>(val, fmt, sign_ch);
 	default: throw std::invalid_argument("unsupported base specified for conversion to string");
 	}
 }
@@ -1036,6 +1127,91 @@ bool try_parse_positive_hex(S src, T val, int base, bool skipws = true)
 	else return true;
 }
 template<typename S, typename T, std::enable_if_t<parse_allowed<S, T>, int> = 0>
+bool try_parse_positive_bin(S src, T val, int base, bool skipws = true)
+{
+	constexpr bool is_string = std::is_same_v<S, string_reader>;
+	constexpr bool is_bigint = std::is_same_v<T, bigint&>;
+
+	if (skipws) skip_whitespace(src);
+
+	// start by zeroing value
+	if constexpr (is_bigint) val.blocks.clear();
+	else for (std::size_t i = 0; i < val.blocks_n; ++i) val.blocks[i] = 0;
+
+	int first_digit, digit, num_digits;
+	std::uint64_t block;
+
+	// first char must be a hex digit - don't extract
+	if ((first_digit = src.peek()) == EOF) return false;
+	if (first_digit < '0' || first_digit > '1') return false;
+	first_digit -= '0';
+
+	while (true)
+	{
+		block = 0; // read a block of 64 bin digits
+		for (num_digits = 0; num_digits < 64; ++num_digits)
+		{
+			// get the digit and make sure it's in range - only extract it if it's good
+			if ((digit = src.peek()) == EOF) break;
+			if (digit < '0' || digit > '1') break;
+			digit -= '0';
+			src.get();
+
+			block <<= 1;
+			block |= digit;
+		}
+		if (num_digits != 0)
+		{
+			if constexpr (!is_bigint)
+			{
+				// detect overflow
+				if (val.blocks[val.blocks_n - 1] >> (std::uint64_t)(64 - num_digits))
+				{
+					if constexpr (!is_string)
+					{
+						for (int ch; (ch = src.peek()) != EOF && ch >= '0' && ch <= '1'; src.get()); // if reading from a stream consume extra valid chars on overflow failure
+					}
+					return false;
+				}
+
+				// incorporate it into value
+				shl(val, (std::uint64_t)(num_digits));
+				val.blocks[0] |= block;
+			}
+			else
+			{
+				// incorporate it into value
+				val <<= (std::uint64_t)(num_digits);
+				val |= block;
+			}
+		}
+
+		if (num_digits < 64) break;
+	}
+
+	if constexpr (is_bigint)
+	{
+		static_assert(detail::highest_set_bit(0) == 0); // sanity check for the behavior below
+
+		if (first_digit == 1) // if the value should sign extend to negative
+		{
+			val.blocks.back() |= ~((1ull << detail::highest_set_bit(val.blocks.back())) - 1); // set all bits after the high bit to one
+			collapse(val);
+		}
+		else // otherwise should sign extend to positive
+		{
+			if (detail::is_neg(val)) val.blocks.push_back(0ull); // if currently negative, toss on a 0 block to make it positive
+		}
+	}
+
+	if constexpr (is_string)
+	{
+		skip_whitespace(src);
+		return src.pos == src.end; // we need to have processed the entire string
+	}
+	else return true;
+}
+template<typename S, typename T, std::enable_if_t<parse_allowed<S, T>, int> = 0>
 bool try_parse_positive_oct(S src, T val, int base, bool skipws = true)
 {
 	constexpr bool is_string = std::is_same_v<S, string_reader>;
@@ -1052,7 +1228,7 @@ bool try_parse_positive_oct(S src, T val, int base, bool skipws = true)
 
 	// first char must be an oct digit - don't extract
 	if ((first_digit = src.peek()) == EOF) return false;
-	if (first_digit < '0' || first_digit > '7') false;
+	if (first_digit < '0' || first_digit > '7') return false;
 	first_digit -= '0';
 
 	while (true)
@@ -1210,6 +1386,7 @@ bool try_parse_positive(S src, T val, int base, bool skipws = true)
 	case 16: return try_parse_positive_hex<S, T>(src, val, base, skipws);
 	case 10: return try_parse_positive_dec<S, T>(src, val, base, skipws);
 	case 8: return try_parse_positive_oct<S, T>(src, val, base, skipws);
+	case 2: return try_parse_positive_bin<S, T>(src, val, base, skipws);
 	case 0:
 	{
 		if (skipws) skip_whitespace(src);
@@ -1220,17 +1397,20 @@ bool try_parse_positive(S src, T val, int base, bool skipws = true)
 		{
 			src.get();
 			if ((digit = src.peek()) == EOF) return true; // get the next character - if there is none, it's a valid decimal zero
+			digit = std::tolower((unsigned char)digit);
 
 			if (digit == 'x') { src.get(); return try_parse_positive_hex<S, T>(src, val, base, false); }             // if second char is 'x', extract it and parse a hex value
-			else if (std::isdigit((unsigned char)digit)) return try_parse_positive_oct<S, T>(src, val, base, false); // otherwise if it's a digit parse as oct
-			else
+			else if (digit == 'o') { src.get(); return try_parse_positive_oct<S, T>(src, val, base, false); }        // if second char is 'o', extract it and parse an oct value
+			else if (digit == 'b') { src.get(); return try_parse_positive_bin<S, T>(src, val, base, false); }        // if second char is 'b', extract it and parse a bin value
+			else if (std::isdigit((unsigned char)digit)) return try_parse_positive_dec<S, T>(src, val, base, false); // if second char is a digit, parse as dec (no prefix)
+			else // otherwise invalid char
 			{
-				if constexpr (is_string)
+				if constexpr (is_string) // if we're in string mode, we need to consume the entire string
 				{
 					skip_whitespace(src);
 					return src.pos == src.end; // otherwise if the rest of string is white space, is valid, otherwise contains illegal chars
 				}
-				else return true;
+				else return true; // otherwise we're good to go
 			}
 		}
 		else return try_parse_positive_dec<S, T>(src, val, base, false); // no prefix is decimal
@@ -1300,19 +1480,18 @@ std::ostream &detail::operator<<(std::ostream &ostr, bigint &&val) { return ostr
 bool detail::try_parse_unsigned(detail::fixed_int_wrapper val, std::string_view str, int base) { return ::try_parse_positive<string_reader, fixed_int_wrapper>(str, val, base); }
 bool detail::try_parse_signed(detail::fixed_int_wrapper val, std::string_view str, int base) { return ::try_parse_signed<string_reader, fixed_int_wrapper>(str, val, base); }
 
-std::istream &detail::extract_unsigned(std::istream &istr, detail::fixed_int_wrapper val)
+std::istream &detail::extract_unsigned(detail::fixed_int_wrapper res, std::istream &istr, int base)
 {
-	if (!::try_parse_positive<std::istream&, fixed_int_wrapper>(istr, val, parse_base(istr))) istr.setstate(std::ios::failbit);
+	if (!::try_parse_positive<std::istream&, fixed_int_wrapper>(istr, res, base)) istr.setstate(std::ios::failbit);
 	return istr;
 }
-std::istream &detail::extract_signed(std::istream &istr, detail::fixed_int_wrapper val)
+std::istream &detail::extract_signed(detail::fixed_int_wrapper res, std::istream &istr, int base)
 {
-	if (!::try_parse_signed<std::istream&, fixed_int_wrapper>(istr, val, parse_base(istr))) istr.setstate(std::ios::failbit);
+	if (!::try_parse_signed<std::istream&, fixed_int_wrapper>(istr, res, base)) istr.setstate(std::ios::failbit);
 	return istr;
 }
 
-std::istream &detail::operator>>(std::istream &istr, bigint &val) { if (!::try_parse_signed<std::istream&, bigint&>(istr, val, parse_base(istr))) istr.setstate(std::ios::failbit); return istr; }
+bool parse_fmt::operator()(bigint &res, std::string_view str) const { return ::try_parse_signed<string_reader, bigint&>(str, res, base); }
+std::istream &parse_fmt::operator()(bigint &res, std::istream &istr) const { if (!::try_parse_signed<std::istream&, bigint&>(istr, res, parse_base(istr))) istr.setstate(std::ios::failbit); return istr; }
 
-bool bigint::try_parse(bigint &res, std::string_view str, int base) { return ::try_parse_signed<string_reader, bigint&>(str, res, base); }
-void bigint::parse(bigint &res, std::string_view str, int base) { if (!try_parse(res, str, base)) throw std::invalid_argument("failed to parse string"); }
-bigint bigint::parse(std::string_view str, int base) { bigint res;  parse(res, str, base); return res; }
+bigint parse_fmt::operator()(std::string_view str) const { detail::bigint res; if (!operator()(res, str)) throw std::invalid_argument("failed to parse string"); return res; }
