@@ -2381,6 +2381,90 @@ void extract_termpos_tests()
 		assert(ss.get() == 'x');
 	}
 }
+void compount_assignment()
+{
+	{
+		uint_t<256> v = 0u;
+		assert(v == 0u);
+
+		v += 1; assert(v == 1u);
+		v += 1u; assert(v == 2u);
+		v += uint_t<128>{1}; assert(v == 3u);
+		v += uint_t<256>{1}; assert(v == 4u);
+		v += uint_t<512>{1}; assert(v == 5u);
+		v += bigint{ 1 }; assert(v == 6u);
+
+		v -= 1; assert(v == 5u);
+		v -= 1u; assert(v == 4u);
+		v -= uint_t<128>{1}; assert(v == 3u);
+		v -= uint_t<256>{1}; assert(v == 2u);
+		v -= uint_t<512>{1}; assert(v == 1u);
+		v -= bigint{ 1 }; assert(v == 0u);
+	}
+	{
+		int_t<256> v = 0;
+		assert(v == 0);
+
+		v += 1; assert(v == 1);
+		v += 1u; assert(v == 2);
+		v += uint_t<128>{1}; assert(v == 3);
+		v += uint_t<256>{1}; assert(v == 4);
+		v += uint_t<512>{1}; assert(v == 5);
+		v += bigint{ 1 }; assert(v == 6);
+
+		v -= 1; assert(v == 5);
+		v -= 1u; assert(v == 4);
+		v -= uint_t<128>{1}; assert(v == 3);
+		v -= uint_t<256>{1}; assert(v == 2);
+		v -= uint_t<512>{1}; assert(v == 1);
+		v -= bigint{ 1 }; assert(v == 0);
+	}
+	{
+		uint_t<256> v = 65u;
+		assert(v == 65u);
+
+		v &= 1; assert(v == 1u);
+		v |= 2; assert(v == 3u);
+		v &= 1u; assert(v == 1u);
+		v |= 2u; assert(v == 3u);
+		v ^= 1; assert(v == 2u);
+		v ^= 1u; assert(v == 3u);
+
+		v = 65u;
+		v &= int_t<128>{1}; assert(v == 1u);
+		v |= int_t<128>{2}; assert(v == 3u);
+		v &= uint_t<128>{1}; assert(v == 1u);
+		v |= uint_t<128>{2}; assert(v == 3u);
+		v ^= int_t<128>{1}; assert(v == 2u);
+		v ^= uint_t<128>{1}; assert(v == 3u);
+
+		v = 65u;
+		v &= int_t<256>{1}; assert(v == 1u);
+		v |= int_t<256>{2}; assert(v == 3u);
+		v &= uint_t<256>{1}; assert(v == 1u);
+		v |= uint_t<256>{2}; assert(v == 3u);
+		v ^= int_t<256>{1}; assert(v == 2u);
+		v ^= uint_t<256>{1}; assert(v == 3u);
+
+		v = 65u;
+		v &= int_t<512>{1}; assert(v == 1u);
+		v |= int_t<512>{2}; assert(v == 3u);
+		v &= uint_t<512>{1}; assert(v == 1u);
+		v |= uint_t<512>{2}; assert(v == 3u);
+		v ^= int_t<512>{1}; assert(v == 2u);
+		v ^= uint_t<512>{1}; assert(v == 3u);
+
+		v = 65u;
+		v &= bigint{1}; assert(v == 1u);
+		v |= bigint{2}; assert(v == 3u);
+		v &= bigint{1}; assert(v == 1u);
+		v |= bigint{2}; assert(v == 3u);
+		v ^= bigint{1}; assert(v == 2u);
+		v ^= bigint{1}; assert(v == 3u);
+	}
+}
+
+// --------------------------------------------
 
 static_assert(std::is_same<uint_t<8>, std::uint8_t>::value, "type equivalence violation");
 static_assert(std::is_same<uint_t<16>, std::uint16_t>::value, "type equivalence violation");
@@ -2397,6 +2481,56 @@ static_assert(std::is_same<std::common_type_t<int, int_t<256>>, int_t<256>>::val
 static_assert(std::is_same<std::common_type_t<int, bigint>, bigint>::value, "common type violation");
 static_assert(std::is_same<std::common_type_t<int_t<256>, bigint>, bigint>::value, "common type violation");
 static_assert(std::is_same<std::common_type_t<int_t<256>, int_t<512>>, int_t<512>>::value, "common type violation");
+
+// --------------------------------------------
+
+#define ASSERT_BIN_OP_RESULT_TYPE(OP, A, B, R) static_assert(std::is_same_v<decltype(std::declval<A>() OP std::declval<B>()), R>, "result type violation: " #A " " #OP " " #B " -> " #R)
+#define ASSERT_BIN_OP_RESULT_TYPE_TESTS(OP) \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<128>, uint_t<128>, uint_t<128>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<128>, uint_t<256>, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<256>, uint_t<128>, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<256>, unsigned long long, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<256>, unsigned long, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<256>, unsigned int, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<256>, unsigned short, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<128>, int_t<128>, int_t<128>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<128>, int_t<256>, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<256>, int_t<128>, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<256>, long long, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<256>, long, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<256>, int, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<256>, short, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<128>, bigint, bigint); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, bigint, int_t<128>, bigint)
+#define ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(OP) \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<256>, int_t<128>, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<128>, uint_t<256>, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<128>, int_t<256>, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<256>, uint_t<128>, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<128>, uint_t<128>, uint_t<128>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<128>, int_t<128>, uint_t<128>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<128>, bigint, bigint); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, bigint, uint_t<128>, bigint)
+	
+ASSERT_BIN_OP_RESULT_TYPE_TESTS(+);
+ASSERT_BIN_OP_RESULT_TYPE_TESTS(-);
+
+ASSERT_BIN_OP_RESULT_TYPE_TESTS(&);
+ASSERT_BIN_OP_RESULT_TYPE_TESTS(|);
+ASSERT_BIN_OP_RESULT_TYPE_TESTS(^);
+
+ASSERT_BIN_OP_RESULT_TYPE_TESTS(*);
+ASSERT_BIN_OP_RESULT_TYPE_TESTS(/);
+ASSERT_BIN_OP_RESULT_TYPE_TESTS(%);
+
+ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(+);
+ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(-);
+
+ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(&);
+ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(|);
+ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(^);
+
+// --------------------------------------------
 
 int main()
 {
@@ -2418,6 +2552,7 @@ int main()
 	factorial_tests();
 	divmod_sign_tests();
 	extract_termpos_tests();
+	compount_assignment();
 
 	// -- benchmarks -- //
 

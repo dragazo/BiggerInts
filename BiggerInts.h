@@ -141,6 +141,13 @@ namespace BiggerInts
 	
 	namespace detail
 	{
+		// -- we need min and max, but not the other algorithms, so faster to just recreate here -- //
+
+		template<typename T, std::enable_if_t<std::is_trivial_v<T>, int> = 0>
+		constexpr T min(T a, T b) noexcept { return a < b ? a : b; }
+		template<typename T, std::enable_if_t<std::is_trivial_v<T>, int> = 0>
+		constexpr T max(T a, T b) noexcept { return a < b ? b : a; }
+
 		// -- fixed-sized int type selection -- //
 
 		template<std::uint64_t bits, bool sign> struct fixed_int_selector { typedef detail::fixed_int<bits, sign> type; };
@@ -234,6 +241,11 @@ namespace BiggerInts
 		}
 		constexpr void make_neg(detail::fixed_int_wrapper a) noexcept { detail::make_not(a); detail::increment(a); }
 
+		constexpr void set_zero(fixed_int_wrapper a) noexcept
+		{
+			for (std::size_t i = 0; i < a.blocks_n; ++i) a.blocks[i] = 0;
+		}
+
 		constexpr void add_same_size(detail::fixed_int_wrapper a, detail::const_fixed_int_wrapper b) noexcept
 		{
 			std::uint64_t carry = 0;
@@ -263,6 +275,7 @@ namespace BiggerInts
 				carry = (a.blocks[i] += v) < v || v < carry ? 1 : 0;
 			}
 		}
+
 		constexpr void and_same_size(detail::fixed_int_wrapper a, detail::const_fixed_int_wrapper b) noexcept
 		{
 			for (std::size_t i = 0; i < a.blocks_n; ++i) a.blocks[i] &= b.blocks[i];
@@ -570,12 +583,71 @@ namespace BiggerInts
 			constexpr fixed_int &operator--() noexcept { decrement(wrap(*this)); return *this; }
 			[[nodiscard]] constexpr fixed_int operator--(int) noexcept { auto cpy = *this; detail::decrement(wrap(*this)); return cpy; }
 
-			constexpr fixed_int &operator+=(const fixed_int &other) noexcept { detail::add_same_size(wrap(*this), wrap(other)); return *this; }
-			constexpr fixed_int &operator-=(const fixed_int &other) noexcept { detail::sub_same_size(wrap(*this), wrap(other)); return *this; }
+			template<std::uint64_t _bits, bool _sign>
+			constexpr fixed_int &operator+=(const fixed_int<_bits, _sign> &other) noexcept
+			{
+				if constexpr (bits <= _bits) { detail::add_same_size(wrap(*this), { other.blocks, bits / 64 }); return *this; }
+				else return *this += (fixed_int)other;
+			}
+			template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+			constexpr fixed_int &operator+=(T val) noexcept
+			{
+				if constexpr (std::is_unsigned_v<T>) { detail::add_u64(wrap(*this), (std::uint64_t)val); return *this; } // unsigned val can be done more efficiently
+				else
+				{
+					if (val >= 0) { detail::add_u64(wrap(*this), (std::uint64_t)val); return *this; } // otherwise positive can be done more efficiently
+					else return *this += (fixed_int)val;
+				}
+			}
+			fixed_int &operator+=(const bigint &other) noexcept { return *this += (fixed_int)other; }
 
-			constexpr fixed_int &operator&=(const fixed_int &other) noexcept { detail::and_same_size(wrap(*this), wrap(other)); return *this; }
-			constexpr fixed_int &operator|=(const fixed_int &other) noexcept { detail::or_same_size(wrap(*this), wrap(other)); return *this; }
-			constexpr fixed_int &operator^=(const fixed_int &other) noexcept { detail::xor_same_size(wrap(*this), wrap(other)); return *this; }
+			template<std::uint64_t _bits, bool _sign>
+			constexpr fixed_int &operator-=(const fixed_int<_bits, _sign> &other) noexcept
+			{
+				if constexpr (bits <= _bits) { detail::sub_same_size(wrap(*this), { other.blocks, bits / 64 }); return *this; }
+				else return *this -= (fixed_int)other;
+			}
+			template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+			constexpr fixed_int &operator-=(T val) noexcept { return *this -= (fixed_int)val; }
+			fixed_int &operator-=(const bigint &other) noexcept { return *this -= (fixed_int)other; }
+
+			template<std::uint64_t _bits, bool _sign>
+			constexpr fixed_int &operator&=(const fixed_int<_bits, _sign> &other) noexcept
+			{
+				if constexpr (bits <= _bits) { detail::and_same_size(wrap(*this), { other.blocks, bits / 64 }); return *this; }
+				else return *this &= (fixed_int)other;
+			}
+			template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+			constexpr fixed_int &operator&=(T val) noexcept { return *this &= (fixed_int)val; }
+			fixed_int &operator&=(const bigint &other) noexcept { return *this &= (fixed_int)other; }
+
+			template<std::uint64_t _bits, bool _sign>
+			constexpr fixed_int &operator|=(const fixed_int<_bits, _sign> &other) noexcept
+			{
+				if constexpr (bits <= _bits) { detail::or_same_size(wrap(*this), { other.blocks, bits / 64 }); return *this; }
+				else return *this |= (fixed_int)other;
+			}
+			template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+			constexpr fixed_int &operator|=(T val) noexcept
+			{
+				if constexpr (std::is_unsigned_v<T>) { blocks[0] |= val; return *this; }
+				return *this |= (fixed_int)val;
+			}
+			fixed_int &operator|=(const bigint &other) noexcept { return *this |= (fixed_int)other; }
+
+			template<std::uint64_t _bits, bool _sign>
+			constexpr fixed_int &operator^=(const fixed_int<_bits, _sign> &other) noexcept
+			{
+				if constexpr (bits <= _bits) { detail::xor_same_size(wrap(*this), { other.blocks, bits / 64 }); return *this; }
+				else return *this ^= (fixed_int)other;
+			}
+			template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+			constexpr fixed_int &operator^=(T val) noexcept
+			{
+				if constexpr (std::is_unsigned_v<T>) { blocks[0] ^= val; return *this; }
+				return *this ^= (fixed_int)val;
+			}
+			fixed_int &operator^=(const bigint &other) noexcept { return *this ^= (fixed_int)other; }
 
 			constexpr fixed_int &operator<<=(std::uint64_t count) noexcept { detail::shl(wrap(*this), count); return *this; }
 			constexpr fixed_int &operator>>=(std::uint64_t count) noexcept
@@ -784,11 +856,19 @@ namespace BiggerInts
 
 		bool cmp_less_non_negative(const bigint &a, const bigint &b) noexcept;
 
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		using mix_result_t = fixed_int<detail::max(bits_1, bits_2), (bits_1 > bits_2 ? sign_1 : bits_2 > bits_1 ? sign_2 : sign_1 == sign_2 ? sign_1 : false)>;
+
 		// -- add -- //
 
-		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator+(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy += b; return cpy; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator+(const fixed_int<bits, sign> &a, T b) { return a + (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator+(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a + b; }
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		[[nodiscard]] constexpr auto operator+(const fixed_int<bits_1, sign_1> &a, const fixed_int<bits_2, sign_2> &b) noexcept
+		{
+			if constexpr (bits_1 <= bits_2) { mix_result_t<bits_1, sign_1, bits_2, sign_2> cpy = a; cpy += b; return cpy; } // more efficient to copy smaller and add larger (slicing)
+			else { mix_result_t<bits_1, sign_1, bits_2, sign_2> cpy = b; cpy += a; return cpy; }
+		}
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr auto operator+(const fixed_int<bits, sign> &a, T b) noexcept { auto cpy = a; cpy += b; return cpy; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr auto operator+(T a, const fixed_int<bits, sign> &b) noexcept { auto cpy = b; cpy += a; return cpy; }
 
 		[[nodiscard]] bigint operator+(const bigint &a, const bigint &b);
 		[[nodiscard]] bigint operator+(bigint &&a, const bigint &b);
@@ -797,9 +877,14 @@ namespace BiggerInts
 
 		// -- sub -- //
 
-		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator-(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy -= b; return cpy; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator-(const fixed_int<bits, sign> &a, T b) { return a - (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator-(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a - b; }
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		[[nodiscard]] constexpr auto operator-(const fixed_int<bits_1, sign_1> &a, const fixed_int<bits_2, sign_2> &b) noexcept
+		{
+			if constexpr (bits_1 <= bits_2) { mix_result_t<bits_1, sign_1, bits_2, sign_2> cpy = a; cpy -= b; return cpy; } // more efficient to copy smaller and add larger (slicing)
+			else { mix_result_t<bits_1, sign_1, bits_2, sign_2> cpy = b; cpy -= a; detail::make_neg(wrap(cpy)); return cpy; }
+		}
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr auto operator-(const fixed_int<bits, sign> &a, T b) noexcept { auto cpy = a; cpy -= b; return cpy; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr auto operator-(T a, const fixed_int<bits, sign> &b) noexcept { auto cpy = b; cpy -= a; detail::make_neg(wrap(cpy)); return cpy; }
 
 		[[nodiscard]] bigint operator-(const bigint &a, const bigint &b);
 		[[nodiscard]] bigint operator-(bigint &&a, const bigint &b);
@@ -808,9 +893,14 @@ namespace BiggerInts
 
 		// -- and -- //
 
-		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator&(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy &= b; return cpy; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator&(const fixed_int<bits, sign> &a, T b) { return a & (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator&(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a & b; }
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		[[nodiscard]] constexpr auto operator&(const fixed_int<bits_1, sign_1> &a, const fixed_int<bits_2, sign_2> &b) noexcept
+		{
+			if constexpr (bits_1 <= bits_2) { mix_result_t<bits_1, sign_1, bits_2, sign_2> cpy = a; cpy &= b; return cpy; } // more efficient to copy smaller and add larger (slicing)
+			else { mix_result_t<bits_1, sign_1, bits_2, sign_2> cpy = b; cpy &= a; return cpy; }
+		}
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr auto operator&(const fixed_int<bits, sign> &a, T b) noexcept { auto cpy = a; cpy &= b; return cpy; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr auto operator&(T a, const fixed_int<bits, sign> &b) noexcept { auto cpy = b; cpy &= a; return cpy; }
 
 		[[nodiscard]] bigint operator&(const bigint &a, const bigint &b);
 		[[nodiscard]] bigint operator&(bigint &&a, const bigint &b);
@@ -819,9 +909,14 @@ namespace BiggerInts
 
 		// -- or -- //
 
-		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator|(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy |= b; return cpy; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator|(const fixed_int<bits, sign> &a, T b) { return a | (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator|(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a | b; }
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		[[nodiscard]] constexpr auto operator|(const fixed_int<bits_1, sign_1> &a, const fixed_int<bits_2, sign_2> &b) noexcept
+		{
+			if constexpr (bits_1 <= bits_2) { mix_result_t<bits_1, sign_1, bits_2, sign_2> cpy = a; cpy |= b; return cpy; } // more efficient to copy smaller and add larger (slicing)
+			else { mix_result_t<bits_1, sign_1, bits_2, sign_2> cpy = b; cpy |= a; return cpy; }
+		}
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr auto operator|(const fixed_int<bits, sign> &a, T b) noexcept { auto cpy = a; cpy |= b; return cpy; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr auto operator|(T a, const fixed_int<bits, sign> &b) noexcept { auto cpy = b; cpy |= a; return cpy; }
 
 		[[nodiscard]] bigint operator|(const bigint &a, const bigint &b);
 		[[nodiscard]] bigint operator|(bigint &&a, const bigint &b);
@@ -830,9 +925,14 @@ namespace BiggerInts
 
 		// -- xor -- //
 
-		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator^(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) { auto cpy = a; cpy ^= b; return cpy; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator^(const fixed_int<bits, sign> &a, T b) { return a ^ (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator^(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a ^ b; }
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		[[nodiscard]] constexpr auto operator^(const fixed_int<bits_1, sign_1> &a, const fixed_int<bits_2, sign_2> &b) noexcept
+		{
+			if constexpr (bits_1 <= bits_2) { mix_result_t<bits_1, sign_1, bits_2, sign_2> cpy = a; cpy ^= b; return cpy; } // more efficient to copy smaller and add larger (slicing)
+			else { mix_result_t<bits_1, sign_1, bits_2, sign_2> cpy = b; cpy ^= a; return cpy; }
+		}
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr auto operator^(const fixed_int<bits, sign> &a, T b) noexcept { auto cpy = a; cpy ^= b; return cpy; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr auto operator^(T a, const fixed_int<bits, sign> &b) noexcept { auto cpy = b; cpy ^= a; return cpy; }
 
 		[[nodiscard]] bigint operator^(const bigint &a, const bigint &b);
 		[[nodiscard]] bigint operator^(bigint &&a, const bigint &b);
@@ -872,7 +972,11 @@ namespace BiggerInts
 
 		// -- mul -- //
 
-		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator*(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) noexcept { fixed_int<bits, sign> res = 0; detail::multiply_same_size_already_zero(wrap(res), wrap(a), wrap(b)); return res; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator*(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) noexcept { fixed_int<bits, sign> res = 0ull; detail::multiply_same_size_already_zero(wrap(res), wrap(a), wrap(b)); return res; }
+		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign> [[nodiscard]] constexpr auto operator*(const fixed_int<bits_1, sign> &a, const fixed_int<bits_2, sign> &b) { return detail::operator*<detail::max(bits_1, bits_2), sign>(a, b); }
+
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator*(const fixed_int<bits, sign> &a, T b) { return a * (fixed_int<bits, sign>)b; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator*(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a * b; }
 
 		[[nodiscard]] bigint operator*(const bigint &a, const bigint &b);
 		[[nodiscard]] bigint operator*(bigint &&a, const bigint &b);
@@ -889,15 +993,15 @@ namespace BiggerInts
 		std::pair<bigint, bigint> divmod(const bigint &a, bigint &&b);
 		std::pair<bigint, bigint> divmod(bigint &&a, bigint &&b);
 
-		bigint operator/(const bigint &num, const bigint &den);
-		bigint operator/(bigint &&num, const bigint &den);
-		bigint operator/(const bigint &num, bigint &&den);
-		bigint operator/(bigint &&num, bigint &&den);
+		[[nodiscard]] bigint operator/(const bigint &num, const bigint &den);
+		[[nodiscard]] bigint operator/(bigint &&num, const bigint &den);
+		[[nodiscard]] bigint operator/(const bigint &num, bigint &&den);
+		[[nodiscard]] bigint operator/(bigint &&num, bigint &&den);
 
-		bigint operator%(const bigint &num, const bigint &den);
-		bigint operator%(bigint &&num, const bigint &den);
-		bigint operator%(const bigint &num, bigint &&den);
-		bigint operator%(bigint &&num, bigint &&den);
+		[[nodiscard]] bigint operator%(const bigint &num, const bigint &den);
+		[[nodiscard]] bigint operator%(bigint &&num, const bigint &den);
+		[[nodiscard]] bigint operator%(const bigint &num, bigint &&den);
+		[[nodiscard]] bigint operator%(bigint &&num, bigint &&den);
 
 		template<std::uint64_t bits>
 		constexpr std::pair<fixed_int<bits, false>, fixed_int<bits, false>> divmod(const fixed_int<bits, false> &num, const fixed_int<bits, false> &den)
@@ -918,10 +1022,17 @@ namespace BiggerInts
 			return res;
 		}
 
-		template<std::uint64_t bits, bool sign>
-		constexpr fixed_int<bits, sign> operator/(const fixed_int<bits, sign> &num, const fixed_int<bits, sign> &den) { return divmod(num, den).first; }
-		template<std::uint64_t bits, bool sign>
-		constexpr fixed_int<bits, sign> operator%(const fixed_int<bits, sign> &num, const fixed_int<bits, sign> &den) { return divmod(num, den).second; }
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator/(const fixed_int<bits, sign> &num, const fixed_int<bits, sign> &den) { return divmod(num, den).first; }
+		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>[[nodiscard]] constexpr auto operator/(const fixed_int<bits_1, sign> &a, const fixed_int<bits_2, sign> &b) { return detail::operator/<detail::max(bits_1, bits_2), sign>(a, b); }
+
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator/(const fixed_int<bits, sign> &a, T b) { return a / (fixed_int<bits, sign>)b; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator/(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a / b; }
+
+		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator%(const fixed_int<bits, sign> &num, const fixed_int<bits, sign> &den) { return divmod(num, den).second; }
+		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>[[nodiscard]] constexpr auto operator%(const fixed_int<bits_1, sign> &a, const fixed_int<bits_2, sign> &b) { return detail::operator%<detail::max(bits_1, bits_2), sign>(a, b); }
+
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator%(const fixed_int<bits, sign> &a, T b) { return a % (fixed_int<bits, sign>)b; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator%(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a % b; }
 
 		// -- cmp -- //
 
