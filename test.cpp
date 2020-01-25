@@ -1994,13 +1994,13 @@ void misc_tests()
 		assert(v == 144);
 	}
 	{
-		std::pair<bigint, bigint> v = detail::divmod((bigint)5, (bigint)3);
+		std::pair<bigint, bigint> v = divmod((bigint)5, (bigint)3);
 		assert(v.first == 1);
 		assert(v.second == 2);
-		v = detail::divmod((bigint)5, 3);
+		v = divmod((bigint)5, 3);
 		assert(v.first == 1);
 		assert(v.second == 2);
-		v = detail::divmod(5, (bigint)3);
+		v = divmod(5, (bigint)3);
 		assert(v.first == 1);
 		assert(v.second == 2);
 	}
@@ -2178,15 +2178,15 @@ void divmod_sign_tests()
 	static_assert(-6 / 5 == -1); static_assert(-6 % 5 == -1);
 	static_assert(-6 / -5 == 1); static_assert(-6 % -5 == -1);
 
-	assert(detail::divmod(int_t<256>(6) COMMA int_t<256>(5)) == std::make_pair<int_t<256> COMMA int_t<256>>(1 COMMA 1));
-	assert(detail::divmod(int_t<256>(6) COMMA int_t<256>(-5)) == std::make_pair<int_t<256> COMMA int_t<256>>(-1 COMMA 1));
-	assert(detail::divmod(int_t<256>(-6) COMMA int_t<256>(5)) == std::make_pair<int_t<256> COMMA int_t<256>>(-1 COMMA -1));
-	assert(detail::divmod(int_t<256>(-6) COMMA int_t<256>(-5)) == std::make_pair<int_t<256> COMMA int_t<256>>(1 COMMA -1));
+	assert(divmod(int_t<256>(6) COMMA int_t<256>(5)) == std::make_pair<int_t<256> COMMA int_t<256>>(1 COMMA 1));
+	assert(divmod(int_t<256>(6) COMMA int_t<256>(-5)) == std::make_pair<int_t<256> COMMA int_t<256>>(-1 COMMA 1));
+	assert(divmod(int_t<256>(-6) COMMA int_t<256>(5)) == std::make_pair<int_t<256> COMMA int_t<256>>(-1 COMMA -1));
+	assert(divmod(int_t<256>(-6) COMMA int_t<256>(-5)) == std::make_pair<int_t<256> COMMA int_t<256>>(1 COMMA -1));
 
-	assert(detail::divmod(bigint(6) COMMA bigint(5)) == std::make_pair<bigint COMMA bigint>(1 COMMA 1));
-	assert(detail::divmod(bigint(6) COMMA bigint(-5)) == std::make_pair<bigint COMMA bigint>(-1 COMMA 1));
-	assert(detail::divmod(bigint(-6) COMMA bigint(5)) == std::make_pair<bigint COMMA bigint>(-1 COMMA - 1));
-	assert(detail::divmod(bigint(-6) COMMA bigint(-5)) == std::make_pair<bigint COMMA bigint>(1 COMMA - 1));
+	assert(divmod(bigint(6) COMMA bigint(5)) == std::make_pair<bigint COMMA bigint>(1 COMMA 1));
+	assert(divmod(bigint(6) COMMA bigint(-5)) == std::make_pair<bigint COMMA bigint>(-1 COMMA 1));
+	assert(divmod(bigint(-6) COMMA bigint(5)) == std::make_pair<bigint COMMA bigint>(-1 COMMA - 1));
+	assert(divmod(bigint(-6) COMMA bigint(-5)) == std::make_pair<bigint COMMA bigint>(1 COMMA - 1));
 }
 void extract_termpos_tests()
 {
@@ -2477,6 +2477,36 @@ void compound_assignment()
 		v *= long{2}; assert(v == 3072u);
 		v *= unsigned long{2}; assert(v == 6144u);
 	}
+	{
+		uint_t<256> v = 0x8000000000000000ull;
+
+		v /= uint_t<128>{2}; assert(v == 0x4000000000000000ull);
+		v /= uint_t<256>{2}; assert(v == 0x2000000000000000ull);
+		v /= uint_t<512>{2}; assert(v == 0x1000000000000000ull);
+		v /= int_t<128>{2}; assert(v == 0x800000000000000ull);
+		v /= int_t<256>{2}; assert(v == 0x400000000000000ull);
+		v /= int_t<512>{2}; assert(v == 0x200000000000000ull);
+		v /= bigint{ 2 }; assert(v == 0x100000000000000ull);
+		v /= int{ 2 }; assert(v == 0x80000000000000ull);
+		v /= unsigned{ 2 }; assert(v == 0x40000000000000ull);
+		v /= long{ 2 }; assert(v == 0x20000000000000ull);
+		v /= unsigned long{ 2 }; assert(v == 0x10000000000000ull);
+	}
+	{
+		uint_t<256> v = 0xffffffffffffffffull;
+
+		v %= uint_t<128>{0x8000000000000000ull}; assert(v == 0x7fffffffffffffffull);
+		v %= uint_t<256>{0x4000000000000000ull}; assert(v == 0x3fffffffffffffffull);
+		v %= uint_t<512>{0x2000000000000000ull}; assert(v == 0x1fffffffffffffffull);
+		v %= int_t<128>{0x1000000000000000ull}; assert(v == 0xfffffffffffffffull);
+		v %= int_t<256>{0x800000000000000ull}; assert(v == 0x7ffffffffffffffull);
+		v %= int_t<512>{0x400000000000000ull}; assert(v == 0x3ffffffffffffffull);
+		v %= bigint{ 0x200000000000000ull }; assert(v == 0x1ffffffffffffffull);
+		v %= int{ 0x1000000 }; assert(v == 0xffffffull);
+		v %= unsigned{ 0x800000 }; assert(v == 0x7fffffull);
+		v %= long{ 0x400000 }; assert(v == 0x3fffffull);
+		v %= unsigned long{ 0x200000 }; assert(v == 0x1fffffull);
+	}
 }
 void mixed_sign_comparison_tests()
 {
@@ -2545,6 +2575,36 @@ void mixed_sign_comparison_tests()
 	assert(cmp(int_t<256>(-4), uint_t<128>(-4)) == -1);
 	assert(cmp(int_t<256>(-4), int_t<128>(-4)) == 0);
 }
+void self_compound_assignment()
+{
+	{
+		int_t<256> v = 1;
+		v += v;
+		assert(v == 2);
+		v *= v;
+		assert(v == 4);
+		v -= v;
+		assert(v == 0);
+	}
+	{
+		int_t<256> v = -1;
+		v += v;
+		assert(v == -2);
+		v *= v;
+		assert(v == 4);
+		v -= v;
+		assert(v == 0);
+	}
+	{
+		int_t<256> v = int_t<256>::parse("fffffffffffffffff", 16);
+		v += v;
+		assert(v.tostr(16) == "1ffffffffffffffffe");
+		v *= v;
+		assert(v.tostr(16) == "3ffffffffffffffff800000000000000004");
+		v -= v;
+		assert(v == 0);
+	}
+}
 
 // --------------------------------------------
 
@@ -2566,6 +2626,21 @@ static_assert(std::is_same<std::common_type_t<int_t<256>, int_t<512>>, int_t<512
 
 // --------------------------------------------
 
+template<typename T>
+struct _divmod_wrap
+{
+	const T &v;
+	template<typename U> constexpr auto operator/(const U &x) { return divmod(v, x).first; }
+};
+struct _divmod_op
+{
+	constexpr _divmod_op() noexcept = default;
+	template<typename T> friend constexpr _divmod_wrap<T> operator/(const T &v, _divmod_op) noexcept { return {v}; }
+};
+#define DIVMOD_QUO / _divmod_op{} /
+
+// --------------------------------------------
+
 #define ASSERT_BIN_OP_RESULT_TYPE(OP, A, B, R) static_assert(std::is_same_v<decltype(std::declval<A>() OP std::declval<B>()), R>, "result type violation: " #A " " #OP " " #B " -> " #R)
 #define ASSERT_BIN_OP_RESULT_TYPE_TESTS(OP) \
 	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<128>, uint_t<128>, uint_t<128>); \
@@ -2575,6 +2650,10 @@ static_assert(std::is_same<std::common_type_t<int_t<256>, int_t<512>>, int_t<512
 	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<256>, unsigned long, uint_t<256>); \
 	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<256>, unsigned int, uint_t<256>); \
 	ASSERT_BIN_OP_RESULT_TYPE(OP, uint_t<256>, unsigned short, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, unsigned long long, uint_t<256>, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, unsigned long, uint_t<256>, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, unsigned int, uint_t<256>, uint_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, unsigned short, uint_t<256>, uint_t<256>); \
 	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<128>, int_t<128>, int_t<128>); \
 	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<128>, int_t<256>, int_t<256>); \
 	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<256>, int_t<128>, int_t<256>); \
@@ -2582,6 +2661,10 @@ static_assert(std::is_same<std::common_type_t<int_t<256>, int_t<512>>, int_t<512
 	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<256>, long, int_t<256>); \
 	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<256>, int, int_t<256>); \
 	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<256>, short, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, long long, int_t<256>, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, long, int_t<256>, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, int, int_t<256>, int_t<256>); \
+	ASSERT_BIN_OP_RESULT_TYPE(OP, short, int_t<256>, int_t<256>); \
 	ASSERT_BIN_OP_RESULT_TYPE(OP, int_t<128>, bigint, bigint); \
 	ASSERT_BIN_OP_RESULT_TYPE(OP, bigint, int_t<128>, bigint)
 #define ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(OP) \
@@ -2605,6 +2688,8 @@ ASSERT_BIN_OP_RESULT_TYPE_TESTS(*);
 ASSERT_BIN_OP_RESULT_TYPE_TESTS(/);
 ASSERT_BIN_OP_RESULT_TYPE_TESTS(%);
 
+ASSERT_BIN_OP_RESULT_TYPE_TESTS(DIVMOD_QUO);
+
 ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(+);
 ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(-);
 
@@ -2613,6 +2698,10 @@ ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(|);
 ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(^);
 
 ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(*);
+ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(/);
+ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(%);
+
+ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(DIVMOD_QUO);
 
 // --------------------------------------------
 
@@ -2637,6 +2726,11 @@ ASSERT_BIN_OP_CONSTEXPR(-);
 ASSERT_BIN_OP_CONSTEXPR(&);
 ASSERT_BIN_OP_CONSTEXPR(|);
 ASSERT_BIN_OP_CONSTEXPR(^);
+
+ASSERT_BIN_OP_CONSTEXPR(/);
+ASSERT_BIN_OP_CONSTEXPR(%);
+
+ASSERT_BIN_OP_CONSTEXPR(DIVMOD_QUO);
 
 ASSERT_UNARY_OP_CONSTEXPR((bool));
 ASSERT_UNARY_OP_CONSTEXPR(!);
@@ -2668,11 +2762,12 @@ int main()
 	extract_termpos_tests();
 	compound_assignment();
 	mixed_sign_comparison_tests();
+	self_compound_assignment();
 
 	// -- benchmarks -- //
 
 	benchmark_binary("multiply ", 200000, 20000, 1000, 5000, [](const auto &a, const auto &b) { return a * b; });
-	benchmark_binary("divmod   ", 4000, 2000, 100, 500, [](const auto &a, const auto &b) { return detail::divmod(a, b); });
+	benchmark_binary("divmod   ", 4000, 2000, 100, 500, [](const auto &a, const auto &b) { return divmod(a, b); });
 	benchmark_binary("tostr dec", 1000, 1000, 100, 100, [fmt = tostr_fmt{}](const auto &a, const auto &b) { return fmt(a) + fmt(b); });
 	benchmark_binary("tostr hex", 1000, 1000, 1000, 1000, [fmt = tostr_fmt{ 16 }](const auto &a, const auto &b) { return fmt(a) + fmt(b); });
 	benchmark_binary("tostr oct", 1000, 1000, 1000, 1000, [fmt = tostr_fmt{ 8 }](const auto &a, const auto &b) { return fmt(a) + fmt(b); });

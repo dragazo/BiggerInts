@@ -678,8 +678,27 @@ namespace BiggerInts
 				return *this;
 			}
 
-			constexpr fixed_int &operator/=(const fixed_int &other) noexcept { *this = divmod(*this, other).first; return *this; }
-			constexpr fixed_int &operator%=(const fixed_int &other) noexcept { *this = divmod(*this, other).second; return *this; }
+			template<std::uint64_t _bits, bool _sign>
+			constexpr fixed_int &operator/=(const fixed_int<_bits, _sign> &other) noexcept
+			{
+				if constexpr (bits >= _bits) *this = BiggerInts::divmod(*this, other).first;
+				else *this = (fixed_int)BiggerInts::divmod(*this, other).first;
+				return *this;
+			}
+			template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+			constexpr fixed_int &operator/=(T val) noexcept { *this = BiggerInts::divmod(*this, val).first; return *this; }
+			fixed_int &operator/=(const bigint &other) noexcept { *this = (fixed_int)BiggerInts::divmod(*this, other).first; return *this; } // divmod is special - we need to upcast to bigint and downcast result in order to be correct
+
+			template<std::uint64_t _bits, bool _sign>
+			constexpr fixed_int &operator%=(const fixed_int<_bits, _sign> &other) noexcept
+			{
+				if constexpr (bits >= _bits) *this = BiggerInts::divmod(*this, other).second;
+				else *this = (fixed_int)BiggerInts::divmod(*this, other).second;
+				return *this;
+			}
+			template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+			constexpr fixed_int &operator%=(T val) noexcept { *this = BiggerInts::divmod(*this, val).second; return *this; }
+			fixed_int &operator%=(const bigint &other) noexcept { *this = (fixed_int)BiggerInts::divmod(*this, other).second; return *this; } // divmod is special - we need to upcast to bigint and downcast result in order to be correct
 
 		public: // -- limits aliases -- //
 
@@ -1019,12 +1038,7 @@ namespace BiggerInts
 
 		void divmod_unchecked_positive_already_zero(bigint &quo, bigint &rem, const bigint &num, const bigint &den);
 		std::pair<bigint, bigint> divmod_unchecked_positive(const bigint &num, const bigint &den);
-
-		std::pair<bigint, bigint> divmod(const bigint &a, const bigint &b);
-		std::pair<bigint, bigint> divmod(bigint &&a, const bigint &b);
-		std::pair<bigint, bigint> divmod(const bigint &a, bigint &&b);
-		std::pair<bigint, bigint> divmod(bigint &&a, bigint &&b);
-
+		
 		[[nodiscard]] bigint operator/(const bigint &num, const bigint &den);
 		[[nodiscard]] bigint operator/(bigint &&num, const bigint &den);
 		[[nodiscard]] bigint operator/(const bigint &num, bigint &&den);
@@ -1035,36 +1049,19 @@ namespace BiggerInts
 		[[nodiscard]] bigint operator%(const bigint &num, bigint &&den);
 		[[nodiscard]] bigint operator%(bigint &&num, bigint &&den);
 
-		template<std::uint64_t bits>
-		constexpr std::pair<fixed_int<bits, false>, fixed_int<bits, false>> divmod(const fixed_int<bits, false> &num, const fixed_int<bits, false> &den)
-		{
-			if (!detail::nonzero(wrap(den))) throw std::domain_error("divide by zero");
-			std::pair<fixed_int<bits, false>, fixed_int<bits, false>> res(0ull, 0ull); // must initialize these to zero
-			detail::divmod_unchecked_positive_already_zero(wrap(res.first), wrap(res.second), wrap(num), wrap(den));
-			return res;
-		}
-		template<std::uint64_t bits>
-		constexpr std::pair<fixed_int<bits, true>, fixed_int<bits, true>> divmod(const fixed_int<bits, true> &num, const fixed_int<bits, true> &den)
-		{
-			if (!detail::nonzero(wrap(den))) throw std::domain_error("divide by zero");
-			std::pair<fixed_int<bits, true>, fixed_int<bits, true>> res(0ull, 0ull); // must initialize these to zero
-			fixed_int<bits, true> num_cpy = num;
-			fixed_int<bits, true> den_cpy = den;
-			detail::divmod_unchecked_already_zero(wrap(res.first), wrap(res.second), wrap(num_cpy), wrap(den_cpy));
-			return res;
-		}
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		[[nodiscard]] constexpr auto operator/(const fixed_int<bits_1, sign_1> &num, const fixed_int<bits_2, sign_2> &den) { return BiggerInts::divmod(num, den).first; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+		[[nodiscard]] constexpr auto operator/(const fixed_int<bits, sign> &num, T den) noexcept { return BiggerInts::divmod(num, den).first; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+		[[nodiscard]] constexpr auto operator/(T num, const fixed_int<bits, sign> &den) noexcept { return BiggerInts::divmod(num, den).first; }
 
-		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator/(const fixed_int<bits, sign> &num, const fixed_int<bits, sign> &den) { return divmod(num, den).first; }
-		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>[[nodiscard]] constexpr auto operator/(const fixed_int<bits_1, sign> &a, const fixed_int<bits_2, sign> &b) { return detail::operator/<detail::max(bits_1, bits_2), sign>(a, b); }
-
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator/(const fixed_int<bits, sign> &a, T b) { return a / (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator/(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a / b; }
-
-		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator%(const fixed_int<bits, sign> &num, const fixed_int<bits, sign> &den) { return divmod(num, den).second; }
-		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>[[nodiscard]] constexpr auto operator%(const fixed_int<bits_1, sign> &a, const fixed_int<bits_2, sign> &b) { return detail::operator%<detail::max(bits_1, bits_2), sign>(a, b); }
-
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator%(const fixed_int<bits, sign> &a, T b) { return a % (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator%(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a % b; }
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		[[nodiscard]] constexpr auto operator%(const fixed_int<bits_1, sign_1> &num, const fixed_int<bits_2, sign_2> &den) { return BiggerInts::divmod(num, den).second; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+		[[nodiscard]] constexpr auto operator%(const fixed_int<bits, sign> &num, T den) noexcept { return BiggerInts::divmod(num, den).second; }
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+		[[nodiscard]] constexpr auto operator%(T num, const fixed_int<bits, sign> &den) noexcept { return BiggerInts::divmod(num, den).second; }
 
 		// -- cmp -- //
 
@@ -1198,6 +1195,40 @@ namespace BiggerInts
 		if constexpr (detail::is_biggerints_type<T>::value) return detail::cmp_raw(a, b);
 		else return -detail::cmp_raw(b, a);
 	}
+
+	// performs both division and modulus with the specified arguments. returns a pair of values: (quotient, remainder).
+	// as with normal division and modulus, throws std::domain_error if the denominator is zero.
+	template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+	[[nodiscard]] constexpr auto divmod(const detail::fixed_int<bits_1, sign_1> &num, const detail::fixed_int<bits_2, sign_2> &den)
+	{
+		typedef detail::mix_result_t<bits_1, sign_1, bits_2, sign_2> res_t;
+
+		if constexpr (bits_1 == bits_2)
+		{
+			if (!detail::nonzero(wrap(den))) throw std::domain_error("divide by zero");
+			std::pair<res_t, res_t> res(0ull, 0ull); // must initialize these to zero
+
+			if constexpr (sign_1 && sign_2)
+			{
+				auto num_cpy = num;
+				auto den_cpy = den;
+				detail::divmod_unchecked_already_zero(wrap(res.first), wrap(res.second), wrap(num_cpy), wrap(den_cpy));
+			}
+			else detail::divmod_unchecked_positive_already_zero(wrap(res.first), wrap(res.second), wrap(num), wrap(den));
+
+			return res;
+		}
+		else if constexpr (bits_1 < bits_2) return BiggerInts::divmod((res_t)num, den);
+		else return BiggerInts::divmod(num, (res_t)den);
+	}
+	template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+	[[nodiscard]] constexpr auto divmod(const detail::fixed_int<bits, sign> &num, T den) { return BiggerInts::divmod(num, (detail::fixed_int<bits, std::is_signed_v<T>>)den); }
+	template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+	[[nodiscard]] constexpr auto divmod(T num, const detail::fixed_int<bits, sign> &den) { return BiggerInts::divmod((detail::fixed_int<bits, std::is_signed_v<T>>)num, den); }
+	[[nodiscard]] std::pair<bigint, bigint> divmod(const bigint &num, const bigint &den);
+	[[nodiscard]] std::pair<bigint, bigint> divmod(bigint &&num, const bigint &den);
+	[[nodiscard]] std::pair<bigint, bigint> divmod(const bigint &num, bigint &&den);
+	[[nodiscard]] std::pair<bigint, bigint> divmod(bigint &&num, bigint &&den);
 }
 
 // -- std info definitions -- //

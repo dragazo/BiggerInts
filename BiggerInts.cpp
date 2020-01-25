@@ -604,20 +604,20 @@ std::pair<bigint, bigint> _divmod(U &&a, V &&b)
 	return _divmod_unchecked(std::forward<U>(a), std::forward<V>(b));
 }
 
-std::pair<bigint, bigint> detail::divmod(const bigint &a, const bigint &b) { return _divmod(a, b); }
-std::pair<bigint, bigint> detail::divmod(bigint &&a, const bigint &b) { return _divmod(std::move(a), b); }
-std::pair<bigint, bigint> detail::divmod(const bigint &a, bigint &&b) { return _divmod(a, std::move(b)); }
-std::pair<bigint, bigint> detail::divmod(bigint &&a, bigint &&b) { return _divmod(std::move(a), std::move(b)); }
+std::pair<bigint, bigint> BiggerInts::divmod(const bigint &a, const bigint &b) { return _divmod(a, b); }
+std::pair<bigint, bigint> BiggerInts::divmod(bigint &&a, const bigint &b) { return _divmod(std::move(a), b); }
+std::pair<bigint, bigint> BiggerInts::divmod(const bigint &a, bigint &&b) { return _divmod(a, std::move(b)); }
+std::pair<bigint, bigint> BiggerInts::divmod(bigint &&a, bigint &&b) { return _divmod(std::move(a), std::move(b)); }
 
-bigint detail::operator/(const bigint &num, const bigint &den) { return detail::divmod(num, den).first; }
-bigint detail::operator/(bigint &&num, const bigint &den) { return detail::divmod(std::move(num), den).first; }
-bigint detail::operator/(const bigint &num, bigint &&den) { return detail::divmod(num, std::move(den)).first; }
-bigint detail::operator/(bigint &&num, bigint &&den) { return detail::divmod(std::move(num), std::move(den)).first; }
+bigint detail::operator/(const bigint &num, const bigint &den) { return BiggerInts::divmod(num, den).first; }
+bigint detail::operator/(bigint &&num, const bigint &den) { return BiggerInts::divmod(std::move(num), den).first; }
+bigint detail::operator/(const bigint &num, bigint &&den) { return BiggerInts::divmod(num, std::move(den)).first; }
+bigint detail::operator/(bigint &&num, bigint &&den) { return BiggerInts::divmod(std::move(num), std::move(den)).first; }
 
-bigint detail::operator%(const bigint &num, const bigint &den) { return detail::divmod(num, den).second; }
-bigint detail::operator%(bigint &&num, const bigint &den) { return detail::divmod(std::move(num), den).second; }
-bigint detail::operator%(const bigint &num, bigint &&den) { return detail::divmod(num, std::move(den)).second; }
-bigint detail::operator%(bigint &&num, bigint &&den) { return detail::divmod(std::move(num), std::move(den)).second; }
+bigint detail::operator%(const bigint &num, const bigint &den) { return BiggerInts::divmod(num, den).second; }
+bigint detail::operator%(bigint &&num, const bigint &den) { return BiggerInts::divmod(std::move(num), den).second; }
+bigint detail::operator%(const bigint &num, bigint &&den) { return BiggerInts::divmod(num, std::move(den)).second; }
+bigint detail::operator%(bigint &&num, bigint &&den) { return BiggerInts::divmod(std::move(num), std::move(den)).second; }
 
 bigint &bigint::operator/=(const bigint &den)
 {
