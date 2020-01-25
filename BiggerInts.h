@@ -514,7 +514,7 @@ namespace BiggerInts
 			constexpr fixed_int(const fixed_int&) noexcept = default;
 			constexpr fixed_int &operator=(const fixed_int&) noexcept = default;
 
-			constexpr fixed_int(const fixed_int<bits, !sign> &other) noexcept { *this = other; }
+			constexpr fixed_int(const fixed_int<bits, !sign> &other) noexcept : blocks{} { *this = other; }
 			constexpr fixed_int &operator=(const fixed_int<bits, !sign> &other) noexcept { detail::demote(wrap(*this), wrap(other)); return *this; }
 
 		public: // -- promotion constructors -- //
@@ -656,7 +656,27 @@ namespace BiggerInts
 				return *this;
 			}
 
-			constexpr fixed_int &operator*=(const fixed_int &other) noexcept { *this = *this * other; return *this; }
+			template<std::uint64_t _bits, bool _sign>
+			constexpr fixed_int &operator*=(const fixed_int<_bits, _sign> &other) noexcept
+			{
+				if constexpr (bits <= _bits)
+				{
+					const auto cpy = *this;
+					detail::set_zero(wrap(*this));
+					const std::uint64_t *other_view = other.blocks;
+					if constexpr (bits == _bits && sign == _sign) { if (this == &other) other_view = cpy.blocks; } // if other is the same type as this then we need to worry about 'val *= val;'
+					detail::multiply_same_size_already_zero(wrap(*this), wrap(cpy), { other_view, bits / 64 });
+					return *this;
+				}
+				else { return *this *= (fixed_int<bits, !sign>)other; } // cast to opposite sign to avoid the self-referencing check at compile time
+			}
+			template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+			constexpr fixed_int &operator*=(T val) noexcept { *this = *this * val; return *this; }
+			fixed_int &operator*=(const bigint &other) noexcept
+			{
+				if (std::uint64_t v = (std::uint64_t)other; other == v) *this = *this * v; else *this = *this * (fixed_int<bits, !sign>)other; // if other is u64 we can use optimized impl, otherwise downcast and do slow way (opposite sign cast - see above)
+				return *this;
+			}
 
 			constexpr fixed_int &operator/=(const fixed_int &other) noexcept { *this = divmod(*this, other).first; return *this; }
 			constexpr fixed_int &operator%=(const fixed_int &other) noexcept { *this = divmod(*this, other).second; return *this; }
@@ -961,6 +981,7 @@ namespace BiggerInts
 		[[nodiscard]] bigint operator+(bigint &&a);
 
 		template<std::uint64_t bits> [[nodiscard]] constexpr fixed_int<bits, true> operator-(const fixed_int<bits, true> &a) noexcept { fixed_int<bits, true> res = a; detail::make_neg(wrap(res)); return res; }
+		template<std::uint64_t bits> [[nodiscard]] constexpr fixed_int<bits, false> operator-(const fixed_int<bits, false> &a) noexcept = delete;
 
 		[[nodiscard]] bigint operator-(const bigint &a);
 		[[nodiscard]] bigint operator-(bigint &&a);
@@ -972,11 +993,22 @@ namespace BiggerInts
 
 		// -- mul -- //
 
-		template<std::uint64_t bits, bool sign> [[nodiscard]] constexpr fixed_int<bits, sign> operator*(const fixed_int<bits, sign> &a, const fixed_int<bits, sign> &b) noexcept { fixed_int<bits, sign> res = 0ull; detail::multiply_same_size_already_zero(wrap(res), wrap(a), wrap(b)); return res; }
-		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign> [[nodiscard]] constexpr auto operator*(const fixed_int<bits_1, sign> &a, const fixed_int<bits_2, sign> &b) { return detail::operator*<detail::max(bits_1, bits_2), sign>(a, b); }
-
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator*(const fixed_int<bits, sign> &a, T b) { return a * (fixed_int<bits, sign>)b; }
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0> [[nodiscard]] constexpr fixed_int<bits, sign> operator*(T a, const fixed_int<bits, sign> &b) { return (fixed_int<bits, sign>)a * b; }
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		[[nodiscard]] constexpr auto operator*(const fixed_int<bits_1, sign_1> &a, const fixed_int<bits_2, sign_2> &b) noexcept
+		{
+			typedef mix_result_t<bits_1, sign_1, bits_2, sign_2> mix_t;
+			if constexpr (bits_1 == bits_2) { mix_t res = 0ull; detail::multiply_same_size_already_zero(wrap(res), wrap(a), wrap(b)); return res; }
+			else if constexpr (bits_1 < bits_2) return (mix_t)a * b;
+			else return a * (mix_t)b;
+		}
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+		[[nodiscard]] constexpr auto operator*(const fixed_int<bits, sign> &a, T b) noexcept
+		{
+			if constexpr (std::is_unsigned_v<T>) { fixed_int<bits, sign> res = 0ull; detail::multiply_u64_already_zero(wrap(res), wrap(a), (std::uint64_t)b); return res; }
+			else return a * (fixed_int<bits, true>)b;
+		}
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+		[[nodiscard]] constexpr auto operator*(T a, const fixed_int<bits, sign> &b) noexcept { return b * a; }
 
 		[[nodiscard]] bigint operator*(const bigint &a, const bigint &b);
 		[[nodiscard]] bigint operator*(bigint &&a, const bigint &b);
@@ -1039,7 +1071,7 @@ namespace BiggerInts
 		template<bool sign>
 		constexpr int cmp_wrapped_wrapped(const_fixed_int_wrapper a, const_fixed_int_wrapper b) noexcept
 		{
-			if (b.blocks_n > a.blocks_n) return -cmp_wrapped_wrapped<sign>(b, a); // wolog let a be at least as large as b (in physical size)
+			if (b.blocks_n > a.blocks_n) return -detail::cmp_wrapped_wrapped<sign>(b, a); // wolog let a be at least as large as b (in physical size)
 			else
 			{
 				if constexpr (sign)
@@ -1060,7 +1092,7 @@ namespace BiggerInts
 					}
 				}
 
-				for (std::size_t i = b.blocks_n; i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i] ? -1 : 1; // otherwise base becision on first different block
+				for (std::size_t i = b.blocks_n; i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i] ? -1 : 1; // otherwise base decision on first different block
 
 				return 0; // otherwise they're equal
 			}
@@ -1070,42 +1102,65 @@ namespace BiggerInts
 		{
 			std::uint64_t fill = 0;
 			if constexpr (sign) fill = val < 0 ? 0xffffffffffffffffull : 0ull;
-			for (std::size_t i = a.blocks_n - 1; i > 0; --i) if (a.blocks[i] != fill)
+			for (std::size_t i = a.blocks_n - 1; i > 0; --i) if (a.blocks[i] != fill) // if a has higher magnitude than b we can tell (immediately for unsigned, or from sign bit for signed)
 			{
 				if constexpr (!sign) return 1;
 				else return detail::is_neg(a) ? -1 : 1;
 			}
-			if (a.blocks[0] != (std::uint64_t)val)
-			{
-				if constexpr (!sign) return a.blocks[0] < (std::uint64_t)val ? -1 : 1;
-				else return a.blocks[0] < (std::uint64_t)val ? 1 : -1;
-			}
+			if (a.blocks[0] != (std::uint64_t)val) return a.blocks[0] < (std::uint64_t)val ? -1 : 1; // otherwise base decision on first different block
 			return 0;
 		}
 		int cmp_bigint_builtin(const bigint &a, long long val) noexcept;
 		int cmp_bigint_builtin(const bigint &a, unsigned long long val) noexcept;
 		
-		template<std::uint64_t bits_1, std::uint64_t bits_2, bool sign>
-		constexpr int cmp_helper(const detail::fixed_int<bits_1, sign> &a, const detail::fixed_int<bits_2, sign> &b) noexcept { return detail::cmp_wrapped_wrapped<sign>(wrap(a), wrap(b)); }
+		// -----------------------------------------------------------------------
 
-		template<std::uint64_t bits, bool sign>
-		constexpr int cmp_helper(const detail::fixed_int<bits, sign> &a, std::conditional_t<sign, long long, unsigned long long> val) noexcept { return detail::cmp_wrapped_builtin<sign>(wrap(a), val); }
-		template<std::uint64_t bits, bool sign>
-		constexpr int cmp_helper(std::conditional_t<sign, long long, unsigned long long> val, const detail::fixed_int<bits, sign> &a) noexcept { return -detail::cmp_wrapped_builtin<sign>(wrap(a), val); }
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		constexpr int cmp_raw(const fixed_int<bits_1, sign_1> &a, const fixed_int<bits_2, sign_2> &b) noexcept
+		{
+			if constexpr (sign_1 == sign_2) return detail::cmp_wrapped_wrapped<sign_1>(wrap(a), wrap(b)); // if signs are same we're good to go
+			else
+			{
+				if constexpr (sign_1) { if (detail::is_neg(wrap(a))) return -1; } // use negative discrimination
+				else { if (detail::is_neg(wrap(b))) return 1; }
 
-		int cmp_helper(const bigint &a, const bigint &b) noexcept;
+				return detail::cmp_wrapped_wrapped<false>(wrap(a), wrap(b)); // otherwise both are positive, so perform unsigned comparison
+			}
+		}
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+		constexpr int cmp_raw(const fixed_int<bits, sign> &a, T b) noexcept
+		{
+			if constexpr (sign == std::is_signed_v<T>) return detail::cmp_wrapped_builtin<sign>(wrap(a), b); // if signs are same we're good to go
+			else
+			{
+				if constexpr (sign) { if (detail::is_neg(wrap(a))) return -1; } // use negative discrimination
+				else { if (b < 0) return 1; } // < 0 test directly because b is a built-in int type
 
-		inline int cmp_helper(const bigint &a, long long val) noexcept { return cmp_bigint_builtin(a, val); }
-		inline int cmp_helper(long long val, const bigint &a) noexcept { return -cmp_bigint_builtin(a, val); }
+				return detail::cmp_wrapped_builtin<false>(wrap(a), b); // otherwise both are positive, so perform unsigned comparison
+			}
+		}
 
-		template<typename T, typename U> inline constexpr bool comparable = (detail::is_biggerints_type<T>::value || detail::is_biggerints_type<U>::value) && std::is_signed_v<T> == std::is_signed_v<U>;
+		int cmp_raw(const bigint &a, const bigint &b) noexcept;
 
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator==(const T &a, const U &b) noexcept { return cmp_helper(a, b) == 0; }
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator!=(const T &a, const U &b) noexcept { return cmp_helper(a, b) != 0; }
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator<(const T &a, const U &b) noexcept { return cmp_helper(a, b) < 0; }
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator<=(const T &a, const U &b) noexcept { return cmp_helper(a, b) <= 0; }
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator>(const T &a, const U &b) noexcept { return cmp_helper(a, b) > 0; }
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator>=(const T &a, const U &b) noexcept { return cmp_helper(a, b) >= 0; }
+		template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+		int cmp_raw(const bigint &a, T val) noexcept
+		{
+			if constexpr (std::is_signed_v<T>) return detail::cmp_bigint_builtin(a, (long long)val);
+			else return detail::cmp_bigint_builtin(a, (unsigned long long)val);
+		}
+
+		// -----------------------------------------------------------------------
+
+		template<typename T> inline constexpr bool is_biggerints_or_builtin = detail::is_biggerints_type<T>::value || detail::is_builtin_int<T>::value;
+
+		template<typename T, typename U> inline constexpr bool comparable = (detail::is_biggerints_type<T>::value && detail::is_biggerints_or_builtin<U>) || (detail::is_biggerints_type<U>::value && detail::is_biggerints_or_builtin<T>);
+
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator==(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) == 0; }
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator!=(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) != 0; }
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator<(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) < 0; }
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator<=(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) <= 0; }
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator>(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) > 0; }
+		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator>=(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) >= 0; }
 
 		// -- io -- //
 
@@ -1138,7 +1193,11 @@ namespace BiggerInts
 
 	// returns -1 if a < b, 1 if a > b, or 0 if a == b
 	template<typename T, typename U, std::enable_if_t<detail::comparable<T, U>, int> = 0>
-	[[nodiscard]] constexpr int cmp(const T &a, const U &b) noexcept { return detail::cmp_helper(a, b); }
+	[[nodiscard]] constexpr int cmp(const T &a, const U &b) noexcept
+	{
+		if constexpr (detail::is_biggerints_type<T>::value) return detail::cmp_raw(a, b);
+		else return -detail::cmp_raw(b, a);
+	}
 }
 
 // -- std info definitions -- //

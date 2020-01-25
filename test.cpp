@@ -2381,7 +2381,7 @@ void extract_termpos_tests()
 		assert(ss.get() == 'x');
 	}
 }
-void compount_assignment()
+void compound_assignment()
 {
 	{
 		uint_t<256> v = 0u;
@@ -2462,6 +2462,88 @@ void compount_assignment()
 		v ^= bigint{1}; assert(v == 2u);
 		v ^= bigint{1}; assert(v == 3u);
 	}
+	{
+		uint_t<256> v = 3;
+
+		v *= uint_t<128>{2}; assert(v == 6u);
+		v *= uint_t<256>{2}; assert(v == 12u);
+		v *= uint_t<512>{2}; assert(v == 24u);
+		v *= int_t<128>{2}; assert(v == 48u);
+		v *= int_t<256>{2}; assert(v == 96u);
+		v *= int_t<512>{2}; assert(v == 192u);
+		v *= bigint{2}; assert(v == 384u);
+		v *= int{2}; assert(v == 768u);
+		v *= unsigned{2}; assert(v == 1536u);
+		v *= long{2}; assert(v == 3072u);
+		v *= unsigned long{2}; assert(v == 6144u);
+	}
+}
+void mixed_sign_comparison_tests()
+{
+	assert(cmp(uint_t<256>(4), 4) == 0);
+	assert(cmp(int_t<256>(4), 4u) == 0);
+	assert(cmp(bigint(4), 4u) == 0);
+	assert(cmp(bigint(4), 4) == 0);
+
+	assert(cmp(uint_t<256>(4), 5) == -1);
+	assert(cmp(int_t<256>(4), 5u) == -1);
+	assert(cmp(bigint(4), 5u) == -1);
+	assert(cmp(bigint(4), 5) == -1);
+
+	assert(cmp(uint_t<256>(4), 3) == 1);
+	assert(cmp(int_t<256>(4), 3u) == 1);
+	assert(cmp(bigint(4), 3u) == 1);
+	assert(cmp(bigint(4), 3) == 1);
+
+	assert(cmp(int_t<256>(4), 5) == -1);
+	assert(cmp(int_t<256>(4), 3) == 1);
+	assert(cmp(uint_t<256>(4), 5u) == -1);
+	assert(cmp(uint_t<256>(4), 3u) == 1);
+
+	assert(cmp(int_t<256>(4), int_t<256>(5)) == -1);
+	assert(cmp(int_t<256>(4), int_t<256>(3)) == 1);
+	assert(cmp(uint_t<256>(4), uint_t<256>(5)) == -1);
+	assert(cmp(uint_t<256>(4), uint_t<256>(3)) == 1);
+
+	assert(cmp(int_t<256>(4), int_t<512>(5)) == -1);
+	assert(cmp(int_t<256>(4), int_t<512>(3)) == 1);
+	assert(cmp(uint_t<256>(4), uint_t<512>(5)) == -1);
+	assert(cmp(uint_t<256>(4), uint_t<512>(3)) == 1);
+
+	assert(cmp(int_t<512>(4), int_t<256>(5)) == -1);
+	assert(cmp(int_t<512>(4), int_t<256>(3)) == 1);
+	assert(cmp(uint_t<512>(4), uint_t<256>(5)) == -1);
+	assert(cmp(uint_t<512>(4), uint_t<256>(3)) == 1);
+
+	assert(cmp(4, uint_t<256>(4)) == 0);
+	assert(cmp(4u, int_t<256>(4)) == 0);
+	assert(cmp(4u, bigint(4)) == 0);
+	assert(cmp(4, bigint(4)) == 0);
+
+	assert(cmp(int_t<256>(-4), -4) == 0);
+	assert(cmp(int_t<256>(-4), (unsigned long long)-4) == -1);
+	assert(cmp(uint_t<256>(-4), -4) == 1);
+	assert(cmp(bigint(-4), -4) == 0);
+	
+	assert(cmp(-4, int_t<256>(-4)) == 0);
+	assert(cmp((unsigned long)-4, int_t<256>(-4)) == 1);
+	assert(cmp(-4, uint_t<256>(-4)) == -1);
+	assert(cmp(-4, bigint(-4)) == 0);
+
+	assert(cmp(uint_t<256>(-4), uint_t<256>(-4)) == 0);
+	assert(cmp(uint_t<256>(-4), int_t<256>(-4)) == 1);
+	assert(cmp(int_t<256>(-4), uint_t<256>(-4)) == -1);
+	assert(cmp(int_t<256>(-4), int_t<256>(-4)) == 0);
+
+	assert(cmp(uint_t<128>(-4), uint_t<256>(-4)) == -1);
+	assert(cmp(uint_t<128>(-4), int_t<256>(-4)) == 1);
+	assert(cmp(int_t<128>(-4), uint_t<256>(-4)) == -1);
+	assert(cmp(int_t<128>(-4), int_t<256>(-4)) == 0);
+
+	assert(cmp(uint_t<256>(-4), uint_t<128>(-4)) == 1);
+	assert(cmp(uint_t<256>(-4), int_t<128>(-4)) == 1);
+	assert(cmp(int_t<256>(-4), uint_t<128>(-4)) == -1);
+	assert(cmp(int_t<256>(-4), int_t<128>(-4)) == 0);
 }
 
 // --------------------------------------------
@@ -2530,6 +2612,38 @@ ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(&);
 ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(|);
 ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(^);
 
+ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(*);
+
+// --------------------------------------------
+
+#define _MERGE(A, B) A##B
+#define MERGE(A, B) _MERGE(A, B)
+
+#define ASSERT_BIN_OP_CONSTEXPR(OP) \
+	static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_1_, __LINE__) = (uint_t<256>)1 OP (uint_t<256>)1; \
+	static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_2_, __LINE__) = (int_t<256>)1 OP (uint_t<256>)1; \
+	static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_3_, __LINE__) = (uint_t<256>)1 OP (int_t<256>)1; \
+	static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_4_, __LINE__) = (int_t<256>)1 OP (int_t<256>)1
+
+#define ASSERT_UNARY_OP_CONSTEXPR_UNSIGNED(OP) static constexpr auto MERGE(CONSTEXPR_TEST_UNARY_OP_1_, __LINE__) = OP (uint_t<256>)1
+#define ASSERT_UNARY_OP_CONSTEXPR_SIGNED(OP) static constexpr auto MERGE(CONSTEXPR_TEST_UNARY_OP_2_, __LINE__) = OP (int_t<256>)1
+#define ASSERT_UNARY_OP_CONSTEXPR(OP) \
+	ASSERT_UNARY_OP_CONSTEXPR_UNSIGNED(OP); \
+	ASSERT_UNARY_OP_CONSTEXPR_SIGNED(OP)
+
+ASSERT_BIN_OP_CONSTEXPR(+);
+ASSERT_BIN_OP_CONSTEXPR(-);
+
+ASSERT_BIN_OP_CONSTEXPR(&);
+ASSERT_BIN_OP_CONSTEXPR(|);
+ASSERT_BIN_OP_CONSTEXPR(^);
+
+ASSERT_UNARY_OP_CONSTEXPR((bool));
+ASSERT_UNARY_OP_CONSTEXPR(!);
+ASSERT_UNARY_OP_CONSTEXPR(!!);
+ASSERT_UNARY_OP_CONSTEXPR(~);
+ASSERT_UNARY_OP_CONSTEXPR_SIGNED(-);
+
 // --------------------------------------------
 
 int main()
@@ -2552,7 +2666,8 @@ int main()
 	factorial_tests();
 	divmod_sign_tests();
 	extract_termpos_tests();
-	compount_assignment();
+	compound_assignment();
+	mixed_sign_comparison_tests();
 
 	// -- benchmarks -- //
 

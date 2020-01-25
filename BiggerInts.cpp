@@ -87,7 +87,7 @@ bool detail::cmp_less_non_negative(const bigint &a, const bigint &b) noexcept //
 	for (std::size_t i = a.blocks.size(); i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i];
 	return false;
 }
-int detail::cmp_helper(const bigint &a, const bigint &b) noexcept
+int detail::cmp_raw(const bigint &a, const bigint &b) noexcept
 {
 	const bool a_neg = detail::is_neg(a);
 	const bool b_neg = detail::is_neg(b);
