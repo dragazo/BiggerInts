@@ -714,7 +714,6 @@ void simple_parse_tests()
 	uint_t<512> temp_u512;
 	int_t<512> temp_i512;
 	uint_t<256> temp_u256;
-	int_t<256> temp_i256;
 
 	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, "- 18"));
 	assert_throws(std::invalid_argument, uint_t<512>::parse(temp_u512, "+ 18"));
@@ -2472,10 +2471,10 @@ void compound_assignment()
 		v *= int_t<256>{2}; assert(v == 96u);
 		v *= int_t<512>{2}; assert(v == 192u);
 		v *= bigint{2}; assert(v == 384u);
-		v *= int{2}; assert(v == 768u);
-		v *= unsigned{2}; assert(v == 1536u);
-		v *= long{2}; assert(v == 3072u);
-		v *= unsigned long{2}; assert(v == 6144u);
+		v *= (int)2; assert(v == 768u);
+		v *= (unsigned)2; assert(v == 1536u);
+		v *= (long)2; assert(v == 3072u);
+		v *= (unsigned long)2; assert(v == 6144u);
 	}
 	{
 		uint_t<256> v = 0x8000000000000000ull;
@@ -2487,10 +2486,10 @@ void compound_assignment()
 		v /= int_t<256>{2}; assert(v == 0x400000000000000ull);
 		v /= int_t<512>{2}; assert(v == 0x200000000000000ull);
 		v /= bigint{ 2 }; assert(v == 0x100000000000000ull);
-		v /= int{ 2 }; assert(v == 0x80000000000000ull);
-		v /= unsigned{ 2 }; assert(v == 0x40000000000000ull);
-		v /= long{ 2 }; assert(v == 0x20000000000000ull);
-		v /= unsigned long{ 2 }; assert(v == 0x10000000000000ull);
+		v /= (int)2; assert(v == 0x80000000000000ull);
+		v /= (unsigned)2; assert(v == 0x40000000000000ull);
+		v /= (long)2; assert(v == 0x20000000000000ull);
+		v /= (unsigned long)2; assert(v == 0x10000000000000ull);
 	}
 	{
 		uint_t<256> v = 0xffffffffffffffffull;
@@ -2502,10 +2501,10 @@ void compound_assignment()
 		v %= int_t<256>{0x800000000000000ull}; assert(v == 0x7ffffffffffffffull);
 		v %= int_t<512>{0x400000000000000ull}; assert(v == 0x3ffffffffffffffull);
 		v %= bigint{ 0x200000000000000ull }; assert(v == 0x1ffffffffffffffull);
-		v %= int{ 0x1000000 }; assert(v == 0xffffffull);
-		v %= unsigned{ 0x800000 }; assert(v == 0x7fffffull);
-		v %= long{ 0x400000 }; assert(v == 0x3fffffull);
-		v %= unsigned long{ 0x200000 }; assert(v == 0x1fffffull);
+		v %= (int)0x1000000; assert(v == 0xffffffull);
+		v %= (unsigned)0x800000; assert(v == 0x7fffffull);
+		v %= (long)0x400000; assert(v == 0x3fffffull);
+		v %= (unsigned long)0x200000; assert(v == 0x1fffffull);
 	}
 }
 void mixed_sign_comparison_tests()
@@ -2709,13 +2708,13 @@ ASSERT_BIN_OP_RESULT_TYPE_TESTS_MIX(DIVMOD_QUO);
 #define MERGE(A, B) _MERGE(A, B)
 
 #define ASSERT_BIN_OP_CONSTEXPR(OP) \
-	static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_1_, __LINE__) = (uint_t<256>)1 OP (uint_t<256>)1; \
-	static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_2_, __LINE__) = (int_t<256>)1 OP (uint_t<256>)1; \
-	static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_3_, __LINE__) = (uint_t<256>)1 OP (int_t<256>)1; \
-	static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_4_, __LINE__) = (int_t<256>)1 OP (int_t<256>)1
+	[[maybe_unused]] static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_1_, __LINE__) = (uint_t<256>)1 OP (uint_t<256>)1; \
+	[[maybe_unused]] static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_2_, __LINE__) = (int_t<256>)1 OP (uint_t<256>)1; \
+	[[maybe_unused]] static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_3_, __LINE__) = (uint_t<256>)1 OP (int_t<256>)1; \
+	[[maybe_unused]] static constexpr auto MERGE(CONSTEXPR_TEST_BIN_OP_4_, __LINE__) = (int_t<256>)1 OP (int_t<256>)1
 
-#define ASSERT_UNARY_OP_CONSTEXPR_UNSIGNED(OP) static constexpr auto MERGE(CONSTEXPR_TEST_UNARY_OP_1_, __LINE__) = OP (uint_t<256>)1
-#define ASSERT_UNARY_OP_CONSTEXPR_SIGNED(OP) static constexpr auto MERGE(CONSTEXPR_TEST_UNARY_OP_2_, __LINE__) = OP (int_t<256>)1
+#define ASSERT_UNARY_OP_CONSTEXPR_UNSIGNED(OP) [[maybe_unused]] static constexpr auto MERGE(CONSTEXPR_TEST_UNARY_OP_1_, __LINE__) = OP (uint_t<256>)1
+#define ASSERT_UNARY_OP_CONSTEXPR_SIGNED(OP) [[maybe_unused]] static constexpr auto MERGE(CONSTEXPR_TEST_UNARY_OP_2_, __LINE__) = OP (int_t<256>)1
 #define ASSERT_UNARY_OP_CONSTEXPR(OP) \
 	ASSERT_UNARY_OP_CONSTEXPR_UNSIGNED(OP); \
 	ASSERT_UNARY_OP_CONSTEXPR_SIGNED(OP)

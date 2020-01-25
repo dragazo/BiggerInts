@@ -73,90 +73,35 @@ namespace BiggerInts
 
 		std::istream &extract_unsigned(fixed_int_wrapper res, std::istream &istr, int base);
 		std::istream &extract_signed(fixed_int_wrapper res, std::istream &istr, int base);
-	}
 
-	// represents a collection of formatting settings for parsing values from strings
-	struct parse_fmt
-	{
-		int base = 10; // the base to use for the conversion (must be 10, 16, 8, 2, or 0) (0 is prefix mode)
+		template<typename T, std::enable_if_t<std::is_trivial_v<T>, int> = 0> constexpr T min(T a, T b) noexcept { return a < b ? a : b; }
+		template<typename T, std::enable_if_t<std::is_trivial_v<T>, int> = 0> constexpr T max(T a, T b) noexcept { return a < b ? b : a; }
 
-		// sets all format settings to the defaults
-		constexpr parse_fmt() noexcept = default;
-		// creates a format settings object for the specified base
-		constexpr parse_fmt(int _base) noexcept : base(_base) {}
-		// extracts the format settings from the specified stream
-		explicit parse_fmt(const std::ios_base &stream);
+		// checks if T is a built-in integer type (signed or unsigned)
+		template<typename T> struct is_builtin_int : std::false_type {};
+		template<> struct is_builtin_int<unsigned short> : std::true_type {};
+		template<> struct is_builtin_int<unsigned int> : std::true_type {};
+		template<> struct is_builtin_int<unsigned long> : std::true_type {};
+		template<> struct is_builtin_int<unsigned long long> : std::true_type {};
+		template<> struct is_builtin_int<short> : std::true_type {};
+		template<> struct is_builtin_int<int> : std::true_type {};
+		template<> struct is_builtin_int<long> : std::true_type {};
+		template<> struct is_builtin_int<long long> : std::true_type {};
 
-		// attempts to convert str into an integer, storing the result in res. returns true on success.
-		template<std::uint64_t bits, bool sign>
-		[[nodiscard]] bool operator()(detail::fixed_int<bits, sign> &res, std::string_view str) const
-		{
-			if constexpr (sign) return try_parse_signed(wrap(res), str, base); else return try_parse_unsigned(wrap(res), str, base);
-		}
-		[[nodiscard]] bool operator()(detail::bigint &res, std::string_view str) const;
+		// checks if T is a biggerings type (signed or unsigned)
+		template<typename T> struct is_biggerints_type : std::false_type {};
+		template<std::uint64_t bits, bool sign> struct is_biggerints_type<fixed_int<bits, sign>> : std::true_type {};
+		template<> struct is_biggerints_type<bigint> : std::true_type {};
 
-		// converts str into an integer - throws on parse failure.
-		template<std::uint64_t bits, bool sign>
-		[[nodiscard]] detail::fixed_int<bits, sign> operator()(std::string_view str) const { detail::fixed_int<bits, sign> res; if (!operator()(res, str)) throw std::invalid_argument("failed to parse string"); return res; }
-		[[nodiscard]] detail::bigint operator()(std::string_view str) const;
+		// mixed type result
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		using mix_result_t = fixed_int<detail::max(bits_1, bits_2), (bits_1 > bits_2 ? sign_1 : bits_2 > bits_1 ? sign_2 : sign_1 == sign_2 ? sign_1 : false)>;
 
-		// attempts to extract a value from the stream, storing the result in res.
-		template<std::uint64_t bits, bool sign>
-		std::istream &operator()(detail::fixed_int<bits, sign> &res, std::istream &istr) const
-		{
-			if constexpr (sign) return extract_signed(wrap(res), istr, base); else return extract_unsigned(wrap(res), istr, base);
-		}
-		std::istream &operator()(detail::bigint &res, std::istream &istr) const;
-	};
-	// represents a collection of formatting settings for converting values to strings
-	struct tostr_fmt
-	{
-		int base = 10;          // the base to use for the conversion (must be 10, 16, 8, or 2)
-		bool showpos = false;   // if set to true positive values printed in decimal will have a '+' sign on the front
-		bool showbase = false;  // if set to true a radix prefix will be appended to the front of the string
-		bool uppercase = false; // if set to true alphabetic characters in the result will be uppercase
+		template<typename T> inline constexpr bool is_biggerints_or_builtin = detail::is_biggerints_type<T>::value || detail::is_builtin_int<T>::value;
 
-		// sets all format settings to the defaults
-		constexpr tostr_fmt() noexcept = default;
-		// creates a format settings object for the specified base
-		constexpr tostr_fmt(int _base) noexcept : base(_base) {}
-		// extracts the format settings from the specified stream
-		explicit tostr_fmt(const std::ios_base &stream);
+		template<typename T, typename U> inline constexpr bool comparable = (detail::is_biggerints_type<T>::value && detail::is_biggerints_or_builtin<U>) || (detail::is_biggerints_type<U>::value && detail::is_biggerints_or_builtin<T>);
 
-		// converts the value into a string using these conversion settings
-		template<std::uint64_t bits, bool sign>
-		[[nodiscard]] std::string operator()(const detail::fixed_int<bits, sign> &val) const
-		{
-			auto cpy = val;
-			if constexpr (sign) return detail::tostr_signed(detail::wrap(cpy), *this); else return detail::tostr_unsigned(detail::wrap(cpy), *this);
-		}
-		[[nodiscard]] std::string operator()(const detail::bigint &val) const;
-		[[nodiscard]] std::string operator()(detail::bigint &&val) const;
-
-		// returns the base that should be passed to a parsing function to parse a string created by this formatter
-		constexpr int parse_base() const noexcept { return showbase ? 0 : base; }
-		// returns a parser object that can be used to parse a string created by this formatter
-		constexpr parse_fmt parser() const noexcept { return parse_fmt{ parse_base() }; }
-	};
-	
-	namespace detail
-	{
-		// -- we need min and max, but not the other algorithms, so faster to just recreate here -- //
-
-		template<typename T, std::enable_if_t<std::is_trivial_v<T>, int> = 0>
-		constexpr T min(T a, T b) noexcept { return a < b ? a : b; }
-		template<typename T, std::enable_if_t<std::is_trivial_v<T>, int> = 0>
-		constexpr T max(T a, T b) noexcept { return a < b ? b : a; }
-
-		// -- fixed-sized int type selection -- //
-
-		template<std::uint64_t bits, bool sign> struct fixed_int_selector { typedef detail::fixed_int<bits, sign> type; };
-		template<bool sign> struct fixed_int_selector<64, sign> { typedef std::conditional_t<sign, std::int64_t, std::uint64_t> type; };
-		template<bool sign> struct fixed_int_selector<32, sign> { typedef std::conditional_t<sign, std::int32_t, std::uint32_t> type; };
-		template<bool sign> struct fixed_int_selector<16, sign> { typedef std::conditional_t<sign, std::int16_t, std::uint16_t> type; };
-		template<bool sign> struct fixed_int_selector<8, sign> { typedef std::conditional_t<sign, std::int8_t, std::uint8_t> type; };
-
-		// -- core fixed-sizes util -- //
+		// -- core operation utils -- //
 
 		constexpr bool is_pow2(std::uint64_t val) noexcept { return val != 0 && (val & (val - 1)) == 0; }
 
@@ -478,23 +423,211 @@ namespace BiggerInts
 		// works independent of size
 		void demote(fixed_int_wrapper a, const bigint &val) noexcept;
 
-		// -- custom intrinsics -- //
+		// -- comparison -- //
 
-		// checks if T is a built-in integer type (signed or unsigned)
-		template<typename T> struct is_builtin_int : std::false_type {};
-		template<> struct is_builtin_int<unsigned short> : std::true_type {};
-		template<> struct is_builtin_int<unsigned int> : std::true_type {};
-		template<> struct is_builtin_int<unsigned long> : std::true_type {};
-		template<> struct is_builtin_int<unsigned long long> : std::true_type {};
-		template<> struct is_builtin_int<short> : std::true_type {};
-		template<> struct is_builtin_int<int> : std::true_type {};
-		template<> struct is_builtin_int<long> : std::true_type {};
-		template<> struct is_builtin_int<long long> : std::true_type {};
+		// -- cmp -- //
 
-		// checks if T is a biggerings type (signed or unsigned)
-		template<typename T> struct is_biggerints_type : std::false_type {};
-		template<std::uint64_t bits, bool sign> struct is_biggerints_type<fixed_int<bits, sign>> : std::true_type {};
-		template<> struct is_biggerints_type<bigint> : std::true_type {};
+		template<bool sign>
+		constexpr int cmp_wrapped_wrapped(const_fixed_int_wrapper a, const_fixed_int_wrapper b) noexcept
+		{
+			if (b.blocks_n > a.blocks_n) return -detail::cmp_wrapped_wrapped<sign>(b, a); // wolog let a be at least as large as b (in physical size)
+			else
+			{
+				if constexpr (sign)
+				{
+					const bool a_neg = detail::is_neg(a);
+					const bool b_neg = detail::is_neg(b);
+					if (a_neg ^ b_neg) return a_neg ? -1 : 1; // if they have different signs we know right away
+				}
+
+				if (a.blocks_n > b.blocks_n)
+				{
+					std::uint64_t fill = 0;
+					if constexpr (sign) fill = detail::is_neg(b) ? 0xffffffffffffffffull : 0ull;
+					for (std::size_t i = a.blocks_n; i-- > b.blocks_n; ) if (a.blocks[i] != fill) // if a has higher magnitude than b we can tell (immediately for unsigned, or from sign bit for signed)
+					{
+						if constexpr (!sign) return 1;
+						else return detail::is_neg(a) ? -1 : 1;
+					}
+				}
+
+				for (std::size_t i = b.blocks_n; i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i] ? -1 : 1; // otherwise base decision on first different block
+
+				return 0; // otherwise they're equal
+			}
+		}
+		template<bool sign>
+		constexpr int cmp_wrapped_builtin(const_fixed_int_wrapper a, std::conditional_t<sign, long long, unsigned long long> val) noexcept
+		{
+			std::uint64_t fill = 0;
+			if constexpr (sign) fill = val < 0 ? 0xffffffffffffffffull : 0ull;
+			for (std::size_t i = a.blocks_n - 1; i > 0; --i) if (a.blocks[i] != fill) // if a has higher magnitude than b we can tell (immediately for unsigned, or from sign bit for signed)
+			{
+				if constexpr (!sign) return 1;
+				else return detail::is_neg(a) ? -1 : 1;
+			}
+			if (a.blocks[0] != (std::uint64_t)val) return a.blocks[0] < (std::uint64_t)val ? -1 : 1; // otherwise base decision on first different block
+			return 0;
+		}
+		int cmp_bigint_builtin(const bigint &a, long long val) noexcept;
+		int cmp_bigint_builtin(const bigint &a, unsigned long long val) noexcept;
+		
+		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+		constexpr int cmp_raw(const fixed_int<bits_1, sign_1> &a, const fixed_int<bits_2, sign_2> &b) noexcept
+		{
+			if constexpr (sign_1 == sign_2) return detail::cmp_wrapped_wrapped<sign_1>(wrap(a), wrap(b)); // if signs are same we're good to go
+			else
+			{
+				if constexpr (sign_1) { if (detail::is_neg(wrap(a))) return -1; } // use negative discrimination
+				else { if (detail::is_neg(wrap(b))) return 1; }
+
+				return detail::cmp_wrapped_wrapped<false>(wrap(a), wrap(b)); // otherwise both are positive, so perform unsigned comparison
+			}
+		}
+		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+		constexpr int cmp_raw(const fixed_int<bits, sign> &a, T b) noexcept
+		{
+			if constexpr (sign == std::is_signed_v<T>) return detail::cmp_wrapped_builtin<sign>(wrap(a), b); // if signs are same we're good to go
+			else
+			{
+				if constexpr (sign) { if (detail::is_neg(wrap(a))) return -1; } // use negative discrimination
+				else { if (b < 0) return 1; } // < 0 test directly because b is a built-in int type
+
+				return detail::cmp_wrapped_builtin<false>(wrap(a), b); // otherwise both are positive, so perform unsigned comparison
+			}
+		}
+
+		int cmp_raw(const bigint &a, const bigint &b) noexcept;
+
+		template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+		int cmp_raw(const bigint &a, T val) noexcept
+		{
+			if constexpr (std::is_signed_v<T>) return detail::cmp_bigint_builtin(a, (long long)val);
+			else return detail::cmp_bigint_builtin(a, (unsigned long long)val);
+		}
+	}
+
+	// represents a collection of formatting settings for parsing values from strings
+	struct parse_fmt
+	{
+		int base = 10; // the base to use for the conversion (must be 10, 16, 8, 2, or 0) (0 is prefix mode)
+
+		// sets all format settings to the defaults
+		constexpr parse_fmt() noexcept = default;
+		// creates a format settings object for the specified base
+		constexpr parse_fmt(int _base) noexcept : base(_base) {}
+		// extracts the format settings from the specified stream
+		explicit parse_fmt(const std::ios_base &stream);
+
+		// attempts to convert str into an integer, storing the result in res. returns true on success.
+		template<std::uint64_t bits, bool sign>
+		[[nodiscard]] bool operator()(detail::fixed_int<bits, sign> &res, std::string_view str) const
+		{
+			if constexpr (sign) return try_parse_signed(wrap(res), str, base); else return try_parse_unsigned(wrap(res), str, base);
+		}
+		[[nodiscard]] bool operator()(detail::bigint &res, std::string_view str) const;
+
+		// converts str into an integer - throws on parse failure.
+		template<std::uint64_t bits, bool sign>
+		[[nodiscard]] detail::fixed_int<bits, sign> operator()(std::string_view str) const { detail::fixed_int<bits, sign> res; if (!operator()(res, str)) throw std::invalid_argument("failed to parse string"); return res; }
+		[[nodiscard]] detail::bigint operator()(std::string_view str) const;
+
+		// attempts to extract a value from the stream, storing the result in res.
+		template<std::uint64_t bits, bool sign>
+		std::istream &operator()(detail::fixed_int<bits, sign> &res, std::istream &istr) const
+		{
+			if constexpr (sign) return extract_signed(wrap(res), istr, base); else return extract_unsigned(wrap(res), istr, base);
+		}
+		std::istream &operator()(detail::bigint &res, std::istream &istr) const;
+	};
+	// represents a collection of formatting settings for converting values to strings
+	struct tostr_fmt
+	{
+		int base = 10;          // the base to use for the conversion (must be 10, 16, 8, or 2)
+		bool showpos = false;   // if set to true positive values printed in decimal will have a '+' sign on the front
+		bool showbase = false;  // if set to true a radix prefix will be appended to the front of the string
+		bool uppercase = false; // if set to true alphabetic characters in the result will be uppercase
+
+		// sets all format settings to the defaults
+		constexpr tostr_fmt() noexcept = default;
+		// creates a format settings object for the specified base
+		constexpr tostr_fmt(int _base) noexcept : base(_base) {}
+		// extracts the format settings from the specified stream
+		explicit tostr_fmt(const std::ios_base &stream);
+
+		// converts the value into a string using these conversion settings
+		template<std::uint64_t bits, bool sign>
+		[[nodiscard]] std::string operator()(const detail::fixed_int<bits, sign> &val) const
+		{
+			auto cpy = val;
+			if constexpr (sign) return detail::tostr_signed(detail::wrap(cpy), *this); else return detail::tostr_unsigned(detail::wrap(cpy), *this);
+		}
+		[[nodiscard]] std::string operator()(const detail::bigint &val) const;
+		[[nodiscard]] std::string operator()(detail::bigint &&val) const;
+
+		// returns the base that should be passed to a parsing function to parse a string created by this formatter
+		constexpr int parse_base() const noexcept { return showbase ? 0 : base; }
+		// returns a parser object that can be used to parse a string created by this formatter
+		constexpr parse_fmt parser() const noexcept { return parse_fmt{ parse_base() }; }
+	};
+
+	// returns -1 if a < b, 1 if a > b, or 0 if a == b
+	template<typename T, typename U, std::enable_if_t<detail::comparable<T, U>, int> = 0>
+	[[nodiscard]] constexpr int cmp(const T &a, const U &b) noexcept
+	{
+		if constexpr (detail::is_biggerints_type<T>::value) return detail::cmp_raw(a, b);
+		else return -detail::cmp_raw(b, a);
+	}
+
+	// performs both division and modulus with the specified arguments. returns a pair of values: (quotient, remainder).
+	// as with normal division and modulus, throws std::domain_error if the denominator is zero.
+	template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
+	[[nodiscard]] constexpr auto divmod(const detail::fixed_int<bits_1, sign_1> &num, const detail::fixed_int<bits_2, sign_2> &den)
+	{
+		typedef detail::mix_result_t<bits_1, sign_1, bits_2, sign_2> res_t;
+
+		if constexpr (bits_1 == bits_2)
+		{
+			if (!detail::nonzero(wrap(den))) throw std::domain_error("divide by zero");
+			std::pair<res_t, res_t> res(0ull, 0ull); // must initialize these to zero
+
+			if constexpr (sign_1 && sign_2)
+			{
+				auto num_cpy = num;
+				auto den_cpy = den;
+				detail::divmod_unchecked_already_zero(wrap(res.first), wrap(res.second), wrap(num_cpy), wrap(den_cpy));
+			}
+			else detail::divmod_unchecked_positive_already_zero(wrap(res.first), wrap(res.second), wrap(num), wrap(den));
+
+			return res;
+		}
+		else if constexpr (bits_1 < bits_2) return BiggerInts::divmod((res_t)num, den);
+		else return BiggerInts::divmod(num, (res_t)den);
+	}
+	template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+	[[nodiscard]] constexpr std::pair<detail::fixed_int<bits, sign>, detail::fixed_int<bits, sign>> divmod(const detail::fixed_int<bits, sign> &num, T den)
+	{
+		return BiggerInts::divmod(num, (detail::fixed_int<bits, std::is_signed_v<T>>)den);
+	}
+	template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
+	[[nodiscard]] constexpr std::pair<detail::fixed_int<bits, sign>, detail::fixed_int<bits, sign>> divmod(T num, const detail::fixed_int<bits, sign> &den)
+	{
+		return BiggerInts::divmod((detail::fixed_int<bits, std::is_signed_v<T>>)num, den);
+	}
+	[[nodiscard]] std::pair<detail::bigint, detail::bigint> divmod(const detail::bigint &num, const detail::bigint &den);
+	[[nodiscard]] std::pair<detail::bigint, detail::bigint> divmod(detail::bigint &&num, const detail::bigint &den);
+	[[nodiscard]] std::pair<detail::bigint, detail::bigint> divmod(const detail::bigint &num, detail::bigint &&den);
+	[[nodiscard]] std::pair<detail::bigint, detail::bigint> divmod(detail::bigint &&num, detail::bigint &&den);
+
+	namespace detail
+	{
+		// -- fixed-sized int type selection -- //
+
+		template<std::uint64_t bits, bool sign> struct fixed_int_selector { typedef detail::fixed_int<bits, sign> type; };
+		template<bool sign> struct fixed_int_selector<64, sign> { typedef std::conditional_t<sign, std::int64_t, std::uint64_t> type; };
+		template<bool sign> struct fixed_int_selector<32, sign> { typedef std::conditional_t<sign, std::int32_t, std::uint32_t> type; };
+		template<bool sign> struct fixed_int_selector<16, sign> { typedef std::conditional_t<sign, std::int16_t, std::uint16_t> type; };
+		template<bool sign> struct fixed_int_selector<8, sign> { typedef std::conditional_t<sign, std::int8_t, std::uint8_t> type; };
 
 		// -- container impl -- //
 
@@ -672,11 +805,7 @@ namespace BiggerInts
 			}
 			template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
 			constexpr fixed_int &operator*=(T val) noexcept { *this = *this * val; return *this; }
-			fixed_int &operator*=(const bigint &other) noexcept
-			{
-				if (std::uint64_t v = (std::uint64_t)other; other == v) *this = *this * v; else *this = *this * (fixed_int<bits, !sign>)other; // if other is u64 we can use optimized impl, otherwise downcast and do slow way (opposite sign cast - see above)
-				return *this;
-			}
+			fixed_int &operator*=(const bigint &other) noexcept { return *this *= (fixed_int<bits, !sign>)other; } // opposite sign to avoid self referencing check at compile time
 
 			template<std::uint64_t _bits, bool _sign>
 			constexpr fixed_int &operator/=(const fixed_int<_bits, _sign> &other) noexcept
@@ -895,9 +1024,6 @@ namespace BiggerInts
 
 		bool cmp_less_non_negative(const bigint &a, const bigint &b) noexcept;
 
-		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
-		using mix_result_t = fixed_int<detail::max(bits_1, bits_2), (bits_1 > bits_2 ? sign_1 : bits_2 > bits_1 ? sign_2 : sign_1 == sign_2 ? sign_1 : false)>;
-
 		// -- add -- //
 
 		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
@@ -1063,101 +1189,14 @@ namespace BiggerInts
 		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
 		[[nodiscard]] constexpr auto operator%(T num, const fixed_int<bits, sign> &den) noexcept { return BiggerInts::divmod(num, den).second; }
 
-		// -- cmp -- //
+		// -- cmp ops -- //
 
-		template<bool sign>
-		constexpr int cmp_wrapped_wrapped(const_fixed_int_wrapper a, const_fixed_int_wrapper b) noexcept
-		{
-			if (b.blocks_n > a.blocks_n) return -detail::cmp_wrapped_wrapped<sign>(b, a); // wolog let a be at least as large as b (in physical size)
-			else
-			{
-				if constexpr (sign)
-				{
-					const bool a_neg = detail::is_neg(a);
-					const bool b_neg = detail::is_neg(b);
-					if (a_neg ^ b_neg) return a_neg ? -1 : 1; // if they have different signs we know right away
-				}
-
-				if (a.blocks_n > b.blocks_n)
-				{
-					std::uint64_t fill = 0;
-					if constexpr (sign) fill = detail::is_neg(b) ? 0xffffffffffffffffull : 0ull;
-					for (std::size_t i = a.blocks_n; i-- > b.blocks_n; ) if (a.blocks[i] != fill) // if a has higher magnitude than b we can tell (immediately for unsigned, or from sign bit for signed)
-					{
-						if constexpr (!sign) return 1;
-						else return detail::is_neg(a) ? -1 : 1;
-					}
-				}
-
-				for (std::size_t i = b.blocks_n; i-- > 0; ) if (a.blocks[i] != b.blocks[i]) return a.blocks[i] < b.blocks[i] ? -1 : 1; // otherwise base decision on first different block
-
-				return 0; // otherwise they're equal
-			}
-		}
-		template<bool sign>
-		constexpr int cmp_wrapped_builtin(const_fixed_int_wrapper a, std::conditional_t<sign, long long, unsigned long long> val) noexcept
-		{
-			std::uint64_t fill = 0;
-			if constexpr (sign) fill = val < 0 ? 0xffffffffffffffffull : 0ull;
-			for (std::size_t i = a.blocks_n - 1; i > 0; --i) if (a.blocks[i] != fill) // if a has higher magnitude than b we can tell (immediately for unsigned, or from sign bit for signed)
-			{
-				if constexpr (!sign) return 1;
-				else return detail::is_neg(a) ? -1 : 1;
-			}
-			if (a.blocks[0] != (std::uint64_t)val) return a.blocks[0] < (std::uint64_t)val ? -1 : 1; // otherwise base decision on first different block
-			return 0;
-		}
-		int cmp_bigint_builtin(const bigint &a, long long val) noexcept;
-		int cmp_bigint_builtin(const bigint &a, unsigned long long val) noexcept;
-		
-		// -----------------------------------------------------------------------
-
-		template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
-		constexpr int cmp_raw(const fixed_int<bits_1, sign_1> &a, const fixed_int<bits_2, sign_2> &b) noexcept
-		{
-			if constexpr (sign_1 == sign_2) return detail::cmp_wrapped_wrapped<sign_1>(wrap(a), wrap(b)); // if signs are same we're good to go
-			else
-			{
-				if constexpr (sign_1) { if (detail::is_neg(wrap(a))) return -1; } // use negative discrimination
-				else { if (detail::is_neg(wrap(b))) return 1; }
-
-				return detail::cmp_wrapped_wrapped<false>(wrap(a), wrap(b)); // otherwise both are positive, so perform unsigned comparison
-			}
-		}
-		template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
-		constexpr int cmp_raw(const fixed_int<bits, sign> &a, T b) noexcept
-		{
-			if constexpr (sign == std::is_signed_v<T>) return detail::cmp_wrapped_builtin<sign>(wrap(a), b); // if signs are same we're good to go
-			else
-			{
-				if constexpr (sign) { if (detail::is_neg(wrap(a))) return -1; } // use negative discrimination
-				else { if (b < 0) return 1; } // < 0 test directly because b is a built-in int type
-
-				return detail::cmp_wrapped_builtin<false>(wrap(a), b); // otherwise both are positive, so perform unsigned comparison
-			}
-		}
-
-		int cmp_raw(const bigint &a, const bigint &b) noexcept;
-
-		template<typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
-		int cmp_raw(const bigint &a, T val) noexcept
-		{
-			if constexpr (std::is_signed_v<T>) return detail::cmp_bigint_builtin(a, (long long)val);
-			else return detail::cmp_bigint_builtin(a, (unsigned long long)val);
-		}
-
-		// -----------------------------------------------------------------------
-
-		template<typename T> inline constexpr bool is_biggerints_or_builtin = detail::is_biggerints_type<T>::value || detail::is_builtin_int<T>::value;
-
-		template<typename T, typename U> inline constexpr bool comparable = (detail::is_biggerints_type<T>::value && detail::is_biggerints_or_builtin<U>) || (detail::is_biggerints_type<U>::value && detail::is_biggerints_or_builtin<T>);
-
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator==(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) == 0; }
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator!=(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) != 0; }
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator<(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) < 0; }
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator<=(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) <= 0; }
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator>(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) > 0; }
-		template<typename T, typename U, std::enable_if_t<comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator>=(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) >= 0; }
+		template<typename T, typename U, std::enable_if_t<detail::comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator==(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) == 0; }
+		template<typename T, typename U, std::enable_if_t<detail::comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator!=(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) != 0; }
+		template<typename T, typename U, std::enable_if_t<detail::comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator<(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) < 0; }
+		template<typename T, typename U, std::enable_if_t<detail::comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator<=(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) <= 0; }
+		template<typename T, typename U, std::enable_if_t<detail::comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator>(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) > 0; }
+		template<typename T, typename U, std::enable_if_t<detail::comparable<T, U>, int> = 0> [[nodiscard]] constexpr bool operator>=(const T &a, const U &b) noexcept { return BiggerInts::cmp(a, b) >= 0; }
 
 		// -- io -- //
 
@@ -1187,48 +1226,6 @@ namespace BiggerInts
 	template<std::uint64_t bits> using uint_t = typename detail::fixed_int_selector<bits, false>::type;
 	template<std::uint64_t bits> using int_t = typename detail::fixed_int_selector<bits, true>::type;
 	using bigint = detail::bigint;
-
-	// returns -1 if a < b, 1 if a > b, or 0 if a == b
-	template<typename T, typename U, std::enable_if_t<detail::comparable<T, U>, int> = 0>
-	[[nodiscard]] constexpr int cmp(const T &a, const U &b) noexcept
-	{
-		if constexpr (detail::is_biggerints_type<T>::value) return detail::cmp_raw(a, b);
-		else return -detail::cmp_raw(b, a);
-	}
-
-	// performs both division and modulus with the specified arguments. returns a pair of values: (quotient, remainder).
-	// as with normal division and modulus, throws std::domain_error if the denominator is zero.
-	template<std::uint64_t bits_1, bool sign_1, std::uint64_t bits_2, bool sign_2>
-	[[nodiscard]] constexpr auto divmod(const detail::fixed_int<bits_1, sign_1> &num, const detail::fixed_int<bits_2, sign_2> &den)
-	{
-		typedef detail::mix_result_t<bits_1, sign_1, bits_2, sign_2> res_t;
-
-		if constexpr (bits_1 == bits_2)
-		{
-			if (!detail::nonzero(wrap(den))) throw std::domain_error("divide by zero");
-			std::pair<res_t, res_t> res(0ull, 0ull); // must initialize these to zero
-
-			if constexpr (sign_1 && sign_2)
-			{
-				auto num_cpy = num;
-				auto den_cpy = den;
-				detail::divmod_unchecked_already_zero(wrap(res.first), wrap(res.second), wrap(num_cpy), wrap(den_cpy));
-			}
-			else detail::divmod_unchecked_positive_already_zero(wrap(res.first), wrap(res.second), wrap(num), wrap(den));
-
-			return res;
-		}
-		else if constexpr (bits_1 < bits_2) return BiggerInts::divmod((res_t)num, den);
-		else return BiggerInts::divmod(num, (res_t)den);
-	}
-	template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
-	[[nodiscard]] constexpr auto divmod(const detail::fixed_int<bits, sign> &num, T den) { return BiggerInts::divmod(num, (detail::fixed_int<bits, std::is_signed_v<T>>)den); }
-	template<std::uint64_t bits, bool sign, typename T, std::enable_if_t<detail::is_builtin_int<T>::value, int> = 0>
-	[[nodiscard]] constexpr auto divmod(T num, const detail::fixed_int<bits, sign> &den) { return BiggerInts::divmod((detail::fixed_int<bits, std::is_signed_v<T>>)num, den); }
-	[[nodiscard]] std::pair<bigint, bigint> divmod(const bigint &num, const bigint &den);
-	[[nodiscard]] std::pair<bigint, bigint> divmod(bigint &&num, const bigint &den);
-	[[nodiscard]] std::pair<bigint, bigint> divmod(const bigint &num, bigint &&den);
-	[[nodiscard]] std::pair<bigint, bigint> divmod(bigint &&num, bigint &&den);
 }
 
 // -- std info definitions -- //

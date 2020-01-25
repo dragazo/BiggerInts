@@ -922,7 +922,7 @@ std::string tostr_positive_oct(T val, const tostr_fmt &fmt, char sign_ch)
 	return str;
 }
 template<typename T, std::enable_if_t<std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint&>, int> = 0>
-std::string tostr_positive_dec(T val, const tostr_fmt &fmt, char sign_ch)
+std::string tostr_positive_dec(T val, const tostr_fmt &/*fmt*/, char sign_ch)
 {
 	constexpr bool is_bigint = std::is_same_v<T, bigint&>;
 
@@ -1044,7 +1044,7 @@ template<typename S, typename T>
 inline constexpr bool parse_allowed = (std::is_same_v<S, std::istream&> || std::is_same_v<S, string_reader>) && (std::is_same_v<T, detail::fixed_int_wrapper> || std::is_same_v<T, bigint&>);
 
 template<typename S, typename T, std::enable_if_t<parse_allowed<S, T>, int> = 0>
-bool try_parse_positive_hex(S src, T val, int base, bool skipws = true)
+bool try_parse_positive_hex(S src, T val, int /*base*/, bool skipws = true)
 {
 	constexpr bool is_string = std::is_same_v<S, string_reader>;
 	constexpr bool is_bigint = std::is_same_v<T, bigint&>;
@@ -1127,7 +1127,7 @@ bool try_parse_positive_hex(S src, T val, int base, bool skipws = true)
 	else return true;
 }
 template<typename S, typename T, std::enable_if_t<parse_allowed<S, T>, int> = 0>
-bool try_parse_positive_bin(S src, T val, int base, bool skipws = true)
+bool try_parse_positive_bin(S src, T val, int /*base*/, bool skipws = true)
 {
 	constexpr bool is_string = std::is_same_v<S, string_reader>;
 	constexpr bool is_bigint = std::is_same_v<T, bigint&>;
@@ -1212,7 +1212,7 @@ bool try_parse_positive_bin(S src, T val, int base, bool skipws = true)
 	else return true;
 }
 template<typename S, typename T, std::enable_if_t<parse_allowed<S, T>, int> = 0>
-bool try_parse_positive_oct(S src, T val, int base, bool skipws = true)
+bool try_parse_positive_oct(S src, T val, int /*base*/, bool skipws = true)
 {
 	constexpr bool is_string = std::is_same_v<S, string_reader>;
 	constexpr bool is_bigint = std::is_same_v<T, bigint&>;
@@ -1296,7 +1296,7 @@ bool try_parse_positive_oct(S src, T val, int base, bool skipws = true)
 	else return true;
 }
 template<typename S, typename T, std::enable_if_t<parse_allowed<S, T>, int> = 0>
-bool try_parse_positive_dec(S src, T val, int base, bool skipws = true)
+bool try_parse_positive_dec(S src, T val, int /*base*/, bool skipws = true)
 {
 	constexpr bool is_string = std::is_same_v<S, string_reader>;
 	constexpr bool is_bigint = std::is_same_v<T, bigint&>;
