@@ -656,12 +656,116 @@ static constexpr std::uint64_t _factorial_lookups[] = {
 	1307674368000, 20922789888000, 355687428096000, 6402373705728000, 121645100408832000, 2432902008176640000
 };
 static constexpr std::uint64_t _factorial_lookups_count = sizeof(_factorial_lookups) / sizeof(*_factorial_lookups);
-bigint bigint::factorial(std::uint64_t v)
+bigint bigint::factorial(const bigint &big_v)
 {
+	if (detail::is_neg(big_v)) throw std::domain_error("negative value passed to bigint::factorial()");
+	if (big_v.blocks.size() == 0) return 1; // 0! = 1
+	if (big_v.blocks.size() > 1) throw std::domain_error("value passed to bigint::factorial() was too large"); // don't even attempt to calc in this case (very very large)
+
+	std::uint64_t v = big_v.blocks[0];
 	if (v < _factorial_lookups_count) return _factorial_lookups[v];
+
 	bigint res = _factorial_lookups[_factorial_lookups_count - 1];
-	for (std::uint64_t i = _factorial_lookups_count; i <= v; ++i) res *= i;
+	for (bigint i = _factorial_lookups_count; i <= v; ++i) res *= i;
+
 	return res;
+}
+
+bigint bigint::permutations(const bigint &n, const bigint &k)
+{
+	bigint p = n - k;
+	if (detail::is_neg(k) || detail::is_neg(p)) throw std::domain_error("invalid input to bigint::permutations()");
+
+	bigint res = 1;
+	while (p < n)
+	{
+		++p;
+		res *= p;
+	}
+
+	return res;
+}
+
+bigint bigint::combinations(const bigint &big_n, const bigint &big_k)
+{
+	int _cmp = cmp(big_n, big_k);
+	if (detail::is_neg(big_k) || _cmp < 0) throw std::domain_error("invalid input to bigint::combinations()");
+	if (big_k.blocks.size() == 0 || _cmp == 0) return 1; // C(n, 0) = C(n, n) = 1
+	if (big_n.blocks.size() > 1) throw std::domain_error("value passed to bigint::combinations() was too large"); // don't even attempt to calc in this case (very very long/big computation/value)
+
+	// from above: n > k > 0 and #n blocks = #k blocks = 1
+	// convert n and k to builtin types for speed
+	std::uint64_t n = big_n.blocks[0];
+	std::uint64_t k = big_k.blocks[0];
+
+	std::vector<bigint> c(k + 1); // set aside space for our dynamic programming solution. source: https://www.geeksforgeeks.org/binomial-coefficient-dp-9/
+								  // k + 1 can't overflow because big_k >= 0 and has only 1 block, which is signed (so 63-bit unsigned val at most)
+	c[0] = 1;
+	for (std::uint64_t i = 1; i <= n; ++i)
+	{
+		for (std::uint64_t j = detail::min(i, k); j > 0; --j) c[j] += c[j - 1];
+	}
+	return c[k];
+}
+
+fibonacci_generator &fibonacci_generator::next(std::size_t n) &
+{
+	using std::swap;
+
+	for (std::size_t half = n / 2; half-- > 0; )
+	{
+		a += b;
+		b += a;
+	}
+	if (n & 1)
+	{
+		a += b;
+		swap(a, b);
+	}
+	return *this;
+}
+
+static std::uint64_t _fib[] = {
+	0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765, 10946, 17711, 28657, 46368, 75025, 121393, 196418, 317811, 514229, 832040,
+	1346269, 2178309, 3524578, 5702887, 9227465, 14930352, 24157817, 39088169, 63245986, 102334155, 165580141, 267914296, 433494437, 701408733, 1134903170, 1836311903,
+	2971215073, 4807526976, 7778742049, 12586269025, 20365011074, 32951280099, 53316291173, 86267571272, 139583862445, 225851433717, 365435296162, 591286729879, 956722026041,
+	1548008755920, 2504730781961, 4052739537881, 6557470319842, 10610209857723, 17167680177565, 27777890035288, 44945570212853, 72723460248141, 117669030460994, 190392490709135,
+	308061521170129, 498454011879264, 806515533049393, 1304969544928657, 2111485077978050, 3416454622906707, 5527939700884757, 8944394323791464, 14472334024676221, 23416728348467685,
+	37889062373143906, 61305790721611591, 99194853094755497, 160500643816367088, 259695496911122585, 420196140727489673, 679891637638612258, 1100087778366101931, 1779979416004714189, 
+	2880067194370816120, 4660046610375530309, 7540113804746346429, 12200160415121876738,
+};
+static constexpr std::size_t _fib_n = sizeof(_fib) / sizeof(*_fib);
+bigint bigint::fibonacci(const bigint &big_n)
+{
+	if (detail::is_neg(big_n)) throw std::domain_error("argument to bigint::fibonacci() too large");
+	if (big_n.blocks.size() == 0) return {};
+	if (big_n.blocks.size() > 1) throw std::domain_error("argument to bigint::fibonacci() was too large");
+
+	// get the index of the fibonacci number to generate
+	std::uint64_t n = big_n.blocks[0];
+	if constexpr (sizeof(std::uint64_t) != sizeof(std::size_t))
+	{
+		if (n != (std::size_t)n) throw std::domain_error("argument to bigint::fibonacci() was too large"); // this would result in gigabytes of bigint data anyway...
+	}
+
+	if (n < _fib_n) return _fib[n];
+	else {
+		fibonacci_generator g{ _fib[_fib_n - 2], _fib[_fib_n - 1] };
+		g.next(n - _fib_n + 1);
+		return std::move(g.b); // by returning b (instead of a like current() would do) we save 1 bigint addition (hence why line above isn't +2)
+	}
+}
+
+bigint bigint::catalan(bigint n)
+{
+	bigint n2 = n;
+	n2 <<= 1;
+
+	bigint c = bigint::combinations(n2, n);
+	++n;
+	c /= n;
+
+	return c;
 }
 
 // given a hex character, converts it to an integer [0, 15] - returns true if it was a valid hex digit. ch is only meaningful on success.

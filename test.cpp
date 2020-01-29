@@ -550,7 +550,31 @@ void bigboi_tests()
 	big_mul = big_mul + 0;
 	big_mul = 0 + big_mul;
 	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+
 	big_mul -= 0;
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	big_mul -= 0u;
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+
+	big_mul -= 1;
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119312");
+	big_mul -= 1u;
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119311");
+	big_mul -= -2;
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+
+	big_mul += 1;
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119314");
+	big_mul += 1u;
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119315");
+	big_mul -= 2;
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+
+	big_mul += 0;
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+	big_mul += 0u;
+	assert(sstostr(big_mul) == "649929522190444530768966266652239714986927778859800606430979456248119313");
+
 	big_mul = big_mul - (decltype(big_mul))0;
 	big_mul = (decltype(big_mul))0 - big_mul;
 	big_mul = big_mul - 0;
@@ -2165,9 +2189,275 @@ void factorial_tests()
 
 		for (std::size_t i = 0; i < factorial_test_count; ++i)
 		{
-			bigint v = bigint::factorial(i);
-			assert(sstostr(v) == factorial_tests[i]);
+			auto v = bigint::factorial(i).tostr();
+			if (v != factorial_tests[i])
+			{
+				std::cerr << "factorial test failed: " << i << " -> " << v << '\n';
+				assert(false);
+			}
 		}
+
+		assert_throws(std::domain_error, (void)bigint::factorial(-1));
+	}
+}
+void permutations_tests()
+{
+	struct { bigint n; bigint k; const char *res; } tests[] = {
+		{0, 0, "1"},
+		{1, 0, "1"},
+		{1, 1, "1"},
+		{5, 0, "1"},
+		{5, 1, "5"},
+		{5, 2, "20"},
+		{5, 3, "60"},
+		{5, 4, "120"},
+		{5, 5, "120"},
+		{100, 75, "6016694711968623882171660390783105677486492244591079720337239243222034038087369825088224575505981006095571218333696000000000000000000"},
+		{200, 75, "4189023360170683260161631881611536672938884242083090607268150639294382052066366890901576899694980216175686861923988774553247948481415187518134943744000000000000000000"},
+		{500, 250, "3774175922216835020368651342048161203016222293638941665928877219217445881377928623068568189795440094371790"
+				   "0799840981483797266170579267515579194769472361974671055670384837797596463739964931338112075023472499152448"
+				   "9488294500276852773918850186560918838230568235779349576671635209831905721310948915399707305574854387728086"
+				   "3562393701284668570328464236141578756337239393445221356331645802580383220317862735227956256872025520834883"
+				   "3487987715612870426370188785873294490023955448947910645454174307665134422966031758060407444384114352803887"
+				   "3372900590571613564545515392588480885427622694092800000000000000000000000000000000000000000000000000000000000000"},
+	};
+
+	for (const auto &i : tests)
+	{
+		auto res = bigint::permutations(i.n, i.k).tostr();
+		if (res != i.res)
+		{
+			std::cerr << "failed permutation: " << i.n << " nPr " << i.k << " -> " << res << '\n';
+			assert(false);
+		}
+	}
+
+	assert_throws(std::domain_error, (void)bigint::permutations(-1, 1));
+	assert_throws(std::domain_error, (void)bigint::permutations(1, -1));
+	assert_throws(std::domain_error, (void)bigint::permutations(5, 6));
+}
+void combinations_tests()
+{
+	struct { bigint n; bigint k; const char *res; } tests[] = {
+		{0, 0, "1"},
+		{1, 0, "1"},
+		{1, 1, "1"},
+		{5, 0, "1"},
+		{5, 1, "5"},
+		{5, 2, "10"},
+		{5, 3, "10"},
+		{5, 4, "5"},
+		{5, 5, "1"},
+		{20, 7, "77520"},
+		{20, 17, "1140"},
+		{200, 20, "1613587787967350073386147640"},
+		{500, 250, "116744315788277682920934734762176619659230081180311446124100284957811112673608473715666417775521605376810865902709989580160037468226393900042796872256"},
+		{500, 369, "3145412414484483458163521552138272018423430868818250999541541571022382477902647976318488695176100913223668230468568606118500"},
+	};
+
+	for (const auto &i : tests)
+	{
+		auto res = bigint::combinations(i.n, i.k).tostr();
+		if (res != i.res)
+		{
+			std::cerr << "failed combinations: " << i.n << " nPr " << i.k << " -> " << res << '\n';
+			assert(false);
+		}
+	}
+
+	assert_throws(std::domain_error, (void)bigint::combinations(-1, 1));
+	assert_throws(std::domain_error, (void)bigint::combinations(1, -1));
+	assert_throws(std::domain_error, (void)bigint::combinations(5, 6));
+}
+void catalan_tests()
+{
+	const char *answers[] =
+	{
+		"1",
+		"1",
+		"2",
+		"5",
+		"14",
+		"42",
+		"132",
+		"429",
+		"1430",
+		"4862",
+		"16796",
+		"58786",
+		"208012",
+		"742900",
+		"2674440",
+		"9694845",
+		"35357670",
+		"129644790",
+		"477638700",
+		"1767263190",
+		"6564120420",
+		"24466267020",
+		"91482563640",
+		"343059613650",
+		"1289904147324",
+		"4861946401452",
+	};
+	constexpr std::size_t answers_n = sizeof(answers) / sizeof(*answers);
+
+	for (std::size_t i = 0; i < answers_n; ++i)
+	{
+		auto res = bigint::catalan(i).tostr();
+		if (res != answers[i])
+		{
+			std::cerr << "failed catalan sequence: " << i << " -> " << res << '\n';
+			assert(false);
+		}
+	}
+
+	assert_throws(std::domain_error, (void)bigint::catalan(-1));
+}
+void fibonacci_tests()
+{
+	const char *answers[] = {
+		"0",
+		"1",
+		"1",
+		"2",
+		"3",
+		"5",
+		"8",
+		"13",
+		"21",
+		"34",
+		"55",
+		"89",
+		"144",
+		"233",
+		"377",
+		"610",
+		"987",
+		"1597",
+		"2584",
+		"4181",
+		"6765",
+		"10946",
+		"17711",
+		"28657",
+		"46368",
+		"75025",
+		"121393",
+		"196418",
+		"317811",
+		"514229",
+		"832040",
+		"1346269",
+		"2178309",
+		"3524578",
+		"5702887",
+		"9227465",
+		"14930352",
+		"24157817",
+		"39088169",
+		"63245986",
+		"102334155",
+		"165580141",
+		"267914296",
+		"433494437",
+		"701408733",
+		"1134903170",
+		"1836311903",
+		"2971215073",
+		"4807526976",
+		"7778742049",
+		"12586269025",
+		"20365011074",
+		"32951280099",
+		"53316291173",
+		"86267571272",
+		"139583862445",
+		"225851433717",
+		"365435296162",
+		"591286729879",
+		"956722026041",
+		"1548008755920",
+		"2504730781961",
+		"4052739537881",
+		"6557470319842",
+		"10610209857723",
+	};
+	constexpr std::size_t answers_n = sizeof(answers) / sizeof(*answers);
+
+	for (std::size_t i = 0; i < answers_n; ++i)
+	{
+		if (auto res = bigint::fibonacci(i).tostr(); res != answers[i])
+		{
+			std::cerr << "failed fibonacci: " << i << " -> " << res << '\n';
+			assert(false);
+		}
+	}
+	for (std::size_t i = 1; i < answers_n; ++i)
+	{
+		if (auto res = fibonacci_generator{}.next(i).current().tostr(); res != answers[i])
+		{
+			std::cerr << "failed fibonacci: " << i << " -> " << res << '\n';
+			assert(false);
+		}
+	}
+
+	fibonacci_generator gen;
+	for (std::size_t i = 0; i < answers_n; ++i)
+	{
+		auto res = gen.current().tostr();
+		if (res != answers[i])
+		{
+			std::cerr << "failed fibonacci: " << i << " -> " << res << '\n';
+			assert(false);
+		}
+		gen.next();
+	}
+
+	{
+		fibonacci_generator g;
+		assert(g.current() == 0); g.next();
+		assert(g.current() == 1); g.next();
+		assert(g.current() == 1); g.next();
+		assert(g.current() == 2); g.next();
+		assert(g.current() == 3); g.next();
+		assert(g.current() == 5);
+
+		g.next(0);
+		assert(g.current() == 5);
+	}
+
+	{
+		auto v = bigint::fibonacci(92);
+		assert(v.tostr() == "7540113804746346429");
+		assert(v <= std::numeric_limits<std::uint64_t>::max());
+		assert((std::uint64_t)v == v);
+
+		assert(fibonacci_generator{}.next(92).current() == v);
+	}
+	{
+		auto v = bigint::fibonacci(93);
+		assert(v.tostr() == "12200160415121876738");
+		assert(v <= std::numeric_limits<std::uint64_t>::max());
+		assert((std::uint64_t)v == v);
+
+		assert(fibonacci_generator{}.next(93).current() == v);
+	}
+	{
+		auto v = bigint::fibonacci(94);
+		assert(v.tostr() == "19740274219868223167");
+		assert(v > std::numeric_limits<std::uint64_t>::max());
+		assert((std::uint64_t)v != v);
+
+		assert(fibonacci_generator{}.next(94).current() == v);
+	}
+	{
+		auto v = bigint::fibonacci(95);
+		assert(v.tostr() == "31940434634990099905");
+		assert(v > std::numeric_limits<std::uint64_t>::max());
+		assert((std::uint64_t)v != v);
+
+		assert(fibonacci_generator{}.next(95).current() == v);
 	}
 }
 void divmod_sign_tests()
@@ -2422,16 +2712,23 @@ void compound_assignment()
 		uint_t<256> v = 65u;
 		assert(v == 65u);
 
+		v &= -1; assert(v == 65u);
 		v &= 1; assert(v == 1u);
 		v |= 2; assert(v == 3u);
 		v &= 1u; assert(v == 1u);
 		v |= 2u; assert(v == 3u);
 		v ^= 1; assert(v == 2u);
 		v ^= 1u; assert(v == 3u);
+		v |= -1; assert(v == uint_t<256>(-1));
+		v ^= 0; assert(v == uint_t<256>(-1));
+		v ^= 0u; assert(v == uint_t<256>(-1));
+		v ^= -1; assert(v == 0);
 
 		v = 65u;
+		v &= int_t<128>{-1}; assert(v == 65u);
 		v &= int_t<128>{1}; assert(v == 1u);
 		v |= int_t<128>{2}; assert(v == 3u);
+		v &= uint_t<128>{-1}; assert(v == 3u);
 		v &= uint_t<128>{1}; assert(v == 1u);
 		v |= uint_t<128>{2}; assert(v == 3u);
 		v ^= int_t<128>{1}; assert(v == 2u);
@@ -2757,6 +3054,10 @@ int main()
 	misc_tests();
 	pow_tests();
 	factorial_tests();
+	permutations_tests();
+	combinations_tests();
+	fibonacci_tests();
+	catalan_tests();
 	divmod_sign_tests();
 	extract_termpos_tests();
 	compound_assignment();
