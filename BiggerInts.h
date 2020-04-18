@@ -1363,14 +1363,6 @@ namespace std
 {
 	// -- bigint info -- //
 
-	template<> struct is_integral<BiggerInts::detail::bigint> : std::true_type {};
-
-	template<> struct is_signed<BiggerInts::detail::bigint> : std::true_type {};
-	template<> struct is_unsigned<BiggerInts::detail::bigint> : std::true_type {};
-
-	template<> struct make_signed<BiggerInts::detail::bigint> { typedef BiggerInts::detail::bigint type; };
-	template<> struct make_unsigned<BiggerInts::detail::bigint> { typedef BiggerInts::detail::bigint type; };
-
 	template<> struct numeric_limits<BiggerInts::detail::bigint>
 	{
 		static constexpr bool is_specialized = true;
@@ -1409,14 +1401,6 @@ namespace std
 	};
 
 	// -- fixed_int info -- //
-
-	template<std::uint64_t bits, bool sign> struct is_integral<BiggerInts::detail::fixed_int<bits, sign>> : std::true_type {};
-
-	template<std::uint64_t bits, bool sign> struct is_signed<BiggerInts::detail::fixed_int<bits, sign>> : std::integral_constant<bool, sign> {};
-	template<std::uint64_t bits, bool sign> struct is_unsigned<BiggerInts::detail::fixed_int<bits, sign>> : std::integral_constant<bool, !sign> {};
-
-	template<std::uint64_t bits, bool sign> struct make_signed<BiggerInts::detail::fixed_int<bits, sign>> { typedef BiggerInts::detail::fixed_int<bits, true> type; };
-	template<std::uint64_t bits, bool sign> struct make_unsigned<BiggerInts::detail::fixed_int<bits, sign>> { typedef BiggerInts::detail::fixed_int<bits, false> type; };
 	
 	template<std::uint64_t bits, bool sign> struct numeric_limits<BiggerInts::detail::fixed_int<bits, sign>>
 	{
